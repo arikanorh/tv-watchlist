@@ -85,8 +85,30 @@
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 7px; border-radius: 6px;
     white-space: nowrap; color: var(--text); flex-shrink: 0; line-height: 1.1; }
   .chip:hover { background: var(--bg3); }
-  .chip.on { background: var(--accent-bg); }
+  .chip.on { box-shadow: inset 0 0 0 1px var(--accent); }
+  .chip.s-up-1 { background: rgba(8, 153, 129, .12); }
+  .chip.s-up-2 { background: rgba(8, 153, 129, .24); }
+  .chip.s-up-3 { background: rgba(8, 153, 129, .40); }
+  .chip.s-up-4 { background: rgba(8, 153, 129, .60); }
+  .chip.s-down-1 { background: rgba(242, 54, 69, .12); }
+  .chip.s-down-2 { background: rgba(242, 54, 69, .24); }
+  .chip.s-down-3 { background: rgba(242, 54, 69, .40); }
+  .chip.s-down-4 { background: rgba(242, 54, 69, .60); }
+  .chip[class*="s-up-"] .px, .chip[class*="s-up-"] .chg, .chip[class*="s-down-"] .px, .chip[class*="s-down-"] .chg { color: var(--text); }
+  .row.s-up-1 { background: rgba(8, 153, 129, .08); }
+  .row.s-up-2 { background: rgba(8, 153, 129, .17); }
+  .row.s-up-3 { background: rgba(8, 153, 129, .30); }
+  .row.s-up-4 { background: rgba(8, 153, 129, .46); }
+  .row.s-down-1 { background: rgba(242, 54, 69, .08); }
+  .row.s-down-2 { background: rgba(242, 54, 69, .17); }
+  .row.s-down-3 { background: rgba(242, 54, 69, .30); }
+  .row.s-down-4 { background: rgba(242, 54, 69, .46); }
+  .row.on[class*="s-"] { box-shadow: inset 0 0 0 1px var(--accent); }
   .chip .sym { font-weight: 600; font-size: 13px; color: var(--text); }
+  .chip .sym small { font-weight: 400; font-size: 9px; color: var(--muted); margin-left: 3px; }
+  .chip.nochart, .row.nochart { cursor: default; }
+  .chip.nochart .sym, .row.nochart .sym { color: var(--muted); font-weight: 500; }
+  .chip.nochart:hover, .row.nochart:hover { background: transparent; }
   .chip .q { display: flex; flex-direction: column; align-items: flex-end; }
   .chip .px { font-size: 12px; }
   .chip .chg { font-size: 10px; }
@@ -268,7 +290,7 @@ function seed() {
         g('Other', ['FX_IDC:XAUTRYG','BIST:ALTIN','BIST:GMSTR']),
       ]},
       { id: 'ozet', name: 'Özet', groups: [
-        g('All', ['TVC:VIX','FX:UKOIL','NASDAQ:NDX','SP:SPX','TVC:US10Y','OANDA:XAUUSD','TVC:SILVER','BINANCE:BTCUSDT','BINANCE:ETHUSDT','TVC:DXY','NASDAQ:QQQ','AMEX:SPY','AMEX:RSP','AMEX:IWM','DJ:DJI','TVC:NI225','KRX:KOSPI','FX:USDJPY','INDEX:S5FI','AMEX:XLF']),
+        g('All', ['TVC:VIX','FX:UKOIL','TVC:US10Y','OANDA:XAUUSD','TVC:SILVER','BINANCE:BTCUSDT','BINANCE:ETHUSDT','TVC:DXY','NASDAQ:QQQ','AMEX:SPY','AMEX:RSP','AMEX:IWM','DJ:DJI','TVC:NI225','KRX:KOSPI','FX:USDJPY','INDEX:S5FI','AMEX:XLF']),
       ]},
       { id: 'zorning', name: 'Z-Örning', groups: [
         g('Main', ['NASDAQ:LULU','NASDAQ:MRVL','NASDAQ:META','NASDAQ:NVDA']),
@@ -277,11 +299,13 @@ function seed() {
     ],
   };
 }
-const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'NASDAQ:NDX', 'CAPITALCOM:SPX500': 'SP:SPX', 'TVC:DJI': 'DJ:DJI', 'TVC:UKOIL': 'FX:UKOIL',
+const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'SKILLING:US100', 'CAPITALCOM:SPX500': 'SKILLING:SPX500', 'TVC:DJI': 'DJ:DJI', 'TVC:UKOIL': 'FX:UKOIL',
   'OANDA:XAGUSD': 'TVC:SILVER', 'AMEX:LEU': 'NYSE:LEU', 'NASDAQ:EUV': 'CBOE:EUV', 'NASDAQ:DXYZ': 'NYSE:DXYZ',
-  'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS', 'TVC:VIX': 'CAPITALCOM:VIX' };
+  'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS' };
 const REMOVED = new Set(['NASDAQ:NDX', 'SP:SPX']);  // no chart in the free widget; pinned CFDs cover them
-const DEFAULT_PINS = ['SKILLING:US100', 'SKILLING:SPX500', 'CAPITALCOM:VIX', 'FX:UKOIL', 'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT'];
+// Free widget has no chart for plain indices and BIST; these stay quote-only.
+const noChart = sym => /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|BIST:)/.test(sym);
+const DEFAULT_PINS = ['SKILLING:US100', 'SKILLING:SPX500', 'TVC:VIX', 'FX:UKOIL', 'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT'];
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
@@ -422,7 +446,24 @@ function renderSession() {
 }
 setInterval(renderSession, 30000);
 let regular = false;
+// Market sentiment tint: |chg%| 0.5–1 light, 1–2 medium, 2–5 strong, 5+ strongest; below 0.5 none.
+const SENTIMENT_TIERS = [0.5, 1, 2, 5];
+function sentimentClass(c) {
+  if (c == null) return '';
+  const a = Math.abs(c);
+  const tier = SENTIMENT_TIERS.filter(t => a >= t).length;
+  return tier ? `s-${c > 0 ? 'up' : 'down'}-${tier}` : '';
+}
+function applySentiment() {
+  document.querySelectorAll('#pins .chip, #list .row').forEach(el => {
+    const q = quotes[el.dataset.symbol];
+    // Outside the regular session the extended-session move (pre/post-market) is what matters.
+    const cls = sentimentClass(q ? (!regular && q.e != null ? q.e : q.c) : null);
+    el.className = el.className.replace(/\bs-(up|down)-\d\b/g, '').replace(/\s+/g, ' ').trim() + (cls ? ' ' + cls : '');
+  });
+}
 function renderQuotes() {
+  applySentiment();
   regular = isRegularSession();
   $('panel').classList.toggle('no-ext', regular);
   if (state.detailsOpen) renderDetails();
@@ -526,9 +567,12 @@ function render() {
   $('intervals').innerHTML = INTERVALS.map(([label, v]) =>
     `<button class="iv${v === state.interval ? ' on' : ''}" data-action="interval" data-value="${v}">${label}</button>`).join('');
 
-  $('pins').innerHTML = (state.pinned || []).map(s => `
-    <button class="chip${s === state.symbol ? ' on' : ''}" data-action="select" data-symbol="${esc(s)}" title="${esc(s)}">
-      <span class="sym">${esc(s.includes(':') ? s.split(':')[1] : s)}</span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
+  const pins = state.pinned || [];
+  const shortOf = s => s.includes(':') ? s.split(':')[1] : s;
+  const dup = new Set(pins.map(shortOf).filter((x, i, a) => a.indexOf(x) !== i));
+  $('pins').innerHTML = pins.map(s => `
+    <button class="chip${s === state.symbol ? ' on' : ''}${noChart(s) ? ' nochart' : ''}" ${noChart(s) ? '' : 'data-action="select"'} data-symbol="${esc(s)}" title="${esc(s)}${noChart(s) ? ' · no chart in the free widget' : ''}">
+      <span class="sym">${esc(shortOf(s))}${dup.has(shortOf(s)) ? `<small>${esc(s.split(':')[0])}</small>` : ''}</span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
       <span class="x" data-action="unpin" data-symbol="${esc(s)}" title="Unpin">×</span>
     </button>`).join('');
   const single = list.groups.length === 1;
@@ -540,13 +584,14 @@ function render() {
     </div>`}
     ${g.collapsed && !single ? '' : g.symbols.map(s => {
       const sym = s.includes(':') ? s.split(':')[1] : s;
-      return `<div class="row${s === state.symbol ? ' on' : ''}" draggable="true" data-action="select" data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}">
+      return `<div class="row${s === state.symbol ? ' on' : ''}${noChart(s) ? ' nochart' : ''}" draggable="true" ${noChart(s) ? '' : 'data-action="select"'} data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}${noChart(s) ? ' · no chart in the free widget' : ''}">
         <span class="sym">${esc(sym)}</span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
         <button class="icon star${(state.pinned || []).includes(s) ? ' on' : ''}" data-action="${(state.pinned || []).includes(s) ? 'unpin' : 'pin'}" data-symbol="${esc(s)}" title="${(state.pinned || []).includes(s) ? 'Unpin from top' : 'Pin to top'}">${(state.pinned || []).includes(s) ? '★' : '☆'}</button>
         <button class="icon" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}" title="Remove">×</button>
       </div>`; }).join('')}
   `).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
   : `<div class="empty">No groups yet</div><div class="grp" data-action="add-group">+ group</div>`;
+  applySentiment();
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -630,6 +675,7 @@ document.addEventListener('click', e => {
       update(false); wsSync(); break;
     case 'unpin':
       e.stopPropagation();
+      if (el.closest('.chip') && !confirm(`Remove ${el.dataset.symbol} from the top bar?`)) return;
       state.pinned = state.pinned.filter(x => x !== el.dataset.symbol); update(false); wsSync(); break;
     case 'manage-lists':
       renderListDlg(); $('listDlg').showModal(); break;
