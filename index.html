@@ -77,6 +77,21 @@
   .grp.collapsed .chev { transform: rotate(-90deg); }
   .grp .icon { width: 22px; height: 22px; font-size: 12px; opacity: 0; }
   .grp:hover .icon { opacity: 1; }
+  .tape { display: flex; gap: 4px; padding: 4px 10px; overflow-x: auto; scrollbar-width: none; background: var(--bg2);
+    border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  .tape::-webkit-scrollbar { display: none; }
+  .tape:empty { display: none; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; font-size: 12px;
+    white-space: nowrap; color: var(--text); flex-shrink: 0; }
+  .chip:hover { background: var(--bg3); }
+  .chip.on { background: var(--accent-bg); }
+  .chip .sym { font-weight: 600; }
+  .chip .q { display: contents; }
+  .chip .ext, .chip .px:empty, .chip .chg:empty { display: none; }
+  .chip .px.up, .chip .chg.up { color: var(--up); }
+  .chip .px.down, .chip .chg.down { color: var(--down); }
+  .chip .x { color: var(--muted); font-size: 13px; width: 0; overflow: hidden; transition: width .15s; }
+  .chip:hover .x { width: 10px; }
   .cols { display: grid; grid-template-columns: 1fr 76px 60px 70px; gap: 6px; padding: 6px 10px; font-size: 12px;
     color: var(--muted); border-bottom: 1px solid var(--border); }
   .cols span:not(:first-child) { text-align: right; }
@@ -115,6 +130,8 @@
   .row .icon { position: absolute; right: 2px; top: 6px; width: 18px; height: 18px; font-size: 12px; opacity: 0;
     background: var(--bg3); }
   .row:hover .icon { opacity: 1; }
+  .row .icon.star { right: 22px; }
+  .row .icon.star.on { opacity: 1; color: #f7a600; background: transparent; }
   .empty { padding: 20px 12px; color: var(--muted); text-align: center; }
 
   .add { display: flex; gap: 4px; padding: 6px; border-top: 1px solid var(--border); }
@@ -191,6 +208,7 @@
     <svg class="i-show" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
   </button>
 </div>
+<div class="tape" id="pins"></div>
 <div class="body">
   <div class="panel" id="panel">
     <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span title="● pre-market · ● post-market · ● overnight">Ext</span></div>
@@ -208,6 +226,10 @@
 <dialog id="listDlg">
   <div class="dlg-head"><span>Watchlists</span><button class="icon" data-action="close-dlg" title="Close">×</button></div>
   <div id="dlgRows"></div>
+  <form class="dlg-add" id="pinForm" title="Pinned symbols shown above every list, comma separated">
+    <input id="pinInput" placeholder="Pinned: SKILLING:US100, BINANCE:BTCUSDT" autocomplete="off" spellcheck="false">
+    <button type="submit">Pin</button>
+  </form>
   <form class="dlg-add" id="newListForm">
     <input id="newListName" placeholder="New list name" autocomplete="off">
     <button type="submit">Add</button>
@@ -223,10 +245,10 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 function seed() {
   const g = (name, symbols) => ({ name, collapsed: false, symbols });
   return {
-    activeListId: 'abd', interval: '60', symbol: 'NASDAQ:NBIS',
+    activeListId: 'abd', interval: '60', symbol: 'NASDAQ:NBIS', pinned: DEFAULT_PINS.slice(),
     lists: [
       { id: 'abd', name: 'ABD', groups: [
-        g('Index', ['SKILLING:US100', 'SKILLING:SPX500', 'NASDAQ:NDX', 'SP:SPX', 'CME_MINI:NQ1!', 'CME_MINI:ES1!', 'CBOT_MINI:YM1!', 'OKX:US100USDT.P', 'OKX:US500USDT.P']),
+        g('Index', ['SKILLING:US100', 'SKILLING:SPX500', 'CME_MINI:NQ1!', 'CME_MINI:ES1!', 'CBOT_MINI:YM1!', 'OKX:US100USDT.P', 'OKX:US500USDT.P']),
         g('Spot', ['NASDAQ:NBIS','NASDAQ:CRWV','NYSE:BE','NASDAQ:CEG','NYSE:MOD','NASDAQ:AVGO','NASDAQ:ASTS','NASDAQ:UPST','NYSE:AMPX','NYSE:KRMN']),
         g('Moon sh', ['NASDAQ:ONDS','NASDAQ:RCAT','NASDAQ:GRRR','NYSE:TE','NASDAQ:ASPI','NASDAQ:EOSE','NYSE:ORCL','NYSE:NKE']),
       ]},
@@ -252,13 +274,16 @@ function seed() {
 const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'NASDAQ:NDX', 'CAPITALCOM:SPX500': 'SP:SPX', 'TVC:DJI': 'DJ:DJI', 'TVC:UKOIL': 'FX:UKOIL',
   'OANDA:XAGUSD': 'TVC:SILVER', 'AMEX:LEU': 'NYSE:LEU', 'NASDAQ:EUV': 'CBOE:EUV', 'NASDAQ:DXYZ': 'NYSE:DXYZ',
   'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS' };
+const REMOVED = new Set(['NASDAQ:NDX', 'SP:SPX']);  // no chart in the free widget; pinned CFDs cover them
+const DEFAULT_PINS = ['SKILLING:US100', 'SKILLING:SPX500', 'TVC:VIX', 'FX:UKOIL', 'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT'];
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
     if (s && Array.isArray(s.lists) && s.lists.length) {
       const fix = x => SYMBOL_FIXES[x] || x;
       s.symbol = fix(s.symbol);
-      s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix); }));
+      s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix).filter(x => !REMOVED.has(x)); }));
+      if (!Array.isArray(s.pinned)) s.pinned = DEFAULT_PINS.slice();
       return s;
     }
   } catch (e) {}
@@ -449,7 +474,7 @@ function wsConnect() {
 // Subscribe exactly the active list's symbols.
 function wsSync() {
   if (!ws || ws.readyState !== 1) return;
-  const want = flatSymbols(activeList());
+  const want = [...new Set([...(state.pinned || []), ...flatSymbols(activeList())])];
   const add = want.filter(x => !wsSubscribed.includes(x)), del = wsSubscribed.filter(x => !want.includes(x));
   if (del.length) wsSend({ m: 'quote_remove_symbols', p: ['qs', ...del] });
   if (add.length) wsSend({ m: 'quote_add_symbols', p: ['qs', ...add] });
@@ -485,6 +510,11 @@ function render() {
   $('intervals').innerHTML = INTERVALS.map(([label, v]) =>
     `<button class="iv${v === state.interval ? ' on' : ''}" data-action="interval" data-value="${v}">${label}</button>`).join('');
 
+  $('pins').innerHTML = (state.pinned || []).map(s => `
+    <button class="chip${s === state.symbol ? ' on' : ''}" data-action="select" data-symbol="${esc(s)}" title="${esc(s)}">
+      <span class="sym">${esc(s.includes(':') ? s.split(':')[1] : s)}</span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
+      <span class="x" data-action="unpin" data-symbol="${esc(s)}" title="Unpin">×</span>
+    </button>`).join('');
   const single = list.groups.length === 1;
   $('list').innerHTML = list.groups.length ? list.groups.map((g, gi) => `
     ${single ? '' : `<div class="grp${g.collapsed ? ' collapsed' : ''}" data-action="toggle-group" data-group="${gi}">
@@ -496,6 +526,7 @@ function render() {
       const sym = s.includes(':') ? s.split(':')[1] : s;
       return `<div class="row${s === state.symbol ? ' on' : ''}" draggable="true" data-action="select" data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}">
         <span class="sym">${esc(sym)}</span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
+        <button class="icon star${(state.pinned || []).includes(s) ? ' on' : ''}" data-action="${(state.pinned || []).includes(s) ? 'unpin' : 'pin'}" data-symbol="${esc(s)}" title="${(state.pinned || []).includes(s) ? 'Unpin from top' : 'Pin to top'}">${(state.pinned || []).includes(s) ? '★' : '☆'}</button>
         <button class="icon" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}" title="Remove">×</button>
       </div>`; }).join('')}
   `).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
@@ -577,6 +608,13 @@ document.addEventListener('click', e => {
     }
     case 'list':
       state.activeListId = el.dataset.id; update(false); wsSync(); break;
+    case 'pin':
+      e.stopPropagation();
+      if (!(state.pinned || []).includes(el.dataset.symbol)) state.pinned = [...(state.pinned || []), el.dataset.symbol];
+      update(false); wsSync(); break;
+    case 'unpin':
+      e.stopPropagation();
+      state.pinned = state.pinned.filter(x => x !== el.dataset.symbol); update(false); wsSync(); break;
     case 'manage-lists':
       renderListDlg(); $('listDlg').showModal(); break;
     case 'close-dlg':
@@ -648,6 +686,14 @@ $('dlgRows').addEventListener('change', e => {
   const name = e.target.value.trim();
   if (!name) { e.target.value = state.lists.find(l => l.id === id).name; return; }
   state.lists.find(l => l.id === id).name = name; update(false);
+});
+$('pinForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const syms = $('pinInput').value.split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+  if (!syms.length) return;
+  state.pinned = [...new Set([...(state.pinned || []), ...syms])];
+  $('pinInput').value = '';
+  update(false); wsSync();
 });
 $('newListForm').addEventListener('submit', e => {
   e.preventDefault();
