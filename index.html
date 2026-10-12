@@ -464,6 +464,12 @@ function seed() {
       { id: 'inci', name: 'İnci', summary: true, groups: [
         g('All', ['NASDAQ:RKLB','NYSE:PL','NASDAQ:APP','CBOE:EUV','NASDAQ:COHU','NYSE:RBRK','NASDAQ:SOFI','NASDAQ:QS','NYSE:NOW','NASDAQ:AVAV','NASDAQ:EOSE','NYSE:RDDT','NASDAQ:CBRS']),
       ]},
+      { id: 'krip', name: 'Krip', summary: true, groups: [
+        g('Main', ['BINANCE:BTCUSDT','BINANCE:ETHUSDT']),
+        g('Section 3', ['BINANCE:XRPUSDT','BINANCE:SOLUSDT','BINANCEUS:HYPEUSDT','COINBASE:AVAXUSDT']),
+        g('Section 2', ['CRYPTOCAP:BTC.D','CRYPTOCAP:TOTAL2','CRYPTOCAP:OTHERS']),
+        g('Section 1', ['TVC:DXY','BINANCE:ETHBTC','BINANCE:XRPETH']),
+      ]},
       { id: 'tr', name: 'TR', summary: 'BIST:XU100', groups: [
         g('FX', ['TVC:DXY','FX:EURUSD','FX:USDTRY','FX:EURTRY']),
         g('BIST', ['BIST:XU100','BIST:XU030D1!','BIST:XBANK','BIST:DMLKT','BIST:ENPRA']),
@@ -496,6 +502,10 @@ function load() {
       s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix).filter(x => !REMOVED.has(x)); }));
       s.pinned = Array.isArray(s.pinned) ? [...new Set(s.pinned.map(fix))] : DEFAULT_PINS.slice();
       s.lists.forEach(l => { if (l.summary === undefined) l.summary = l.id === 'tr' ? 'BIST:XU100' : ['abd', 'inci', 'zorning'].includes(l.id); });
+      if (!s.lists.some(l => l.id === 'krip')) {
+        const k = seed().lists.find(l => l.id === 'krip'), i = s.lists.findIndex(l => l.id === 'inci');
+        s.lists.splice(i < 0 ? s.lists.length : i + 1, 0, k);
+      }
       return s;
     }
   } catch (e) {}
@@ -595,7 +605,7 @@ function showSymbol() { send('set-symbol', { symbol: state.symbol }); }
 // Quotes: TradingView scanner (unofficial, CORS-enabled). Polled for the active list only.
 const quotes = {};
 let quoteTimer = null;
-const fmt = p => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(p);
+const fmt = p => p >= 1e9 ? (p >= 1e12 ? (p / 1e12).toFixed(2) + 'T' : (p / 1e9).toFixed(2) + 'B') : new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(p);  // market-cap style symbols (CRYPTOCAP:TOTAL2)
 function quoteHtml(sym) {
   const q = quotes[sym];
   if (!q) return '<span class="px"></span><span class="chg"></span><span class="ext"></span>';
