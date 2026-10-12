@@ -77,16 +77,18 @@
   .grp.collapsed .chev { transform: rotate(-90deg); }
   .grp .icon { width: 22px; height: 22px; font-size: 12px; opacity: 0; }
   .grp:hover .icon { opacity: 1; }
-  .tape { display: flex; gap: 4px; padding: 4px 10px; overflow-x: auto; scrollbar-width: none; background: var(--bg2);
+  .tape { display: flex; gap: 2px; padding: 3px 8px; overflow-x: auto; scrollbar-width: none; background: var(--bg2);
     border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
   .tape::-webkit-scrollbar { display: none; }
   .tape:empty { display: none; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; font-size: 12px;
-    white-space: nowrap; color: var(--text); flex-shrink: 0; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 7px; border-radius: 6px;
+    white-space: nowrap; color: var(--text); flex-shrink: 0; line-height: 1.1; }
   .chip:hover { background: var(--bg3); }
   .chip.on { background: var(--accent-bg); }
-  .chip .sym { font-weight: 600; }
-  .chip .q { display: contents; }
+  .chip .sym { font-weight: 600; font-size: 13px; color: var(--text); }
+  .chip .q { display: flex; flex-direction: column; align-items: flex-end; }
+  .chip .px { font-size: 12px; }
+  .chip .chg { font-size: 10px; }
   .chip .ext, .chip .px:empty, .chip .chg:empty { display: none; }
   .chip .px.up, .chip .chg.up { color: var(--up); }
   .chip .px.down, .chip .chg.down { color: var(--down); }
