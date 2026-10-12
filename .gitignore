@@ -1,2 +1,4 @@
 reference/
 .DS_Store
+relay/.wrangler/
+node_modules/
