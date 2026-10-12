@@ -87,7 +87,7 @@
   .cmd-hint { font-size: 12px; color: var(--muted); white-space: nowrap; }
   .cmd-list { max-height: 50vh; overflow-y: auto; }
   .cmd-list .ac-item { padding: 8px 12px; font-size: 13px; }
-  .cmd-list .ac-item .add { position: static; padding: 0; border: 0; }
+  .cmd-list .ac-item .ex .icon { display: inline-flex; width: 22px; height: 22px; opacity: 1; margin-left: 4px; background: var(--bg3); }
   .cmd-foot { padding: 8px 12px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); }
   .toggle { display: none; }
   body.chart-hidden .chart, body.chart-hidden .resizer { display: none; }
@@ -142,8 +142,18 @@
   .taperow { display: flex; align-items: center; background: var(--bg2); border-bottom: 1px solid var(--border); }
   .tape { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 3px 8px; overflow-x: auto; scrollbar-width: none;
     font-variant-numeric: tabular-nums; }
-  .ivsel { flex-shrink: 0; margin: 0 8px 0 4px; background: var(--bg3); color: var(--text); border: 1px solid var(--border);
-    border-radius: 6px; padding: 4px 6px; font-size: 12px; font-weight: 500; }
+  .ivsel { position: relative; flex-shrink: 0; margin: 0 8px 0 4px; }
+  .ivbtn { display: inline-flex; align-items: center; gap: 6px; background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ivbtn::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+    transform: rotate(45deg) translateY(-2px); }
+  .ivbackdrop { display: none; }
+  .ivmenu[hidden] { display: none; }
+  .ivmenu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+  .ivmenu button { padding: 8px 0; min-width: 44px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--muted); background: var(--bg); }
+  .ivmenu button:hover { color: var(--text); background: var(--bg3); }
+  .ivmenu button.on { color: #fff; background: var(--accent); }
   .tape::-webkit-scrollbar { display: none; }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 7px; border-radius: 6px;
     white-space: nowrap; color: var(--text); flex-shrink: 0; line-height: 1.1; }
@@ -300,6 +310,7 @@
   .d-stale { color: var(--muted); font-size: 11px; margin-top: 6px; }
   #feeders { position: fixed; left: -2000px; top: 0; width: 320px; pointer-events: none; }
   #feeders > div { width: 320px; height: 220px; }
+  .mbar { display: none; }
   .hud { position: absolute; bottom: 36px; right: 70px; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 5px 8px 5px 10px;
     background: rgba(19, 23, 34, .82); border: 1px solid var(--border); border-radius: 8px; font-variant-numeric: tabular-nums;
     font-size: 12px; color: var(--text); backdrop-filter: blur(4px); transition: opacity .15s; }
@@ -345,21 +356,54 @@
     .resizer { display: none; }
     .toggle { display: none; }
     /* Compact header: no list manager / chart toggle; pinned chips on one line (symbol + change only). */
-    .bar { display: none; }   /* no top bar on phones: the bottom nav + pinned tape carry everything */
+    .bar, .taperow { display: none; }   /* no top bar / pinned tape on phones */
+    .chart #tv_chart { position: relative; flex: 1; min-height: 0; }
+    .hud { display: none !important; }
+    .mbar { display: flex; align-items: baseline; gap: 12px; flex-shrink: 0; padding: 10px 14px;
+      border-top: 1px solid var(--border); background: var(--bg2); cursor: pointer; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mbar .mbt { display: flex; align-items: baseline; justify-content: flex-end; gap: 10px; flex: 1; min-width: 0; }
+    .mbar .msym { align-self: stretch; margin: -10px 0 -10px -14px; padding: 0 14px; max-width: 45%; overflow: hidden; text-overflow: ellipsis;
+      font-size: 19px; font-weight: 700; color: var(--text); background: none; border: 0; border-right: 1px solid var(--border); border-radius: 0; text-align: left; }
+    .symmenu { position: absolute; left: 0; right: 0; bottom: 100%; z-index: 40; max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 10px 8px 12px; background: var(--bg2); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.5); }
+    .symmenu[hidden] { display: none; }
+    .symmenu::before { content: ''; display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--bg3); margin: 0 auto 8px; }
+    .symmenu button { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 12px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font-size: 16px; text-align: left; }
+    .symmenu button.on { background: var(--bg3); }
+    .symmenu button .s { flex: 1; font-weight: 700; }
+    .symmenu button .px { font-size: 16px; font-weight: 600; }
+    .symmenu button .chg { font-size: 14px; min-width: 64px; text-align: right; }
+    .mbar { position: relative; z-index: 40; }
+    .mbar .ivsel { position: static; display: flex; align-self: stretch; margin: -10px -14px -10px 4px; }
+    .mbar .ivbtn { height: 100%; font-size: 15px; padding: 0 14px; border-radius: 0; border: 0; border-left: 1px solid var(--border); }
+    .mbar .ivbtn::after { display: none; }
+    /* Bottom sheet on phones */
+    .ivmenu { position: absolute; left: 0; right: 0; top: auto; bottom: 100%; z-index: 40; grid-template-columns: repeat(4, 1fr); gap: 8px;
+      padding: 14px 16px 16px; border: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
+      box-shadow: 0 -10px 30px rgba(0,0,0,.5); }
+    .ivmenu::before { content: ''; grid-column: 1 / -1; justify-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--bg3); margin-bottom: 2px; }
+    .ivmenu button { padding: 14px 0; font-size: 16px; }
+    .ivbackdrop { display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, .45); }
+    .ivbackdrop[hidden] { display: none; }
+    .mbar .px { font-size: 19px; font-weight: 600; }
+    .mbar .chg { font-size: 15px; }
+    .mbar .cd { font-size: 15px; color: var(--muted); }
+    .mbar .cd b { color: var(--text); font-weight: 600; }
+    .mbar .cd b.soon { color: #f7a600; }
+    .mbar .up { color: var(--up); } .mbar .down { color: var(--down); }
     .tape { padding: 2px 6px; gap: 2px; }
     .chip { padding: 2px 6px; gap: 5px; }
     .chip .sym { font-size: 12px; }
     .chip .q { flex-direction: row; align-items: baseline; }
     .chip .px { display: none; }
     .chip .chg { font-size: 11px; }
-    .ivsel { padding: 2px 4px; font-size: 11px; margin: 0 6px 0 2px; }
     /* Views: exactly one of list / details / chart fills the screen, picked by the bottom nav. */
     .panel, .details, .chart { width: auto !important; max-height: none; border-right: 0; flex: 1; min-height: 0; }
     .tabs { display: none; }
     body[data-mview] .mlists, body[data-mview] .panel, body[data-mview] .details, body[data-mview] .chart { display: none; }
     body[data-mview="lists"] .mlists { display: block; flex: 1; overflow-y: auto; }
     body[data-mview="list"] .panel { display: flex; }
-    body[data-mview="chart"]:not(.chart-hidden) .chart { display: block; }
+    body[data-mview="chart"]:not(.chart-hidden) .chart { display: flex; flex-direction: column; }
     /* Symbol details: full-screen overlay above the current view, closed with its × */
     body[data-mview].details-open .details { display: block; position: fixed; left: 0; right: 0; top: 0; bottom: calc(46px + max(0px, calc(env(safe-area-inset-bottom, 0px) - 12px))); z-index: 9; }
     /* Nav sits in the flex column (no fixed positioning → no gap below the content). */
@@ -389,7 +433,8 @@
 </div>
 <div class="taperow">
   <div class="tape" id="pins"></div>
-  <select class="ivsel" id="intervals" title="Chart interval"></select>
+  <div class="ivsel" id="intervals"><button class="ivbtn" data-action="iv-toggle" title="Chart interval"></button><div class="ivmenu" hidden></div></div>
+  <div class="ivbackdrop" id="ivbackdrop" hidden data-action="iv-close"></div>
 </div>
 <div class="breadth" id="summary"></div>
 <div id="feeders" aria-hidden="true"></div>
@@ -416,6 +461,7 @@
   <div class="chart" id="chartWrap">
     <div id="tv_chart"></div>
     <div class="hud" id="hud" hidden></div>
+    <div class="mbar" id="mbar"><button class="msym" id="mbarSym" data-action="sym-toggle" title="Pick from watchlist"></button><span class="mbt" id="mbarText" data-action="open-search"></span><div class="symmenu" id="symmenu" hidden></div></div>
   </div>
 </div>
 
@@ -593,8 +639,10 @@ function mountChart() {
     symbol: state.symbol || flatSymbols(activeList())[0] || 'BINANCE:BTCUSDT', interval: state.interval,
     timezone: 'Etc/UTC', theme: 'dark', style: '1', locale: 'en',
     allow_symbol_change: true, details: false, hotlist: false, calendar: false,
-    hide_side_toolbar: true, hide_top_toolbar: true,
-    disabled_features: ['header_indicators', 'header_compare', 'show_object_tree', 'legend_context_menu'],
+    hide_side_toolbar: true, hide_top_toolbar: true, hide_legend: true, hide_volume: true,
+    backgroundColor: '#131722', gridColor: 'rgba(42, 46, 57, 0.4)',
+    overrides: { 'mainSeriesProperties.sessionId': '24h' },  // Session → 24 hours (regular | extended | premarket | postmarket | 24h)
+    disabled_features: ['header_indicators', 'header_compare', 'show_object_tree', 'legend_context_menu', 'control_bar'],
     support_host: 'https://www.tradingview.com',
     // Note: the free embed forces mainSeriesProperties.showCountdown=false at load, so neither `overrides`
     // nor `use_localstorage_for_settings` can keep the widget's own countdown across reloads.
@@ -938,7 +986,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && (!
 
 function renderIntervals() {
   const ivs = INTERVALS.some(x => x[1] === state.interval) ? INTERVALS : [...INTERVALS, [intervalLabel(state.interval), state.interval]];
-  $('intervals').innerHTML = ivs.map(([label, v]) => `<option value="${v}"${v === state.interval ? ' selected' : ''}>${label}</option>`).join('');
+  $('intervals').querySelector('.ivbtn').textContent = intervalLabel(state.interval);
+  $('intervals').querySelector('.ivmenu').innerHTML = ivs.map(([label, v]) => `<button class="${v === state.interval ? 'on' : ''}" data-action="iv-pick" data-value="${v}">${label}</button>`).join('');
 }
 function render() {
   const list = activeList();
@@ -1119,6 +1168,32 @@ document.addEventListener('click', e => {
       e.stopPropagation();
       const e2 = eod[activeList().id]; if (e2) { e2.dismissed = true; localStorage.setItem(EOD_KEY, JSON.stringify(eod)); renderEod(); } break;
     }
+    case 'iv-toggle': {
+      e.stopPropagation();
+      const m = $('intervals').querySelector('.ivmenu'), open = m.hidden;
+      closeSheets(); if (open) { m.hidden = false; $('ivbackdrop').hidden = false; } break;
+    }
+    case 'iv-close':
+      closeSheets(); break;
+    case 'sym-toggle': {
+      e.stopPropagation();
+      const m = $('symmenu'), open = m.hidden;
+      closeSheets();
+      if (open) { renderSymMenu(); m.hidden = false; $('ivbackdrop').hidden = false; m.querySelector('.on')?.scrollIntoView({ block: 'center' }); }
+      break;
+    }
+    case 'sym-pick':
+      e.stopPropagation(); closeSheets();
+      state.symbol = el.dataset.value; update(true); break;
+    case 'iv-pick':
+      e.stopPropagation();
+      state.interval = el.dataset.value; update(false); send('set-interval', { interval: state.interval });
+      closeSheets(); break;
+    case 'open-search': {
+      if (e.target.closest('#intervals')) return;
+      if (!$('symmenu').hidden || !$('intervals').querySelector('.ivmenu').hidden) { closeSheets(); return; }
+      openCmd('symbol', ''); break;
+    }
     case 'hud-hide':
       state.hudHidden = true; save(); renderHud(); break;
     case 'toggle-details':
@@ -1133,7 +1208,17 @@ document.addEventListener('click', e => {
 });
 
 
-$('intervals').addEventListener('change', e => { state.interval = e.target.value; update(false); send('set-interval', { interval: state.interval }); });
+function closeSheets() { $('intervals').querySelector('.ivmenu').hidden = true; $('symmenu').hidden = true; $('ivbackdrop').hidden = true; }
+function renderSymMenu() {
+  const list = activeList(), syms = list ? flatSymbols(list) : [];
+  $('symmenu').innerHTML = syms.map(sym => {
+    const q = quotes[sym], chg = q ? (!regular && q.e != null ? q.e : q.c) : null, price = q ? (!regular && q.ep != null ? q.ep : q.p) : null;
+    const short = sym.includes(':') ? sym.split(':')[1] : sym;
+    return `<button class="${sym === state.symbol ? 'on' : ''}" data-action="sym-pick" data-value="${esc(sym)}"><span class="s">${esc(short)}</span>` +
+      `<span class="px ${signCls(chg)}">${price != null ? fmtN(price) : ''}</span><span class="chg ${signCls(chg)}">${chg != null ? fmtPct(chg) : ''}</span></button>`;
+  }).join('');
+}
+document.addEventListener('click', e => { if (!e.target.closest('#intervals, #mbarSym, #symmenu')) closeSheets(); }, true);
 // Symbol search for the add box: TradingView's search via the relay (full coverage), scanner as fallback.
 const RELAY_HTTP = RELAY_WS ? RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '') : '';
 const PREFERRED_EX = ['NASDAQ', 'NYSE', 'AMEX', 'CBOE', 'BIST', 'BINANCE', 'OANDA', 'FX', 'TVC', 'SKILLING', 'CAPITALCOM', 'CME_MINI', 'OKX', 'FX_IDC', 'COINBASE', 'CRYPTOCAP', 'SP', 'DJ'];
@@ -1213,7 +1298,15 @@ function applyDetails() {
 }
 
 // Mobile: which of the three views is on screen (desktop shows all side by side and ignores this).
+// The interval <select> lives in the tape on desktop and on top of the chart on phones.
+function placeIntervals() {
+  const sel = $('intervals'), phone = window.innerWidth < 768;
+  const target = phone ? $('mbar') : document.querySelector('.taperow');
+  if (sel.parentElement !== target) target.appendChild(sel);
+}
+window.addEventListener('resize', placeIntervals);
 function setMobileView(v) {
+  placeIntervals();
   state.mview = v; save();
   document.body.dataset.mview = v;
   document.querySelectorAll('.mnav button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
@@ -1320,8 +1413,8 @@ function renderCmd() {
   }
   if (cmd.mode !== 'symbol') return;
   box.innerHTML = cmd.items.length ? cmd.items.map((it, i) => `<div class="ac-item${i === cmd.index ? ' on' : ''}" data-i="${i}">
-      <span class="s">${esc(it.sym)}</span><span class="ex">${esc(it.type || '')}</span><span class="d">${esc(it.desc || '')}</span></div>`).join('')
-    + `<div class="cmd-foot">Enter = open on chart · Shift+Enter = add to list · Esc = close</div>`
+      <span class="s">${esc(it.sym)}</span><span class="ex">${esc(it.type || '')} <button class="icon" data-add="${i}" title="Add to list">＋</button></span><span class="d">${esc(it.desc || '')}</span></div>`).join('')
+    + `<div class="cmd-foot">Enter / tap = open on chart · ＋ or Shift+Enter = add to list · Esc = close</div>`
     : ($('cmdInput').value.trim() ? '<div class="ac-empty">No matches</div>' : '');
   box.querySelector('.ac-item.on')?.scrollIntoView({ block: 'nearest' });
 }
@@ -1368,7 +1461,7 @@ $('cmdInput').addEventListener('keydown', e => {
   else if (e.key === 'ArrowUp' && cmd.items.length) { cmd.index = (cmd.index - 1 + cmd.items.length) % cmd.items.length; renderCmd(); e.preventDefault(); }
   else if (e.key === 'Enter') { pickCmd(e.shiftKey); e.preventDefault(); }
 });
-$('cmdList').addEventListener('mousedown', e => { const it = e.target.closest('.ac-item'); if (it) { e.preventDefault(); cmd.index = +it.dataset.i; pickCmd(e.shiftKey); } });
+$('cmdList').addEventListener('mousedown', e => { const it = e.target.closest('.ac-item'); if (it) { e.preventDefault(); cmd.index = +it.dataset.i; pickCmd(e.shiftKey || !!e.target.closest('[data-add]')); } });
 $('cmd').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
 // Chart HUD: countdown to the current bar's close (aligned to the symbol's session, like TradingView) + live price.
@@ -1400,7 +1493,7 @@ const fmtCountdown = t => t >= 86400 ? `${Math.floor(t / 86400)}d ${Math.floor(t
 function renderHud() {
   const el = $('hud');
   el.hidden = !!state.hudHidden || !!state.chartHidden;
-  if (el.hidden || !state.symbol) return;
+  if (!state.symbol || state.chartHidden) return;
   const q = quotes[state.symbol];
   const left = barCloseIn(state.symbol, state.interval);
   const price = q ? (!regular && q.ep != null ? q.ep : q.p) : null;
@@ -1408,6 +1501,10 @@ function renderHud() {
   el.innerHTML = `<span class="cd${left <= 10 ? ' soon' : ''}" title="Time to bar close">${fmtCountdown(Math.max(0, Math.round(left)))}</span><span class="ivl">${intervalLabel(state.interval)}</span>` +
     (price != null ? `<span class="px ${signCls(chg)}">${fmtN(price)}</span><span class="chg ${signCls(chg)}">${fmtPct(chg)}</span>` : '') +
     `<span class="x" data-action="hud-hide" title="Hide HUD">×</span>`;
+  const sym = state.symbol, short = sym.includes(':') ? sym.split(':')[1] : sym;
+  $('mbarSym').textContent = short;
+  $('mbarText').innerHTML = `<span class="px ${signCls(chg)}">${price != null ? fmtN(price) : ''}</span><span class="chg ${signCls(chg)}">${price != null ? fmtPct(chg) : ''}</span>` +
+    `<span class="cd"><b class="${left <= 10 ? 'soon' : ''}">${fmtCountdown(Math.max(0, Math.round(left)))}</b></span>`;
 }
 setInterval(() => { if (!document.hidden) renderHud(); }, 1000);
 $('hudToggle').addEventListener('change', e => { state.hudHidden = !e.target.checked; save(); renderHud(); });
