@@ -71,6 +71,15 @@
   .dlg-add { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border); }
   .dlg-add input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
   .dlg-add button { background: var(--accent); color: #fff; border-radius: 6px; padding: 0 12px; }
+  .cmd { width: min(460px, calc(100vw - 32px)); margin-top: 12vh; }
+  .cmd-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .cmd-mode { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; width: 54px; }
+  .cmd-head input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; font-size: 18px; font-weight: 500; }
+  .cmd-hint { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .cmd-list { max-height: 50vh; overflow-y: auto; }
+  .cmd-list .ac-item { padding: 8px 12px; font-size: 13px; }
+  .cmd-list .ac-item .add { position: static; padding: 0; border: 0; }
+  .cmd-foot { padding: 8px 12px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); }
   .toggle { display: none; }
   body.chart-hidden .chart, body.chart-hidden .resizer { display: none; }
   body.chart-hidden .panel { width: auto !important; flex: 1; max-height: none; border-bottom: 0; }
@@ -196,7 +205,28 @@
   .row .icon.star.on { opacity: 1; color: #f7a600; background: transparent; }
   .empty { padding: 20px 12px; color: var(--muted); text-align: center; }
 
-  .add { display: flex; gap: 4px; padding: 6px; border-top: 1px solid var(--border); }
+  .selbar { display: grid; grid-template-columns: auto 1fr auto; gap: 0 10px; align-items: center; padding: 6px 10px;
+    border-top: 1px solid var(--border); background: var(--bg2); }
+  .selbar:empty { display: none; }
+  .selbar .ssym { font-weight: 700; font-size: 15px; }
+  .selbar .ssym small { font-size: 10px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+  .selbar .sdesc { min-width: 0; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .selbar .q { display: flex; align-items: baseline; gap: 8px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+  .selbar .q .px { font-size: 17px; font-weight: 600; }
+  .selbar .q .chg { font-size: 13px; font-weight: 500; }
+  .selbar .q .ext { display: none; }
+  .selbar .q .px.up, .selbar .q .chg.up { color: var(--up); } .selbar .q .px.down, .selbar .q .chg.down { color: var(--down); }
+  .selbar .sadd { grid-column: 1 / -1; justify-self: stretch; margin-top: 4px; background: var(--accent); color: #fff; border-radius: 6px;
+    padding: 4px 10px; font-size: 12px; font-weight: 500; }
+  .add { display: none; position: relative; gap: 4px; padding: 6px; border-top: 1px solid var(--border); }
+  .ac { position: absolute; left: 6px; right: 6px; bottom: 100%; max-height: 260px; overflow-y: auto; background: var(--bg2);
+    border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 -6px 24px rgba(0, 0, 0, .4); z-index: 5; }
+  .ac-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 6px 10px; cursor: pointer; font-size: 12px; }
+  .ac-item:hover, .ac-item.on { background: var(--accent-bg); }
+  .ac-item .s { font-weight: 600; }
+  .ac-item .ex { color: var(--muted); font-size: 11px; text-align: right; }
+  .ac-item .d { grid-column: 1 / -1; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ac-empty { padding: 8px 10px; color: var(--muted); font-size: 12px; }
   .add input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border);
     border-radius: 6px; padding: 5px 6px; text-transform: uppercase; font-size: 12px; }
   .add button { background: var(--accent); color: #fff; border-radius: 6px; width: 28px; }
@@ -230,6 +260,17 @@
   .d-stale { color: var(--muted); font-size: 11px; margin-top: 6px; }
   #feeders { position: fixed; left: -2000px; top: 0; width: 320px; pointer-events: none; }
   #feeders > div { width: 320px; height: 220px; }
+  .hud { position: absolute; bottom: 36px; right: 70px; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 5px 8px 5px 10px;
+    background: rgba(19, 23, 34, .82); border: 1px solid var(--border); border-radius: 8px; font-variant-numeric: tabular-nums;
+    font-size: 12px; color: var(--text); backdrop-filter: blur(4px); transition: opacity .15s; }
+  .hud:hover { opacity: .35; }
+  .hud .cd { font-size: 16px; font-weight: 600; letter-spacing: .02em; }
+  .hud .cd.soon { color: #f7a600; }
+  .hud .ivl { color: var(--muted); font-size: 11px; }
+  .hud .px { font-size: 14px; font-weight: 600; } .hud .chg { font-size: 12px; }
+  .hud .up { color: var(--up); } .hud .down { color: var(--down); }
+  .hud .x { color: var(--muted); font-size: 13px; cursor: pointer; margin-left: 2px; }
+  .hud .x:hover { color: var(--text); }
   .resizer { width: 5px; flex-shrink: 0; cursor: col-resize; background: var(--border); }
   .resizer:hover, .resizer.active { background: var(--accent); }
   body.resizing { cursor: col-resize; user-select: none; }
@@ -274,8 +315,10 @@
   <div class="panel" id="panel">
     <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span title="● pre-market · ● post-market · ● overnight">Ext</span></div>
     <div class="list" id="list"></div>
+    <div class="selbar" id="selbar"></div>
     <form class="add" id="addForm">
-      <input id="symInput" placeholder="NASDAQ:NBIS" autocomplete="off" spellcheck="false">
+      <div class="ac" id="ac" hidden></div>
+      <input id="symInput" placeholder="Search symbol or type NASDAQ:NBIS" autocomplete="off" spellcheck="false" aria-autocomplete="list">
       <button type="submit" title="Add symbol">+</button>
     </form>
   </div>
@@ -284,12 +327,16 @@
     <button class="icon dclose" data-action="toggle-details" title="Close details">×</button>
     <div id="dbody"></div>
   </aside>
-  <div class="chart" id="chartWrap"></div>
+  <div class="chart" id="chartWrap">
+    <div id="tv_chart"></div>
+    <div class="hud" id="hud" hidden></div>
+  </div>
 </div>
 
 <dialog id="listDlg">
   <div class="dlg-head"><span>Watchlists</span><button class="icon" data-action="close-dlg" title="Close">×</button></div>
   <div id="dlgRows"></div>
+  <label class="dlg-row" style="gap:8px;cursor:pointer"><input type="checkbox" id="hudToggle"> Show chart HUD (bar countdown, live price)</label>
   <form class="dlg-add" id="pinForm" title="Pinned symbols shown above every list, comma separated">
     <input id="pinInput" placeholder="Pinned: SKILLING:US100, BINANCE:BTCUSDT" autocomplete="off" spellcheck="false">
     <button type="submit">Pin</button>
@@ -298,6 +345,11 @@
     <input id="newListName" placeholder="New list name" autocomplete="off">
     <button type="submit">Add</button>
   </form>
+</dialog>
+
+<dialog id="cmd" class="cmd">
+  <div class="cmd-head"><span class="cmd-mode" id="cmdMode">Symbol</span><input id="cmdInput" autocomplete="off" spellcheck="false" placeholder="Search symbol"><span class="cmd-hint" id="cmdHint"></span></div>
+  <div id="cmdList" class="cmd-list"></div>
 </dialog>
 
 <script src="https://s3.tradingview.com/tv.js"></script>
@@ -409,13 +461,7 @@ async function onChartSymbol(d) {
   const sym = await resolveSymbol(d.original_name, d.short_name);
   if (lastChartName !== d.original_name) return;
   chart.symbol = sym;
-  const input = $('symInput');
-  if (flatSymbols(activeList()).includes(sym)) {
-    if (state.symbol !== sym) { state.symbol = sym; save(); render(); }
-    if (autofilled) { input.value = ''; autofilled = false; }
-  } else if (!input.value || autofilled) {
-    input.value = sym; autofilled = true;
-  }
+  if (flatSymbols(activeList()).includes(sym) && state.symbol !== sym) { state.symbol = sym; save(); render(); }
 }
 async function resolveSymbol(name, short) {
   if (resolved[name]) return resolved[name];
@@ -439,13 +485,14 @@ async function resolveSymbol(name, short) {
 }
 
 function mountChart() {
-  $('chartWrap').innerHTML = '<div id="tv_chart"></div>';
+  const old = $('tv_chart'); const fresh = document.createElement('div'); fresh.id = 'tv_chart'; old.replaceWith(fresh);
   new TradingView.widget({
     autosize: true, container_id: 'tv_chart',
     symbol: state.symbol || flatSymbols(activeList())[0] || 'BINANCE:BTCUSDT', interval: state.interval,
     timezone: 'Etc/UTC', theme: 'dark', style: '1', locale: 'en',
     allow_symbol_change: true, details: false, hotlist: false, calendar: false,
-    hide_side_toolbar: true,
+    hide_side_toolbar: true, hide_top_toolbar: true,
+    disabled_features: ['header_indicators', 'header_compare', 'show_object_tree', 'legend_context_menu'],
     support_host: 'https://www.tradingview.com',
     // Note: the free embed forces mainSeriesProperties.showCountdown=false at load, so neither `overrides`
     // nor `use_localstorage_for_settings` can keep the widget's own countdown across reloads.
@@ -595,7 +642,7 @@ const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session'
   'open_price', 'high_price', 'low_price', 'prev_close_price', 'bid', 'ask', 'volume', 'average_volume',
   'price_52_week_high', 'price_52_week_low', 'all_time_high', 'price_percent_change_1_week', 'price_percent_change_52_week',
   'market_cap_basic', 'earnings_release_next_date', 'price_target_average',
-  'description', 'exchange', 'type', 'currency_code'];
+  'description', 'exchange', 'type', 'currency_code', 'session-regular', 'timezone'];
 const raw = {};
 let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, lastPulse = 0, wsEverOpen = false;
 // TradingView accepts the socket only from localhost / tradingview.com origins; elsewhere go through the relay
@@ -703,7 +750,19 @@ function render() {
       <div class="grows">${g.collapsed ? `<div class="gcount">${g.symbols.length} symbols</div>` : g.symbols.map(s => rowHtml(s, gi)).join('')}</div>
     </div>`).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
   : `<div class="empty">No groups yet</div><div class="grp" data-action="add-group">+ group</div>`;
+  renderSelbar();
   applySentiment();
+}
+function renderSelbar() {
+  const sym = state.symbol, el = $('selbar');
+  if (!sym) { el.innerHTML = ''; return; }
+  const inList = flatSymbols(activeList()).includes(sym);
+  const short = sym.includes(':') ? sym.split(':')[1] : sym;
+  const desc = raw[sym]?.description || '';
+  el.innerHTML = `<span class="ssym" title="${esc(sym)}">${esc(short)}<small>${esc(sym.split(':')[0] || '')}</small></span>` +
+    `<span class="sdesc" title="${esc(desc)}">${esc(desc === short ? '' : desc)}</span>` +
+    `<span class="q" data-q="${esc(sym)}">${quoteHtml(sym)}</span>` +
+    (inList ? '' : `<button class="sadd" data-action="add-selected" title="Add ${esc(sym)} to ${esc(activeList().name)}">+ Add to ${esc(activeList().name)}</button>`);
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -810,10 +869,14 @@ document.addEventListener('click', e => {
       state.symbol = el.dataset.symbol; state.detailsOpen = true; save(); render();
       if (!noChart(state.symbol)) showSymbol();
       applyDetails(); break;
+    case 'add-selected':
+      addSymbol(state.symbol); break;
+    case 'hud-hide':
+      state.hudHidden = true; save(); renderHud(); break;
     case 'toggle-details':
       state.detailsOpen = !state.detailsOpen; save(); applyDetails(); break;
     case 'toggle-chart':
-      state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
+      state.chartHidden = !state.chartHidden; save(); applyChartHidden(); renderHud(); break;
     case 'toggle-panel':
       $('panel').classList.toggle('hidden'); break;
   }
@@ -821,17 +884,77 @@ document.addEventListener('click', e => {
 
 
 $('intervals').addEventListener('change', e => { state.interval = e.target.value; update(false); send('set-interval', { interval: state.interval }); });
-$('symInput').addEventListener('input', () => { autofilled = false; });
-$('addForm').addEventListener('submit', e => {
-  e.preventDefault();
+// Symbol search for the add box: TradingView's search via the relay (full coverage), scanner as fallback.
+const RELAY_HTTP = RELAY_WS ? RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '') : '';
+const PREFERRED_EX = ['NASDAQ', 'NYSE', 'AMEX', 'CBOE', 'BIST', 'BINANCE', 'OANDA', 'FX', 'TVC', 'SKILLING', 'CAPITALCOM', 'CME_MINI', 'OKX', 'FX_IDC', 'COINBASE', 'CRYPTOCAP', 'SP', 'DJ'];
+const stripEm = x => String(x || '').replace(/<\/?em>/g, '');
+async function searchSymbols(text) {
+  if (RELAY_HTTP) {
+    try {
+      const r = await fetch(`${RELAY_HTTP}/search?text=${encodeURIComponent(text)}`);
+      if (r.ok) {
+        const j = await r.json();
+        const items = (j.symbols || []).map(it => ({
+          sym: `${it.prefix || it.source_id || it.exchange}:${stripEm(it.symbol)}`,
+          desc: stripEm(it.description), ex: it.exchange, type: it.type,
+        }));
+        if (items.length) return items.slice(0, 10);
+      }
+    } catch (_) {}
+  }
+  // Fallback: scanner (no broker CFDs), primary listings on familiar exchanges, biggest first.
+  try {
+    const body = { filter: [{ left: 'is_primary', operation: 'equal', right: true }, { left: 'exchange', operation: 'in_range', right: PREFERRED_EX }],
+      filter2: { operator: 'or', operands: [{ expression: { left: 'name', operation: 'match', right: text } }, { expression: { left: 'description', operation: 'match', right: text } }] },
+      columns: ['name', 'exchange', 'description', 'type'], sort: { sortBy: 'market_cap_basic', sortOrder: 'desc', nullsFirst: false }, range: [0, 10] };
+    const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify(body) });
+    return ((await r.json()).data || []).map(row => ({ sym: row.s, desc: row.d[2], ex: row.d[1], type: row.d[3] }));
+  } catch (_) { return []; }
+}
+let acItems = [], acIndex = -1, acTimer = null, acSeq = 0;
+function renderAc() {
+  const box = $('ac');
+  if (!acItems.length) { box.hidden = true; box.innerHTML = ''; return; }
+  box.innerHTML = acItems.map((it, i) => `<div class="ac-item${i === acIndex ? ' on' : ''}" data-i="${i}" title="${esc(it.sym)}">
+    <span class="s">${esc(it.sym)}</span><span class="ex">${esc(it.type || '')}</span><span class="d">${esc(it.desc || '')}</span></div>`).join('');
+  box.hidden = false;
+  box.querySelector('.ac-item.on')?.scrollIntoView({ block: 'nearest' });
+}
+function closeAc() { acItems = []; acIndex = -1; renderAc(); }
+function addSymbol(sym) {
   const list = activeList();
-  const sym = $('symInput').value.trim().toUpperCase();
+  sym = sym.trim().toUpperCase();
+  if (!sym) return;
   if (!list.groups.length) list.groups.push({ name: 'Main', collapsed: false, symbols: [] });
   const g = list.groups[list.groups.length - 1];
-  if (!sym) return;
   if (!flatSymbols(list).includes(sym)) g.symbols.push(sym);
-  $('symInput').value = '';
+  $('symInput').value = ''; closeAc();
   state.symbol = sym; update(true); wsSync();
+}
+$('symInput').addEventListener('input', e => {
+  autofilled = false;
+  const text = e.target.value.trim();
+  clearTimeout(acTimer);
+  if (!text) return closeAc();
+  acTimer = setTimeout(async () => {
+    const seq = ++acSeq;
+    const items = await searchSymbols(text);
+    if (seq !== acSeq) return;  // a newer query is in flight
+    acItems = items; acIndex = items.length ? 0 : -1; renderAc();
+  }, 250);
+});
+$('symInput').addEventListener('keydown', e => {
+  if (!acItems.length) { if (e.key === 'Escape') closeAc(); return; }
+  if (e.key === 'ArrowDown') { acIndex = (acIndex + 1) % acItems.length; renderAc(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { acIndex = (acIndex - 1 + acItems.length) % acItems.length; renderAc(); e.preventDefault(); }
+  else if (e.key === 'Escape') { closeAc(); }
+});
+$('ac').addEventListener('mousedown', e => { const it = e.target.closest('.ac-item'); if (it) { e.preventDefault(); addSymbol(acItems[+it.dataset.i].sym); } });
+$('symInput').addEventListener('blur', () => setTimeout(closeAc, 150));
+$('addForm').addEventListener('submit', e => {
+  e.preventDefault();
+  // Enter picks the highlighted suggestion; a raw EXCHANGE:SYMBOL still works without one.
+  addSymbol(acIndex >= 0 && acItems[acIndex] ? acItems[acIndex].sym : $('symInput').value);
 });
 
 function applyDetails() {
@@ -848,6 +971,7 @@ applyChartHidden();
 
 // List management dialog: rename inline, reorder, delete, add.
 function renderListDlg() {
+  $('hudToggle').checked = !state.hudHidden;
   $('dlgRows').innerHTML = state.lists.map((l, i) => `
     <div class="dlg-row">
       <input value="${esc(l.name)}" data-rename="${l.id}" aria-label="List name">
@@ -888,11 +1012,121 @@ $('newListForm').addEventListener('submit', e => {
 });
 $('listDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
+// Command palette (TradingView-style): type a letter anywhere → symbol search; type a digit → interval entry.
+const cmd = { mode: 'symbol', items: [], index: -1, seq: 0, timer: null };
+function parseInterval(text) {
+  const m = /^(\d{1,4})\s*([mhdwMHDW]?)$/.exec(text.trim()); if (!m) return null;
+  const n = +m[1], u = (m[2] || 'm').toLowerCase();
+  if (!n) return null;
+  if (u === 'm') return String(n);
+  if (u === 'h') return String(n * 60);
+  if (u === 'd') return n === 1 ? 'D' : n + 'D';
+  if (u === 'w') return n === 1 ? 'W' : n + 'W';
+  return null;
+}
+function openCmd(mode, seed) {
+  cmd.mode = mode; cmd.items = []; cmd.index = -1;
+  $('cmdMode').textContent = mode === 'symbol' ? 'Symbol' : 'Interval';
+  $('cmdInput').placeholder = mode === 'symbol' ? 'Search symbol' : 'e.g. 15, 2h, 1d, 1w';
+  $('cmdInput').value = seed; $('cmdHint').textContent = '';
+  $('cmdList').innerHTML = mode === 'symbol' ? '' : `<div class="cmd-foot">Number = minutes · h = hours · d = days · w = weeks · Enter applies</div>`;
+  const d = $('cmd'); if (!d.open) d.showModal();
+  const i = $('cmdInput'); i.focus(); i.setSelectionRange(i.value.length, i.value.length);
+  onCmdInput();
+}
+function renderCmd() {
+  const box = $('cmdList');
+  if (cmd.mode !== 'symbol') return;
+  box.innerHTML = cmd.items.length ? cmd.items.map((it, i) => `<div class="ac-item${i === cmd.index ? ' on' : ''}" data-i="${i}">
+      <span class="s">${esc(it.sym)}</span><span class="ex">${esc(it.type || '')}</span><span class="d">${esc(it.desc || '')}</span></div>`).join('')
+    + `<div class="cmd-foot">Enter = open on chart · Shift+Enter = add to list · Esc = close</div>`
+    : ($('cmdInput').value.trim() ? '<div class="ac-empty">No matches</div>' : '');
+  box.querySelector('.ac-item.on')?.scrollIntoView({ block: 'nearest' });
+}
+function onCmdInput() {
+  const text = $('cmdInput').value.trim();
+  if (cmd.mode === 'interval') {
+    const v = parseInterval(text);
+    $('cmdHint').textContent = v ? '→ ' + intervalLabel(v) : (text ? 'invalid' : '');
+    return;
+  }
+  clearTimeout(cmd.timer);
+  if (!text) { cmd.items = []; renderCmd(); return; }
+  cmd.timer = setTimeout(async () => {
+    const seq = ++cmd.seq;
+    const items = await searchSymbols(text);
+    if (seq !== cmd.seq) return;
+    cmd.items = items; cmd.index = items.length ? 0 : -1; renderCmd();
+  }, 200);
+}
+function pickCmd(addToList) {
+  if (cmd.mode === 'interval') {
+    const v = parseInterval($('cmdInput').value); if (!v) return;
+    state.interval = v; save(); renderIntervals(); send('set-interval', { interval: v });
+    $('cmd').close(); return;
+  }
+  const it = cmd.items[cmd.index]; if (!it) return;
+  if (addToList) addSymbol(it.sym);
+  else { state.symbol = it.sym; update(!noChart(it.sym)); if (state.detailsOpen) renderDetails(); }
+  $('cmd').close();
+}
+$('cmdInput').addEventListener('input', onCmdInput);
+$('cmdInput').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' && cmd.items.length) { cmd.index = (cmd.index + 1) % cmd.items.length; renderCmd(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp' && cmd.items.length) { cmd.index = (cmd.index - 1 + cmd.items.length) % cmd.items.length; renderCmd(); e.preventDefault(); }
+  else if (e.key === 'Enter') { pickCmd(e.shiftKey); e.preventDefault(); }
+});
+$('cmdList').addEventListener('mousedown', e => { const it = e.target.closest('.ac-item'); if (it) { e.preventDefault(); cmd.index = +it.dataset.i; pickCmd(e.shiftKey); } });
+$('cmd').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+// Chart HUD: countdown to the current bar's close (aligned to the symbol's session, like TradingView) + live price.
+function tzNow(tz) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date());
+  const g = t => parts.find(x => x.type === t).value;
+  return { wd: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(g('weekday')), sec: ((+g('hour') % 24) * 3600) + (+g('minute') * 60) + (+g('second')) };
+}
+function barCloseIn(sym, interval) {
+  const r = raw[sym] || {};
+  const tz = r.timezone || 'America/New_York';
+  const sess = r['session-regular'] || '';
+  const m = /^(\d{2})(\d{2})-(\d{2})(\d{2})/.exec(sess);
+  const allDay = !m || sess.startsWith('24x7') || (m[1] === '00' && m[2] === '00' && m[3] === '00' && m[4] === '00');
+  const open = allDay ? 0 : (+m[1] * 60 + +m[2]) * 60, close = allDay ? 86400 : (+m[3] * 60 + +m[4]) * 60;
+  const { wd, sec } = tzNow(tz);
+  if (/^\d+$/.test(interval)) {
+    const n = +interval * 60;
+    const base = sec >= open ? open : 0;                       // intraday bars align to session open (pre-market: midnight)
+    const start = base + Math.floor((sec - base) / n) * n;
+    return start + n - sec;
+  }
+  const days = interval === 'W' ? (allDay ? (7 - wd) % 7 || 7 : ((5 - wd) + 7) % 7) : 0;  // week closes Fri (session) or Sun 00:00 (24x7)
+  let left = close - sec + days * 86400;
+  if (left <= 0) left += 86400 * (allDay ? 1 : (wd === 5 ? 3 : wd === 6 ? 2 : 1));
+  return left;
+}
+const fmtCountdown = t => t >= 86400 ? `${Math.floor(t / 86400)}d ${Math.floor(t % 86400 / 3600)}h` : t >= 3600 ? `${Math.floor(t / 3600)}:${String(Math.floor(t % 3600 / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}` : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+function renderHud() {
+  const el = $('hud');
+  el.hidden = !!state.hudHidden || !!state.chartHidden;
+  if (el.hidden || !state.symbol) return;
+  const q = quotes[state.symbol];
+  const left = barCloseIn(state.symbol, state.interval);
+  const price = q ? (!regular && q.ep != null ? q.ep : q.p) : null;
+  const chg = q ? (!regular && q.e != null ? q.e : q.c) : null;
+  el.innerHTML = `<span class="cd${left <= 10 ? ' soon' : ''}" title="Time to bar close">${fmtCountdown(Math.max(0, Math.round(left)))}</span><span class="ivl">${intervalLabel(state.interval)}</span>` +
+    (price != null ? `<span class="px ${signCls(chg)}">${fmtN(price)}</span><span class="chg ${signCls(chg)}">${fmtPct(chg)}</span>` : '') +
+    `<span class="x" data-action="hud-hide" title="Hide HUD">×</span>`;
+}
+setInterval(() => { if (!document.hidden) renderHud(); }, 1000);
+$('hudToggle').addEventListener('change', e => { state.hudHidden = !e.target.checked; save(); renderHud(); });
+
 // Keyboard: ↑/↓ move through the active list's chartable tickers, ←/→ switch watchlists.
 document.addEventListener('keydown', e => {
   if (e.altKey || e.ctrlKey || e.metaKey) return;
   const t = e.target;
   if (t.closest && (t.closest('input, textarea, select, dialog[open]'))) return;
+  if (/^[a-zA-Z]$/.test(e.key)) { openCmd('symbol', e.key.toUpperCase()); e.preventDefault(); return; }
+  if (/^[0-9]$/.test(e.key)) { openCmd('interval', e.key); e.preventDefault(); return; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     const i = state.lists.findIndex(l => l.id === state.activeListId);
     const j = (i + (e.key === 'ArrowRight' ? 1 : -1) + state.lists.length) % state.lists.length;
@@ -1094,6 +1328,7 @@ renderQuotes();
 renderSession();
 applyDetails();
 mountChart();
+renderHud();
 wsConnect();
 
 // Dev live reload: on localhost, poll the file's Last-Modified and reload when it changes. No-op elsewhere.

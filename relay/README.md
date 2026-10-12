@@ -2,6 +2,7 @@
 
 TradingView's quote websocket only accepts connections whose `Origin` is localhost or a tradingview.com domain.
 This worker accepts the page's websocket, dials TradingView with a `https://www.tradingview.com` Origin and relays frames both ways.
+It also proxies `GET /search?text=…` to TradingView's symbol search (same origin lock) for the add-box autocomplete.
 
 Deploys automatically from GitHub Actions (`.github/workflows/deploy-relay.yml`) whenever `relay/**` changes on `main`; the repo secret `CLOUDFLARE_API_TOKEN` must hold a token made from the "Edit Cloudflare Workers" template. Manual deploy, if ever needed:
 
