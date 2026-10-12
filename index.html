@@ -216,7 +216,7 @@
   .eod-body .col span:first-child { font-weight: 600; }
   .eod.collapsed .eod-body { display: none; }
   /* Selected symbol strip under the list (+ add when it is not in this list) */
-  .selbar { display: grid; grid-template-columns: auto 1fr auto; gap: 0 10px; align-items: center; padding: 8px 12px;
+  .selbar { display: none; grid-template-columns: auto 1fr auto; gap: 0 10px; align-items: center; padding: 8px 12px;
     border-top: 1px solid var(--border); background: var(--bg2); }
   .selbar:empty { display: none; }
   .selbar .ssym { font-weight: 700; font-size: 16px; }
@@ -399,6 +399,7 @@
     .gtab { height: 18px; font-size: 10px; padding: 0 10px; }
     .gtools .icon { width: 16px; height: 16px; font-size: 11px; }
     .gcount { padding: 8px 10px; }
+    .selbar { display: grid; }
     .selbar .ssym { font-size: 15px; }
     .selbar .sadd { padding: 4px 10px; font-size: 12px; margin-top: 4px; }
     .ml-row { padding: 10px 14px; }
