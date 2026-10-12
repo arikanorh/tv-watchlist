@@ -265,10 +265,11 @@
   .symmenu .symbot input { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; font-size: 16px; color: var(--text);
     background: var(--bg); border: 1px solid var(--border); border-radius: 10px; outline: none; }
   .symmenu .symbot input:focus { border-color: var(--accent); }
-  .symmenu .lists { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-  .symmenu .lists::-webkit-scrollbar { display: none; }
-  .symmenu .lists button { width: auto; flex: none; padding: 7px 12px; border-radius: 999px; background: var(--bg3); color: var(--muted); font-size: 14px; font-weight: 600; }
-  .symmenu .lists button.on { background: var(--accent); color: #fff; }
+  .lchips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .lchips::-webkit-scrollbar { display: none; }
+  .lchips button { width: auto; flex: none; padding: 7px 12px; border-radius: 999px; background: var(--bg3); color: var(--muted); font-size: 14px; font-weight: 600; }
+  .lchips button.on { background: var(--accent); color: #fff; }
+  .panel .lchips { flex-shrink: 0; padding: 8px; border-top: 1px solid var(--border); background: var(--bg2); }
   .symmenu .sect { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .symmenu .empty { padding: 14px 10px; color: var(--muted); font-size: 14px; text-align: left; }
   .symmenu #symRows button { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 12px 10px; border-radius: 8px; color: var(--text); font-size: 16px; text-align: left; }
@@ -415,7 +416,8 @@
     .symmenu { bottom: 40px; right: auto; width: min(420px, 100%); border-right: 1px solid var(--border); box-shadow: 8px 0 30px rgba(0,0,0,.4); }
     .symmenu #symRows button { padding: 8px 10px; font-size: 14px; }
     .symmenu #symRows .px { font-size: 14px; } .symmenu #symRows .chg { font-size: 12px; }
-    .symmenu .lists button { padding: 5px 10px; font-size: 12px; }
+    .lchips button { padding: 5px 10px; font-size: 12px; }
+    .panel .lchips { display: none; }
     .symmenu .symbot input { font-size: 14px; padding: 8px 10px; }
     .d-sym b { font-size: 18px; }
     .d-price .big { font-size: 26px; }
@@ -455,6 +457,7 @@
     <div class="list" id="list"></div>
     <div class="eod" id="eod"></div>
     <div class="selbar" id="selbar"></div>
+    <div class="lchips" id="listChips"></div>
     <form class="add" id="addForm">
       <div class="ac" id="ac" hidden></div>
       <input id="symInput" placeholder="Search symbol or type NASDAQ:NBIS" autocomplete="off" spellcheck="false" aria-autocomplete="list">
@@ -468,7 +471,7 @@
   </aside>
   <div class="chart" id="chartWrap">
     <div id="tv_chart"></div>
-    <div class="symmenu" id="symmenu" hidden><div id="symRows"></div><div class="symbot"><div class="lists" id="symLists"></div><input id="symSearch" type="search" placeholder="Search symbol" autocomplete="off" autocapitalize="characters" enterkeyhint="search"></div></div>
+    <div class="symmenu" id="symmenu" hidden><div id="symRows"></div><div class="symbot"><div class="lchips" id="symLists"></div><input id="symSearch" type="search" placeholder="Search symbol" autocomplete="off" autocapitalize="characters" enterkeyhint="search"></div></div>
     <div class="mbar" id="mbar"><button class="msym" id="mbarSym" data-action="sym-toggle" title="Pick from watchlist"></button><span class="mbt" id="mbarText"></span><div class="ivsel" id="intervals"><button class="ivbtn" data-action="iv-toggle" title="Chart interval"></button><div class="ivmenu" hidden></div></div></div>
   </div>
 </div>
@@ -1038,7 +1041,10 @@ function render() {
   renderMLists();
   applySentiment();
 }
+const listChips = action => state.lists.map(l => `<button class="${l.id === state.activeListId ? 'on' : ''}" data-action="${action}" data-id="${esc(l.id)}">${esc(l.name)}</button>`).join('');
 function renderMLists() {
+  $('listChips').innerHTML = listChips('list');
+  $('listChips').querySelector('.on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
   $('mlists').innerHTML = state.lists.map(l => {
     const b = l.summary === true ? breadth(summarySymbols(l)) : null;
     const v = typeof l.summary === 'string' ? effChange(quotes[l.summary]) : (b ? b.avg : null);
@@ -1230,7 +1236,7 @@ const symSearch = { timer: null, seq: 0, items: [] };
 function renderSymMenu() {
   const list = activeList(), syms = list ? flatSymbols(list) : [];
   const q = $('symSearch').value.trim().toUpperCase();
-  $('symLists').innerHTML = state.lists.map(l => `<button class="${l.id === state.activeListId ? 'on' : ''}" data-action="sym-list" data-id="${esc(l.id)}">${esc(l.name)}</button>`).join('');
+  $('symLists').innerHTML = listChips('sym-list');
   const rows = syms.filter(sym => !q || sym.toUpperCase().includes(q) || (raw[sym]?.description || '').toUpperCase().includes(q)).map(sym => {
     const qt = quotes[sym], chg = qt ? (!regular && qt.e != null ? qt.e : qt.c) : null, price = qt ? (!regular && qt.ep != null ? qt.ep : qt.p) : null;
     const short = sym.includes(':') ? sym.split(':')[1] : sym;
