@@ -8,7 +8,7 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 
 | Path | Role |
 |---|---|
-| `index.html` | The whole app: CSS, markup, JS (~900 lines). Only deliverable. |
+| `index.html` | The whole app: CSS, markup, JS (~1800 lines). Only deliverable. |
 | `relay/worker.js` | Cloudflare Worker that relays the TradingView quote websocket for non-localhost origins. |
 | `relay/wrangler.toml`, `relay/README.md` | Worker config + deploy notes. |
 | `.github/workflows/deploy-relay.yml` | Deploys the worker on push to `main` when `relay/**` changes (secret `CLOUDFLARE_API_TOKEN`). |
@@ -34,7 +34,7 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 
 **Details panel** — `renderDetails()` builds a quote sheet for `state.symbol` from `raw`; same-symbol updates are patched per `[data-k]` cell with flash; range bars for day and 52 weeks; stock-only "Company" block. Toggle persisted in `state.detailsOpen`.
 
-**Layout** — top bar (tabs, intervals, status, tick time, session badge, ⋯ lists, details, chart toggles) → ticker tape → body: list panel | resizer | details | chart. Mobile (<768px): stacked, intervals hidden (widget has its own), session badge collapses to a dot, chart toggle gives the list the full screen. Panel width is draggable and persisted.
+**Layout** — CSS is mobile-first: the base rules describe a phone, `@media (min-width: 768px)` lays the same pieces out side by side. Phone: three views behind a bottom nav (`body[data-mview]` = `lists` cards / `list` table / `chart`), pinned tape on lists + chart, tabs bar on chart only, details as a full-screen sheet. Desktop: top bar (tabs, ⋯ lists, status, tick time, chart toggle) → tape → breadth → body: list panel (draggable width, persisted as `--panel-w`) | resizer | details | chart. The chart always carries a bottom **chart bar** (`#mbar`: symbol + company → opens the symbol sheet `#symmenu` with list chips and search; price, change, bar countdown; interval picker `#intervals` → bottom sheet on phones, dropdown on desktop). `@media (hover: hover)` holds hover-only affordances; on touch screens the selected row shows its tools.
 
 **Dev conveniences** — on localhost the page polls its own `Last-Modified` every second and reloads itself (live reload); off localhost this is inert.
 
