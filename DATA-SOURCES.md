@@ -6,7 +6,7 @@ All of these are **unofficial** (reverse-engineered from TradingView's own front
 
 `wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart`
 
-Opens from a browser page on any origin (tested from `http://localhost:8787`). One connection serves any number of symbols.
+**Origin allow-list**: the handshake is accepted only with `Origin` = `http://localhost:*`, `https://www.tradingview.com`, `https://s.tradingview.com` (tested with raw upgrade requests). No Origin → 403, `https://arikanorh.github.io` → 403. So the socket works for local development only; on GitHub Pages the app falls back to §2 scanner polling (10 s) plus hidden widget feeders (§3) for symbols the scanner lacks. A tiny relay (e.g. a Cloudflare Worker that dials TradingView with a tradingview.com Origin) would restore streaming on any host. One connection serves any number of symbols.
 
 ### Framing
 Every message is `~m~<length>~m~<json>`; several frames can be concatenated in one WebSocket message.
