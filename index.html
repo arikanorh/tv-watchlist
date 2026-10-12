@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watchlist</title>
+<style>
+  :root {
+    --bg: #131722; --bg2: #1e222d; --bg3: #2a2e39; --border: #2a2e39;
+    --text: #d1d4dc; --muted: #787b86; --accent: #2962ff; --accent-bg: #1c2a52;
+    --up: #089981; --down: #f23645;
+  }
+  * { box-sizing: border-box; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; height: 100dvh; }
+  button, input, select { font: inherit; color: inherit; }
+  button { background: none; border: 0; cursor: pointer; padding: 0; }
+
+  .bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; min-width: 0;
+    border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .tabs { flex: 0 1 auto; }
+  .ivs { margin-left: 8px; padding-left: 10px; border-left: 1px solid var(--border); }
+  #chartToggle svg { display: block; }
+  #chartToggle .i-show, #chartToggle.off .i-hide { display: none; }
+  #chartToggle.off .i-show { display: block; }
+  .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 5px 12px; border-radius: 6px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+  .tab:hover { background: var(--bg3); color: var(--text); }
+  .tab.on { background: var(--bg3); color: #fff; }
+  .icon { width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center;
+    justify-content: center; color: var(--muted); font-size: 15px; }
+  .icon:hover { background: var(--bg3); color: var(--text); }
+  .spacer { flex: 1; }
+  .ivs { display: flex; gap: 2px; }
+  .iv { padding: 4px 8px; border-radius: 6px; color: var(--muted); font-size: 12px; }
+  .iv:hover { background: var(--bg3); color: var(--text); }
+  .iv.on { background: var(--accent-bg); color: #fff; }
+  .upd { white-space: nowrap; font-size: 14px; font-weight: 500; color: var(--muted); padding: 4px 10px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+  .upd:hover { background: var(--bg3); color: var(--text); }
+  .upd.err { color: var(--down); }
+  .status { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .status.live { background: var(--up); }
+  .status.off { background: var(--down); }
+  .upd.pulse { animation: pulse .6s ease-out; }
+  @keyframes pulse { 0% { color: var(--text); background: var(--accent-bg); } 100% { color: var(--muted); background: transparent; } }
+  dialog { background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0; width: min(360px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0, 0, 0, .55); }
+  .dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+    border-bottom: 1px solid var(--border); font-weight: 600; }
+  .dlg-row { display: flex; align-items: center; gap: 6px; padding: 6px 12px; }
+  .dlg-row input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+  .dlg-row .count { color: var(--muted); font-size: 11px; width: 48px; text-align: right; }
+  .dlg-row .icon { color: var(--muted); }
+  .dlg-row .icon:hover { color: var(--down); }
+  .dlg-row .move { font-size: 11px; width: 22px; }
+  .dlg-add { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border); }
+  .dlg-add input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+  .dlg-add button { background: var(--accent); color: #fff; border-radius: 6px; padding: 0 12px; }
+  .toggle { display: none; }
+  body.chart-hidden .chart, body.chart-hidden .resizer { display: none; }
+  body.chart-hidden .panel { width: auto !important; flex: 1; max-height: none; border-bottom: 0; }
+
+  .body { display: flex; flex: 1; min-height: 0; }
+  .panel { width: 300px; flex-shrink: 0; background: var(--bg);
+    display: flex; flex-direction: column; min-height: 0; }
+  .list { flex: 1; overflow-y: auto; }
+  .grp { display: flex; align-items: center; gap: 6px; padding: 7px 10px; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; color: var(--text); background: var(--bg2); cursor: pointer; user-select: none; }
+  .grp .chev { color: var(--muted); font-size: 10px; }
+  .grp .name { flex: 1; }
+  .grp .chev { display: inline-block; transition: transform .15s; }
+  .grp.collapsed .chev { transform: rotate(-90deg); }
+  .grp .icon { width: 22px; height: 22px; font-size: 12px; opacity: 0; }
+  .grp:hover .icon { opacity: 1; }
+  .cols { display: grid; grid-template-columns: 1fr 76px 60px 70px; gap: 6px; padding: 6px 10px; font-size: 12px;
+    color: var(--muted); border-bottom: 1px solid var(--border); }
+  .cols span:not(:first-child) { text-align: right; }
+  .row { display: grid; grid-template-columns: 1fr 76px 60px 70px; gap: 6px; align-items: center; padding: 0 10px;
+    height: 30px; cursor: pointer; font-size: 13px; font-variant-numeric: tabular-nums; position: relative;
+    border-left: 2px solid transparent; }
+  .row:hover { background: var(--bg2); }
+  .row.on { background: var(--accent-bg); border-left-color: var(--accent); }
+  .row .sym { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .q { display: contents; }
+  .row .px, .row .chg, .row .ext { text-align: right; }
+  .row .ext { font-size: 12px; display: flex; align-items: center; justify-content: flex-end; }
+  .row .ext .v { min-width: 50px; text-align: right; font-variant-numeric: tabular-nums; }
+  .ss { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+  .ss.pre { background: #f7a600; }
+  .ss.post { background: #4f8cff; }
+  .ss.night { background: #b06cff; }
+  .sess { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 12px; color: var(--muted);
+    padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); }
+  .sess .ss { margin: 0; width: 7px; height: 7px; }
+  .sess .ss.open { background: var(--up); }
+  .sess .ss.closed { background: var(--muted); }
+  .panel.no-ext .cols, .panel.no-ext .row { grid-template-columns: 1fr 76px 60px; }
+  .panel.no-ext .cols span:last-child, .panel.no-ext .ext { display: none; }
+  .row .px.up, .row .chg.up, .row .ext.up { color: var(--up); }
+  .row .px.down, .row .chg.down, .row .ext.down { color: var(--down); }
+  .row .px:empty::before, .row .chg:empty::before, .row .ext:empty::before { content: '–'; color: var(--muted); }
+  .row.dragging { opacity: .4; }
+  .row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+  .grp.drop-into { box-shadow: inset 0 0 0 1px var(--accent); }
+  .flash { animation: cell .9s ease-out; border-radius: 3px; }
+  .f-up { --fl: rgba(8, 153, 129, .45); }
+  .f-down { --fl: rgba(242, 54, 69, .45); }
+  .f-same { --fl: rgba(41, 98, 255, .35); }
+  @keyframes cell { 0% { background: var(--fl); } 100% { background: transparent; } }
+  .row .icon { position: absolute; right: 2px; top: 6px; width: 18px; height: 18px; font-size: 12px; opacity: 0;
+    background: var(--bg3); }
+  .row:hover .icon { opacity: 1; }
+  .empty { padding: 20px 12px; color: var(--muted); text-align: center; }
+
+  .add { display: flex; gap: 4px; padding: 6px; border-top: 1px solid var(--border); }
+  .add input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 6px; text-transform: uppercase; font-size: 12px; }
+  .add button { background: var(--accent); color: #fff; border-radius: 6px; width: 28px; }
+
+  .details { display: none; width: 280px; flex-shrink: 0; overflow-y: auto; background: var(--bg);
+    border-right: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  body.details-open .details { display: block; }
+  #detailsToggle.on { color: var(--text); background: var(--bg3); }
+  .d-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--border); }
+  .d-sym { display: flex; align-items: baseline; gap: 8px; }
+  .d-sym b { font-size: 18px; }
+  .d-sym small { color: var(--muted); font-size: 12px; }
+  .d-desc { color: var(--muted); font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .d-price { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; }
+  .d-price .big { font-size: 26px; font-weight: 500; letter-spacing: -.01em; }
+  .d-price .big small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+  .d-price .up, .d-ext .up { color: var(--up); }
+  .d-price .down, .d-ext .down { color: var(--down); }
+  .d-sep { margin: 0 6px; color: var(--border); }
+  .d-price span { font-size: 13px; }
+  .d-ext { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .d-sec { padding: 8px 14px 10px; border-bottom: 1px solid var(--border); }
+  .d-sec h4 { margin: 0 0 6px; font-size: 11px; font-weight: 500; color: var(--muted); }
+  .d-kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 13px; }
+  .d-kv span:first-child { color: var(--muted); }
+  .d-bar { position: relative; height: 4px; background: var(--bg3); border-radius: 2px; margin: 8px 0 4px; }
+  .d-bar i { transition: left .3s; position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--text);
+    transform: translateX(-50%); }
+  .d-bar-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+  .d-empty { padding: 24px 14px; color: var(--muted); font-size: 13px; }
+  .d-stale { color: var(--muted); font-size: 11px; margin-top: 6px; }
+  .resizer { width: 5px; flex-shrink: 0; cursor: col-resize; background: var(--border); }
+  .resizer:hover, .resizer.active { background: var(--accent); }
+  body.resizing { cursor: col-resize; user-select: none; }
+  body.resizing .chart { pointer-events: none; }
+  .chart { flex: 1; min-width: 0; position: relative; }
+  #tv_chart { position: absolute; inset: 0; }
+
+  @media (max-width: 768px) {
+    .body { flex-direction: column; }
+    .panel { width: auto !important; max-height: 40dvh; border-bottom: 1px solid var(--border); }
+    .details { width: auto; max-height: 45dvh; border-right: 0; border-bottom: 1px solid var(--border); }
+    .resizer { display: none; }
+    .panel.hidden { display: none; }
+    .toggle { display: inline-flex; }
+    .bar { padding: 4px 8px; gap: 4px; }
+    .ivs { display: none; }
+    .tabs { flex: 1 1 auto; }
+    .upd { font-size: 12px; padding: 4px 6px; }
+    .sess { padding: 6px; gap: 0; }
+    .sess > span { display: none; }
+    .chart { min-height: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="icon toggle" data-action="toggle-panel" title="Toggle list">☰</button>
+  <div class="tabs" id="tabs"></div>
+  <div class="ivs" id="intervals"></div>
+  <span class="spacer"></span>
+  <span class="status off" id="status"></span>
+  <button class="upd" id="upd" data-action="refresh" title="Last tick. Click to reconnect.">–</button>
+  <span class="sess" id="sess" title="US stock market session (New York time)"><i class="ss closed"></i><span>–</span></span>
+  <button class="icon" data-action="manage-lists" title="Manage lists">⋯</button>
+  <button class="icon" id="detailsToggle" data-action="toggle-details" title="Show details">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M13 9h5M13 13h5"/></svg>
+  </button>
+  <button class="icon" id="chartToggle" data-action="toggle-chart" title="Hide chart">
+    <svg class="i-hide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+    <svg class="i-show" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+  </button>
+</div>
+<div class="body">
+  <div class="panel" id="panel">
+    <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span title="● pre-market · ● post-market · ● overnight">Ext</span></div>
+    <div class="list" id="list"></div>
+    <form class="add" id="addForm">
+      <input id="symInput" placeholder="NASDAQ:NBIS" autocomplete="off" spellcheck="false">
+      <button type="submit" title="Add symbol">+</button>
+    </form>
+  </div>
+  <div class="resizer" id="resizer"></div>
+  <aside class="details" id="details" aria-label="Symbol details"></aside>
+  <div class="chart" id="chartWrap"></div>
+</div>
+
+<dialog id="listDlg">
+  <div class="dlg-head"><span>Watchlists</span><button class="icon" data-action="close-dlg" title="Close">×</button></div>
+  <div id="dlgRows"></div>
+  <form class="dlg-add" id="newListForm">
+    <input id="newListName" placeholder="New list name" autocomplete="off">
+    <button type="submit">Add</button>
+  </form>
+</dialog>
+
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+const KEY = 'tvwl.state.v2';
+const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+function seed() {
+  const g = (name, symbols) => ({ name, collapsed: false, symbols });
+  return {
+    activeListId: 'abd', interval: '60', symbol: 'NASDAQ:NBIS',
+    lists: [
+      { id: 'abd', name: 'ABD', groups: [
+        g('Index', ['SKILLING:US100', 'SKILLING:SPX500', 'NASDAQ:NDX', 'SP:SPX', 'CME_MINI:NQ1!', 'CME_MINI:ES1!', 'CBOT_MINI:YM1!', 'OKX:US100USDT.P', 'OKX:US500USDT.P']),
+        g('Spot', ['NASDAQ:NBIS','NASDAQ:CRWV','NYSE:BE','NASDAQ:CEG','NYSE:MOD','NASDAQ:AVGO','NASDAQ:ASTS','NASDAQ:UPST','NYSE:AMPX','NYSE:KRMN']),
+        g('Moon sh', ['NASDAQ:ONDS','NASDAQ:RCAT','NASDAQ:GRRR','NYSE:TE','NASDAQ:ASPI','NASDAQ:EOSE','NYSE:ORCL','NYSE:NKE']),
+      ]},
+      { id: 'inci', name: 'İnci', groups: [
+        g('All', ['NASDAQ:RKLB','NYSE:PL','NASDAQ:APP','CBOE:EUV','NASDAQ:COHU','NYSE:RBRK','NASDAQ:SOFI','NASDAQ:QS','NYSE:NOW','NASDAQ:AVAV','NASDAQ:EOSE','NYSE:RDDT','NASDAQ:CBRS']),
+      ]},
+      { id: 'tr', name: 'TR', groups: [
+        g('FX', ['TVC:DXY','FX:EURUSD','FX:USDTRY','FX:EURTRY']),
+        g('BIST', ['BIST:XU100','BIST:XU030D1!','BIST:XBANK','BIST:DMLKT','BIST:ENPRA']),
+        g('Altın & Gümüş', ['OANDA:XAUUSD','TVC:SILVER','TVC:GOLDSILVER','OANDA:XAUEUR']),
+        g('Other', ['FX_IDC:XAUTRYG','BIST:ALTIN','BIST:GMSTR']),
+      ]},
+      { id: 'ozet', name: 'Özet', groups: [
+        g('All', ['TVC:VIX','FX:UKOIL','NASDAQ:NDX','SP:SPX','TVC:US10Y','OANDA:XAUUSD','TVC:SILVER','BINANCE:BTCUSDT','BINANCE:ETHUSDT','TVC:DXY','NASDAQ:QQQ','AMEX:SPY','AMEX:RSP','AMEX:IWM','DJ:DJI','TVC:NI225','KRX:KOSPI','FX:USDJPY','INDEX:S5FI','AMEX:XLF']),
+      ]},
+      { id: 'zorning', name: 'Z-Örning', groups: [
+        g('Main', ['NASDAQ:LULU','NASDAQ:MRVL','NASDAQ:META','NASDAQ:NVDA']),
+        g('Section 1', ['NASDAQ:RXRX','NASDAQ:SPCX','NYSE:LEU','NASDAQ:MU','NASDAQ:GOOGL','NASDAQ:AMZN','NASDAQ:MSFT','NASDAQ:PLTR','NYSE:DXYZ','NASDAQ:ALAB','NASDAQ:AMD','NYSE:NET','NYSE:ANET','NASDAQ:SEZL','NYSE:VST','NASDAQ:SHAZ','NYSE:QXO','NASDAQ:ALMU','AMEX:NASA','NASDAQ:CRDO','NASDAQ:IREN','NASDAQ:KTOS']),
+      ]},
+    ],
+  };
+}
+const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'NASDAQ:NDX', 'CAPITALCOM:SPX500': 'SP:SPX', 'TVC:DJI': 'DJ:DJI', 'TVC:UKOIL': 'FX:UKOIL',
+  'OANDA:XAGUSD': 'TVC:SILVER', 'AMEX:LEU': 'NYSE:LEU', 'NASDAQ:EUV': 'CBOE:EUV', 'NASDAQ:DXYZ': 'NYSE:DXYZ',
+  'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS' };
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && Array.isArray(s.lists) && s.lists.length) {
+      const fix = x => SYMBOL_FIXES[x] || x;
+      s.symbol = fix(s.symbol);
+      s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix); }));
+      return s;
+    }
+  } catch (e) {}
+  return seed();
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+
+let state = load();
+const $ = id => document.getElementById(id);
+const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
+const flatSymbols = list => list.groups.flatMap(g => g.symbols);
+
+// Widget iframe accepts {name:'set-symbol',data:{symbol}} / {name:'set-interval',data:{interval}} via postMessage.
+const chart = { ready: false, pending: {} };
+function send(name, data) {
+  const f = $('chartWrap').querySelector('iframe');
+  if (!chart.ready || !f) { chart.pending[name] = data; return; }
+  f.contentWindow.postMessage({ name, data }, '*');
+}
+window.addEventListener('message', e => {
+  const f = $('chartWrap').querySelector('iframe');
+  if (!f || f.contentWindow !== e.source) return;
+  if (!chart.ready) {
+    chart.ready = true;
+    for (const k in chart.pending) send(k, chart.pending[k]);
+    chart.pending = {};
+  }
+  // The widget streams quoteUpdate for the symbol currently on the chart (JSON string, provider TradingView).
+  if (typeof e.data === 'string' && e.data.includes('quoteUpdate')) {
+    try {
+      const m = JSON.parse(e.data);
+      if (m.name === 'quoteUpdate') {
+        onChartSymbol(m.data);
+      }
+    } catch (_) {}
+  }
+});
+
+// Chart → list sync: when the symbol is changed inside the widget, highlight it if listed, otherwise prefill the add box.
+const resolved = {};
+let lastChartName = null, autofilled = false;
+async function onChartSymbol(d) {
+  if (!d || d.original_name === lastChartName) return;
+  lastChartName = d.original_name;
+  const sym = await resolveSymbol(d.original_name, d.short_name);
+  if (lastChartName !== d.original_name) return;
+  chart.symbol = sym;
+  const input = $('symInput');
+  if (flatSymbols(activeList()).includes(sym)) {
+    if (state.symbol !== sym) { state.symbol = sym; save(); render(); }
+    if (autofilled) { input.value = ''; autofilled = false; }
+  } else if (!input.value || autofilled) {
+    input.value = sym; autofilled = true;
+  }
+}
+async function resolveSymbol(name, short) {
+  if (resolved[name]) return resolved[name];
+  const [ex] = name.split(':');
+  let sym = name;
+  if (ex === 'BATS_DLY' || ex === 'BATS' || ex === 'CBOE') {
+    // Delayed Cboe feed: find the listing exchange. Prefer a symbol already in any list.
+    const known = state.lists.flatMap(flatSymbols).find(x => x.split(':')[1] === short);
+    if (known) sym = known;
+    else {
+      const cands = ['NASDAQ', 'NYSE', 'AMEX', 'CBOE'].map(x => x + ':' + short);
+      try {
+        const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST',
+          body: JSON.stringify({ symbols: { tickers: cands }, columns: ['close'] }) });
+        const found = new Set((await r.json()).data.map(x => x.s));
+        sym = cands.find(c => found.has(c)) || sym;
+      } catch (_) {}
+    }
+  }
+  return resolved[name] = sym;
+}
+
+function mountChart() {
+  $('chartWrap').innerHTML = '<div id="tv_chart"></div>';
+  new TradingView.widget({
+    autosize: true, container_id: 'tv_chart',
+    symbol: state.symbol || flatSymbols(activeList())[0] || 'BINANCE:BTCUSDT', interval: state.interval,
+    timezone: 'Etc/UTC', theme: 'dark', style: '1', locale: 'en',
+    allow_symbol_change: true, details: false, hotlist: false, calendar: false,
+    hide_side_toolbar: true,
+    support_host: 'https://www.tradingview.com',
+  });
+}
+function showSymbol() { send('set-symbol', { symbol: state.symbol }); }
+
+// Quotes: TradingView scanner (unofficial, CORS-enabled). Polled for the active list only.
+const quotes = {};
+let quoteTimer = null;
+const fmt = p => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(p);
+function quoteHtml(sym) {
+  const q = quotes[sym];
+  if (!q) return '<span class="px"></span><span class="chg"></span><span class="ext"></span>';
+  const pct = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+  const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
+  const dot = q.ss ? `<i class="ss ${q.ss}"></i>` : '';
+  const ext = q.e == null ? dot : dot + `<span class="v">${pct(q.e)}</span>`;
+  // Outside the regular session, Last shows the extended-session price when there is one.
+  const last = !regular && q.ep != null ? q.ep : q.p;
+  return `<span class="px ${cls(q.c)}" title="${last !== q.p ? q.es : ''}">${fmt(last)}</span><span class="chg ${cls(q.c)}">${pct(q.c)}</span>` +
+    `<span class="ext ${cls(q.e)}" title="${q.es || ''}">${ext}</span>`;
+}
+// Regular US session: Mon–Fri 09:30–16:00 America/New_York. Ext column is hidden then.
+function isRegularSession() {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false,
+    weekday: 'short', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
+  const get = t => parts.find(x => x.type === t).value;
+  const mins = (+get('hour') % 24) * 60 + +get('minute');
+  return !['Sat', 'Sun'].includes(get('weekday')) && mins >= 9 * 60 + 30 && mins < 16 * 60;
+}
+// US session phase for the top bar: pre 04:00–09:30, open 09:30–16:00, post 16:00–20:00, overnight 20:00–04:00 (Mon–Fri), closed on weekends.
+function sessionPhase() {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false,
+    weekday: 'short', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
+  const get = t => parts.find(x => x.type === t).value;
+  const wd = get('weekday'), m = (+get('hour') % 24) * 60 + +get('minute');
+  if (wd === 'Sat' || (wd === 'Sun' && m < 20 * 60) || (wd === 'Fri' && m >= 20 * 60)) return ['closed', 'Closed'];
+  if (m < 4 * 60 || m >= 20 * 60) return ['night', 'Overnight'];
+  if (m < 9 * 60 + 30) return ['pre', 'Pre-market'];
+  if (m < 16 * 60) return ['open', 'Market open'];
+  return ['post', 'Post-market'];
+}
+function renderSession() {
+  const [cls, label] = sessionPhase();
+  const tz = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' }).format(new Date());
+  $('sess').innerHTML = `<i class="ss ${cls}"></i><span>${label}<span class="tz"> · ${tz} NY</span></span>`;
+}
+setInterval(renderSession, 30000);
+let regular = false;
+function renderQuotes() {
+  regular = isRegularSession();
+  $('panel').classList.toggle('no-ext', regular);
+  if (state.detailsOpen) renderDetails();
+  document.querySelectorAll('.q[data-q]').forEach(el => {
+    const html = quoteHtml(el.dataset.q);
+    if (html === el.innerHTML) return;
+    const oldPx = el.querySelector('.px')?.textContent, oldChg = el.querySelector('.chg')?.textContent, oldExt = el.querySelector('.ext')?.textContent;
+    el.innerHTML = html;
+    const px = el.querySelector('.px');
+    const flash = (node, cls) => { if (node && !node.classList.contains('flash')) { node.classList.add('flash', cls); node.addEventListener('animationend', () => node.classList.remove('flash', cls), { once: true }); } };
+    if (oldPx != null && px.textContent !== oldPx) {
+      const d = parseFloat(px.textContent.replace(/,/g, '')) - parseFloat(oldPx.replace(/,/g, ''));
+      flash(px, d > 0 ? 'f-up' : d < 0 ? 'f-down' : 'f-same');
+    }
+    if (oldChg != null && el.querySelector('.chg').textContent !== oldChg) flash(el.querySelector('.chg'), 'f-same');
+    if (oldExt != null && el.querySelector('.ext').textContent !== oldExt) flash(el.querySelector('.ext'), 'f-same');
+  });
+}
+// Quote stream: TradingView quote websocket (unofficial). One connection, all symbols of the active list,
+// partial updates merged into `quotes`. Fields: lp/ch/chp = regular session, rtc/rch/rchp = extended session.
+const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode',
+  'open_price', 'high_price', 'low_price', 'prev_close_price', 'bid', 'ask', 'volume', 'average_volume',
+  'price_52_week_high', 'price_52_week_low', 'all_time_high', 'price_percent_change_1_week', 'price_percent_change_52_week',
+  'market_cap_basic', 'earnings_release_next_date', 'price_target_average',
+  'description', 'exchange', 'type', 'currency_code'];
+const raw = {};
+let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, lastPulse = 0;
+const frame = o => { const j = JSON.stringify(o); return '~m~' + j.length + '~m~' + j; };
+const wsSend = o => { if (ws && ws.readyState === 1) ws.send(frame(o)); };
+function wsConnect() {
+  clearTimeout(wsTimer);
+  if (ws) { ws.onclose = null; ws.close(); }
+  wsSubscribed = [];
+  ws = new WebSocket('wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart');
+  ws.onopen = () => {
+    wsRetry = 0;
+    wsSend({ m: 'set_auth_token', p: ['unauthorized_user_token'] });
+    wsSend({ m: 'quote_create_session', p: ['qs'] });
+    wsSend({ m: 'quote_set_fields', p: ['qs', ...QUOTE_FIELDS] });
+    wsSync();
+    setStatus('live');
+  };
+  ws.onmessage = e => {
+    for (const part of String(e.data).split(/~m~\d+~m~/).filter(Boolean)) {
+      if (part.startsWith('~h~')) { ws.send('~m~' + part.length + '~m~' + part); continue; }
+      let m; try { m = JSON.parse(part); } catch (_) { continue; }
+      if (m.m === 'qsd' && m.p[1]?.s === 'ok') onQuote(m.p[1].n, m.p[1].v);
+    }
+  };
+  ws.onclose = () => {
+    setStatus('off');
+    wsTimer = setTimeout(wsConnect, Math.min(30000, 1000 * 2 ** wsRetry++));
+  };
+}
+// Subscribe exactly the active list's symbols.
+function wsSync() {
+  if (!ws || ws.readyState !== 1) return;
+  const want = flatSymbols(activeList());
+  const add = want.filter(x => !wsSubscribed.includes(x)), del = wsSubscribed.filter(x => !want.includes(x));
+  if (del.length) wsSend({ m: 'quote_remove_symbols', p: ['qs', ...del] });
+  if (add.length) wsSend({ m: 'quote_add_symbols', p: ['qs', ...add] });
+  wsSubscribed = want;
+}
+let renderTimer = null;
+function onQuote(sym, v) {
+  const r = raw[sym] = Object.assign(raw[sym] || {}, v);
+  if (r.lp == null) return;
+  // Session marker: pre-market (amber), post-market (blue), overnight/BOATS (purple); none during the regular session.
+  const ss = r.current_session === 'pre_market' ? 'pre' : r.current_session === 'post_market' ? 'post'
+    : r.current_session !== 'market' && r.rtc != null ? 'night' : '';
+  const ext = { pre: 'Pre-market', post: 'Post-market', night: 'Overnight' }[ss] || '';
+  quotes[sym] = { p: r.lp, c: r.chp ?? 0, e: r.rchp ?? null, ep: r.rtc ?? null, es: ext, ss };
+  const now = Date.now();
+  const upd = $('upd');
+  upd.textContent = '↻ ' + new Date().toLocaleTimeString('en-GB');
+  if (now - lastPulse > 1500) { lastPulse = now; upd.classList.remove('pulse'); void upd.offsetWidth; upd.classList.add('pulse'); }
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(renderQuotes, 250);
+}
+function setStatus(st) { $('status').className = 'status ' + st; $('status').title = st === 'live' ? 'Live stream connected' : 'Reconnecting…'; }
+function refreshQuotes() { wsRetry = 0; wsConnect(); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && (!ws || ws.readyState !== 1)) refreshQuotes(); });
+
+function render() {
+  const list = activeList();
+  state.activeListId = list.id;
+
+  $('tabs').innerHTML = state.lists.map(l =>
+    `<button class="tab${l.id === list.id ? ' on' : ''}" data-action="list" data-id="${l.id}">${esc(l.name)}</button>`).join('');
+
+  $('intervals').innerHTML = INTERVALS.map(([label, v]) =>
+    `<button class="iv${v === state.interval ? ' on' : ''}" data-action="interval" data-value="${v}">${label}</button>`).join('');
+
+  const single = list.groups.length === 1;
+  $('list').innerHTML = list.groups.length ? list.groups.map((g, gi) => `
+    ${single ? '' : `<div class="grp${g.collapsed ? ' collapsed' : ''}" data-action="toggle-group" data-group="${gi}">
+      <span class="chev">▾</span><span class="name">${esc(g.name)}</span>
+      <button class="icon" data-action="rename-group" data-group="${gi}" title="Rename group">✎</button>
+      <button class="icon" data-action="delete-group" data-group="${gi}" title="Delete group">×</button>
+    </div>`}
+    ${g.collapsed && !single ? '' : g.symbols.map(s => {
+      const sym = s.includes(':') ? s.split(':')[1] : s;
+      return `<div class="row${s === state.symbol ? ' on' : ''}" draggable="true" data-action="select" data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}">
+        <span class="sym">${esc(sym)}</span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
+        <button class="icon" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}" title="Remove">×</button>
+      </div>`; }).join('')}
+  `).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
+  : `<div class="empty">No groups yet</div><div class="grp" data-action="add-group">+ group</div>`;
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function update(switchSymbol) { save(); render(); if (switchSymbol) showSymbol(); if (state.detailsOpen) renderDetails(); }
+
+// Drag & drop: reorder symbols within a group or move them between groups (drop on a row or a group header).
+let drag = null;
+const listEl = $('list');
+listEl.addEventListener('dragstart', e => {
+  const row = e.target.closest('.row'); if (!row) return;
+  drag = { gi: +row.dataset.group, sym: row.dataset.symbol };
+  row.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', drag.sym);
+});
+listEl.addEventListener('dragend', () => { drag = null; clearDrop(); });
+const clearDrop = () => listEl.querySelectorAll('.drop-before, .drop-into, .dragging').forEach(el => el.classList.remove('drop-before', 'drop-into', 'dragging'));
+listEl.addEventListener('dragover', e => {
+  if (!drag) return;
+  const row = e.target.closest('.row'), grp = e.target.closest('.grp[data-action="toggle-group"]');
+  if (!row && !grp) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  clearDrop();
+  (row || grp).classList.add(row ? 'drop-before' : 'drop-into');
+});
+listEl.addEventListener('drop', e => {
+  if (!drag) return;
+  const row = e.target.closest('.row'), grp = e.target.closest('.grp[data-action="toggle-group"]');
+  if (!row && !grp) return;
+  e.preventDefault();
+  if (row && row.dataset.symbol === drag.sym) { drag = null; clearDrop(); return; }
+  const list = activeList();
+  const from = list.groups[drag.gi];
+  from.symbols.splice(from.symbols.indexOf(drag.sym), 1);
+  if (row) {
+    const to = list.groups[+row.dataset.group];
+    const idx = to.symbols.indexOf(row.dataset.symbol);
+    to.symbols.splice(idx < 0 ? to.symbols.length : idx, 0, drag.sym);
+  } else {
+    list.groups[+grp.dataset.group].symbols.push(drag.sym);
+  }
+  drag = null; update(false); renderQuotes();
+});
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const list = activeList();
+  const gi = +el.dataset.group;
+  switch (el.dataset.action) {
+    case 'select':
+      state.symbol = el.dataset.symbol; update(true); break;
+    case 'remove': {
+      e.stopPropagation();
+      const g = list.groups[gi]; g.symbols = g.symbols.filter(s => s !== el.dataset.symbol);
+      update(false); wsSync(); break;
+    }
+    case 'interval':
+      state.interval = el.dataset.value; update(false); send('set-interval', { interval: state.interval }); break;
+    case 'toggle-group':
+      list.groups[gi].collapsed = !list.groups[gi].collapsed; update(false); break;
+    case 'add-group': {
+      const name = prompt('Group name'); if (!name) return;
+      list.groups.push({ name: name.trim(), collapsed: false, symbols: [] }); update(false); break;
+    }
+    case 'rename-group': {
+      e.stopPropagation();
+      const name = prompt('Group name', list.groups[gi].name); if (!name) return;
+      list.groups[gi].name = name.trim(); update(false); break;
+    }
+    case 'delete-group': {
+      e.stopPropagation();
+      if (!confirm(`Delete group "${list.groups[gi].name}"?`)) return;
+      list.groups.splice(gi, 1); update(false); wsSync(); break;
+    }
+    case 'list':
+      state.activeListId = el.dataset.id; update(false); wsSync(); break;
+    case 'manage-lists':
+      renderListDlg(); $('listDlg').showModal(); break;
+    case 'close-dlg':
+      $('listDlg').close(); break;
+    case 'dlg-delete': {
+      const l = state.lists.find(x => x.id === el.dataset.id);
+      if (state.lists.length === 1) return alert('Cannot delete the last list');
+      if (!confirm(`Delete list "${l.name}"?`)) return;
+      state.lists = state.lists.filter(x => x.id !== l.id);
+      if (state.activeListId === l.id) state.activeListId = state.lists[0].id;
+      update(false); wsSync(); renderListDlg(); break;
+    }
+    case 'dlg-move': {
+      const i = state.lists.findIndex(x => x.id === el.dataset.id), j = i + (+el.dataset.dir);
+      if (j < 0 || j >= state.lists.length) return;
+      [state.lists[i], state.lists[j]] = [state.lists[j], state.lists[i]];
+      update(false); renderListDlg(); break;
+    }
+    case 'toggle-details':
+      state.detailsOpen = !state.detailsOpen; save(); applyDetails(); break;
+    case 'toggle-chart':
+      state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
+    case 'toggle-panel':
+      $('panel').classList.toggle('hidden'); break;
+  }
+});
+
+
+$('symInput').addEventListener('input', () => { autofilled = false; });
+$('addForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const list = activeList();
+  const sym = $('symInput').value.trim().toUpperCase();
+  if (!list.groups.length) list.groups.push({ name: 'Main', collapsed: false, symbols: [] });
+  const g = list.groups[list.groups.length - 1];
+  if (!sym) return;
+  if (!flatSymbols(list).includes(sym)) g.symbols.push(sym);
+  $('symInput').value = '';
+  state.symbol = sym; update(true); wsSync();
+});
+
+function applyDetails() {
+  document.body.classList.toggle('details-open', !!state.detailsOpen);
+  $('detailsToggle').classList.toggle('on', !!state.detailsOpen);
+  $('detailsToggle').title = state.detailsOpen ? 'Hide details' : 'Show details';
+  if (state.detailsOpen) renderDetails();
+}
+
+function applyChartHidden() {
+  document.body.classList.toggle('chart-hidden', !!state.chartHidden);
+  $('chartToggle').classList.toggle('off', !!state.chartHidden);
+  $('chartToggle').title = state.chartHidden ? 'Show chart' : 'Hide chart';
+}
+applyChartHidden();
+
+// List management dialog: rename inline, reorder, delete, add.
+function renderListDlg() {
+  $('dlgRows').innerHTML = state.lists.map((l, i) => `
+    <div class="dlg-row">
+      <input value="${esc(l.name)}" data-rename="${l.id}" aria-label="List name">
+      <span class="count">${flatSymbols(l).length} sym</span>
+      <button class="icon move" data-action="dlg-move" data-id="${l.id}" data-dir="-1" title="Move up" ${i === 0 ? 'disabled' : ''}>▲</button>
+      <button class="icon move" data-action="dlg-move" data-id="${l.id}" data-dir="1" title="Move down" ${i === state.lists.length - 1 ? 'disabled' : ''}>▼</button>
+      <button class="icon" data-action="dlg-delete" data-id="${l.id}" title="Delete list">🗑</button>
+    </div>`).join('');
+}
+$('dlgRows').addEventListener('change', e => {
+  const id = e.target.dataset.rename; if (!id) return;
+  const name = e.target.value.trim();
+  if (!name) { e.target.value = state.lists.find(l => l.id === id).name; return; }
+  state.lists.find(l => l.id === id).name = name; update(false);
+});
+$('newListForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('newListName').value.trim(); if (!name) return;
+  const l = { id: uid(), name, groups: [{ name: 'Main', collapsed: false, symbols: [] }] };
+  state.lists.push(l); state.activeListId = l.id;
+  $('newListName').value = '';
+  update(false); wsSync(); renderListDlg();
+});
+$('listDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+// Panel width: drag the divider; persisted in state.
+if (state.panelWidth) $('panel').style.width = state.panelWidth + 'px';
+$('resizer').addEventListener('pointerdown', e => {
+  const r = e.currentTarget, startX = e.clientX, startW = $('panel').offsetWidth;
+  r.setPointerCapture(e.pointerId); r.classList.add('active'); document.body.classList.add('resizing');
+  const move = ev => { state.panelWidth = Math.min(600, Math.max(200, startW + ev.clientX - startX)); $('panel').style.width = state.panelWidth + 'px'; };
+  const up = () => { r.classList.remove('active'); document.body.classList.remove('resizing');
+    r.removeEventListener('pointermove', move); r.removeEventListener('pointerup', up); save(); };
+  r.addEventListener('pointermove', move); r.addEventListener('pointerup', up);
+});
+
+
+// Details panel: quote sheet for the selected symbol, built from the merged websocket fields in `raw`.
+const fmtN = (v, d = 2) => v == null ? '–' : new Intl.NumberFormat('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
+const fmtBig = v => v == null ? '–' : v >= 1e12 ? (v / 1e12).toFixed(2) + 'T' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'K' : String(v);
+const fmtPct = v => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+const signCls = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
+function fmtDays(unix) {
+  if (!unix) return null;
+  const d = new Date(unix * 1000), days = Math.round((d - Date.now()) / 864e5);
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return days < 0 ? `${date} (past)` : days === 0 ? `${date}, today` : `${date}, in ${days}d`;
+}
+function rangeBar(lo, hi, v) {
+  if (lo == null || hi == null || v == null || hi <= lo) return '';
+  const pct = Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
+  return `<div class="d-bar"><i style="left:${pct.toFixed(1)}%"></i></div><div class="d-bar-l"><span>${fmtN(lo)}</span><span>${fmtN(hi)}</span></div>`;
+}
+let detailsSym = null;
+function renderDetails() {
+  if (!state.detailsOpen) return;
+  const el = $('details'), sym = state.symbol, r = raw[sym], q = quotes[sym];
+  if (!sym || !r || r.lp == null) {
+    detailsSym = null;
+    el.innerHTML = `<div class="d-empty">${sym ? 'Waiting for data for ' + esc(sym) + '…' : 'Select a symbol in the list to see its details.'}</div>`;
+    return;
+  }
+  const [ex, short] = sym.includes(':') ? sym.split(':') : ['', sym];
+  const cur = r.currency_code ? ' ' + r.currency_code : '';
+  const v = (k, html, cls = '') => `<span data-k="${k}" class="${cls}">${html}</span>`;
+  const kv = (k, html, cls = '') => html == null || html === '–' ? '' : `<div class="d-kv"><span>${k}</span>${v(k, html, cls)}</div>`;
+  const stock = r.type === 'stock' || r.type === 'dr' || r.type === 'fund';
+  const volRatio = r.volume && r.average_volume ? (r.volume / r.average_volume) : null;
+  const upside = r.price_target_average && r.lp ? (r.price_target_average / r.lp - 1) * 100 : null;
+  // Header mirrors the list: outside the regular session the big price is the extended-session price.
+  const extended = q && q.ep != null && !regular;
+  const big = extended ? q.ep : r.lp;
+  const extLine = extended
+    ? `<div class="d-ext"><i class="ss ${q.ss}"></i>${q.es} ${v('extp', fmtPct(q.e), signCls(q.e))}<span class="d-sep">·</span>Close ${v('close', fmtN(r.lp))}</div>`
+    : '';
+  const stale = r.update_mode && r.update_mode.startsWith('delayed') ? `<div class="d-stale">Delayed ${Math.round(parseInt(r.update_mode.split('_').pop(), 10) / 60) || 15} min</div>` : '';
+  const html = `
+    <div class="d-head">
+      <div class="d-sym"><b>${esc(short)}</b><small>${esc(r.exchange || ex)}</small></div>
+      <div class="d-desc" title="${esc(r.description || '')}">${esc(r.description || '')}</div>
+      <div class="d-price">${v('lp', fmtN(big) + `<small>${cur}</small>`, 'big ' + signCls(extended ? q.e : r.chp))}${v('chg', (r.ch != null ? (r.ch > 0 ? '+' : '') + fmtN(r.ch) : '') + ' ' + fmtPct(r.chp), signCls(r.chp))}</div>
+      ${extLine}${stale}
+    </div>
+    <div class="d-sec"><h4>Today</h4>
+      ${rangeBar(r.low_price, r.high_price, r.lp)}
+      ${kv('Open', fmtN(r.open_price))}${kv('Prev close', fmtN(r.prev_close_price))}
+      ${kv('Bid / Ask', r.bid != null && r.ask != null ? fmtN(r.bid) + ' / ' + fmtN(r.ask) : null)}
+      ${kv('Volume', r.volume != null ? fmtBig(r.volume) + (volRatio ? ` <small class="${volRatio >= 1.5 ? 'up' : ''}">${volRatio.toFixed(1)}× avg</small>` : '') : null)}
+    </div>
+    ${r.price_52_week_low != null ? `<div class="d-sec"><h4>52 weeks</h4>
+      ${rangeBar(r.price_52_week_low, r.price_52_week_high, r.lp)}
+      ${kv('1 week', fmtPct(r.price_percent_change_1_week), signCls(r.price_percent_change_1_week))}
+      ${kv('52 weeks', fmtPct(r.price_percent_change_52_week), signCls(r.price_percent_change_52_week))}
+      ${kv('From ATH', r.all_time_high ? fmtPct((r.lp / r.all_time_high - 1) * 100) : null, 'down')}
+    </div>` : ''}
+    ${stock ? `<div class="d-sec"><h4>Company</h4>
+      ${kv('Market cap', fmtBig(r.market_cap_basic))}
+      ${kv('Next earnings', fmtDays(r.earnings_release_next_date))}
+      ${kv('Analyst target', r.price_target_average ? fmtN(r.price_target_average) + ` <small class="${signCls(upside)}">${fmtPct(upside)}</small>` : null)}
+    </div>` : ''}`;
+
+  // Same symbol: patch changed values in place (and flash them) instead of rebuilding the panel.
+  if (detailsSym === sym) {
+    const tmp = document.createElement('div'); tmp.innerHTML = html;
+    const cur = new Map([...el.querySelectorAll('[data-k]')].map(n => [n.dataset.k, n]));
+    const next = [...tmp.querySelectorAll('[data-k]')];
+    if (next.length === cur.size && next.every(n => cur.has(n.dataset.k))) {
+      for (const n of next) {
+        const o = cur.get(n.dataset.k);
+        if (o.innerHTML === n.innerHTML) continue;
+        const a = parseFloat(o.textContent.replace(/[^\d.-]/g, '')), b = parseFloat(n.textContent.replace(/[^\d.-]/g, ''));
+        o.innerHTML = n.innerHTML; o.className = n.className;
+        flashNode(o, b > a ? 'f-up' : b < a ? 'f-down' : 'f-same');
+      }
+      // Range bar markers move without a flash.
+      const bars = el.querySelectorAll('.d-bar i'), nb = tmp.querySelectorAll('.d-bar i');
+      if (bars.length === nb.length) bars.forEach((b, i) => { b.style.left = nb[i].style.left; });
+      return;
+    }
+  }
+  el.innerHTML = html;
+  detailsSym = sym;
+}
+function flashNode(node, cls) {
+  if (!node || node.classList.contains('flash')) return;
+  node.classList.add('flash', cls);
+  node.addEventListener('animationend', () => node.classList.remove('flash', cls), { once: true });
+}
+
+// Boot (after every module above is defined).
+render();
+renderQuotes();
+renderSession();
+applyDetails();
+mountChart();
+wsConnect();
+
+// Dev live reload: on localhost, poll the file's Last-Modified and reload when it changes. No-op elsewhere.
+if (['localhost', '127.0.0.1'].includes(location.hostname)) (async () => {
+  const stamp = async () => { try { const r = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store' }); return r.headers.get('last-modified') || r.headers.get('etag'); } catch (_) { return null; } };
+  let last = await stamp();
+  setInterval(async () => { const now = await stamp(); if (now && last && now !== last) location.reload(); if (now) last = now; }, 1000);
+})();
+</script>
+</body>
+</html>
