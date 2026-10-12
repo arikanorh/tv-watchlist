@@ -450,6 +450,11 @@ const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session'
   'description', 'exchange', 'type', 'currency_code'];
 const raw = {};
 let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, lastPulse = 0, wsEverOpen = false;
+// TradingView accepts the socket only from localhost / tradingview.com origins; elsewhere go through the relay
+// (relay/worker.js on Cloudflare). Empty RELAY_WS → scanner polling fallback.
+const WS_DIRECT = 'wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart';
+const RELAY_WS = '';
+const IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 let quoteSource = new URLSearchParams(location.search).get('quotes') === 'poll' ? 'poll' : 'ws';
 const frame = o => { const j = JSON.stringify(o); return '~m~' + j.length + '~m~' + j; };
 const wsSend = o => { if (ws && ws.readyState === 1) ws.send(frame(o)); };
@@ -458,7 +463,7 @@ function wsConnect() {
   if (quoteSource === 'poll') return startPolling();
   if (ws) { ws.onclose = null; ws.close(); }
   wsSubscribed = [];
-  ws = new WebSocket('wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart');
+  ws = new WebSocket(IS_LOCAL || !RELAY_WS ? WS_DIRECT : RELAY_WS);
   ws.onopen = () => {
     wsRetry = 0; wsEverOpen = true;
     wsSend({ m: 'set_auth_token', p: ['unauthorized_user_token'] });
