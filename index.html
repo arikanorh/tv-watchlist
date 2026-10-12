@@ -360,20 +360,33 @@
     .chart #tv_chart { position: relative; flex: 1; min-height: 0; }
     .hud { display: none !important; }
     .mbar { display: flex; align-items: baseline; gap: 12px; flex-shrink: 0; padding: 10px 14px;
-      border-top: 1px solid var(--border); background: var(--bg2); cursor: pointer; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .mbar .mbt { display: flex; align-items: baseline; justify-content: flex-end; gap: 10px; flex: 1; min-width: 0; }
-    .mbar .msym { align-self: stretch; margin: -10px 0 -10px -14px; padding: 0 14px; max-width: 45%; overflow: hidden; text-overflow: ellipsis;
-      font-size: 19px; font-weight: 700; color: var(--text); background: none; border: 0; border-right: 1px solid var(--border); border-radius: 0; text-align: left; }
-    .symmenu { position: absolute; left: 0; right: 0; bottom: 100%; z-index: 40; max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
-      padding: 10px 8px 12px; background: var(--bg2); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.5); }
+      border-top: 1px solid var(--border); background: var(--bg2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mbar .mbt { display: flex; align-items: baseline; justify-content: flex-end; gap: 10px; flex: none; }
+    .mbar .msym { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; align-self: stretch; margin: -10px 0 -10px -14px; padding: 0 12px 0 14px;
+      font-size: 19px; font-weight: 700; color: var(--text); background: none; border: 0; border-radius: 0; text-align: left; }
+    .mbar .msym small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 500; color: var(--muted); }
+    .symmenu { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 40; display: flex; flex-direction: column; background: var(--bg2); }
     .symmenu[hidden] { display: none; }
-    .symmenu::before { content: ''; display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--bg3); margin: 0 auto 8px; }
+    .symmenu #symRows { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px; }
+    .symmenu .symbot { flex: none; padding: 8px; border-top: 1px solid var(--border); background: var(--bg2); }
+    .symmenu .symbot input { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; outline: none; }
+    .symmenu .symbot input:focus { border-color: var(--accent); }
+    .symmenu .lists { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+    .symmenu .lists::-webkit-scrollbar { display: none; }
+    .symmenu .sect { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .symmenu .empty { padding: 14px 10px; color: var(--muted); font-size: 14px; }
+    .symmenu button.sr .s { flex: none; }
+    .symmenu button.sr .ex { flex: none; font-size: 11px; color: var(--muted); }
+    .symmenu button.sr .d { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--muted); }
+    .symmenu button.sr .add { flex: none; width: 34px; height: 34px; margin: -6px 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--bg3); color: var(--text); font-size: 18px; }
+    .symmenu .lists button { width: auto; flex: none; padding: 7px 12px; border-radius: 999px; background: var(--bg3); color: var(--muted); font-size: 14px; font-weight: 600; }
+    .symmenu .lists button.on { background: var(--accent); color: #fff; }
     .symmenu button { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 12px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font-size: 16px; text-align: left; }
     .symmenu button.on { background: var(--bg3); }
     .symmenu button .s { flex: 1; font-weight: 700; }
     .symmenu button .px { font-size: 16px; font-weight: 600; }
     .symmenu button .chg { font-size: 14px; min-width: 64px; text-align: right; }
-    .mbar { position: relative; z-index: 40; }
+    .mbar { position: relative; z-index: 41; }
     .mbar .ivsel { position: static; display: flex; align-self: stretch; margin: -10px -14px -10px 4px; }
     .mbar .ivbtn { height: 100%; font-size: 15px; padding: 0 14px; border-radius: 0; border: 0; border-left: 1px solid var(--border); }
     .mbar .ivbtn::after { display: none; }
@@ -461,7 +474,8 @@
   <div class="chart" id="chartWrap">
     <div id="tv_chart"></div>
     <div class="hud" id="hud" hidden></div>
-    <div class="mbar" id="mbar"><button class="msym" id="mbarSym" data-action="sym-toggle" title="Pick from watchlist"></button><span class="mbt" id="mbarText" data-action="open-search"></span><div class="symmenu" id="symmenu" hidden></div></div>
+    <div class="symmenu" id="symmenu" hidden><div id="symRows"></div><div class="symbot"><div class="lists" id="symLists"></div><input id="symSearch" type="search" placeholder="Search symbol" autocomplete="off" autocapitalize="characters" enterkeyhint="search"></div></div>
+    <div class="mbar" id="mbar"><button class="msym" id="mbarSym" data-action="sym-toggle" title="Pick from watchlist"></button><span class="mbt" id="mbarText"></span></div>
   </div>
 </div>
 
@@ -1179,21 +1193,22 @@ document.addEventListener('click', e => {
       e.stopPropagation();
       const m = $('symmenu'), open = m.hidden;
       closeSheets();
-      if (open) { renderSymMenu(); m.hidden = false; $('ivbackdrop').hidden = false; m.querySelector('.on')?.scrollIntoView({ block: 'center' }); }
+      if (open) { $('symSearch').value = ''; symSearch.items = []; renderSymMenu(); m.style.bottom = $('mbar').offsetHeight + 'px'; m.hidden = false; $('ivbackdrop').hidden = false; m.querySelector('#symRows .on')?.scrollIntoView({ block: 'center' }); }
       break;
     }
+    case 'sym-list':
+      e.stopPropagation();
+      state.activeListId = el.dataset.id; update(false); wsSync(); renderSymMenu();
+      $('symRows').scrollTop = 0; break;
     case 'sym-pick':
       e.stopPropagation(); closeSheets();
       state.symbol = el.dataset.value; update(true); break;
+    case 'sym-add':
+      e.stopPropagation(); closeSheets(); addSymbol(el.dataset.value); break;
     case 'iv-pick':
       e.stopPropagation();
       state.interval = el.dataset.value; update(false); send('set-interval', { interval: state.interval });
       closeSheets(); break;
-    case 'open-search': {
-      if (e.target.closest('#intervals')) return;
-      if (!$('symmenu').hidden || !$('intervals').querySelector('.ivmenu').hidden) { closeSheets(); return; }
-      openCmd('symbol', ''); break;
-    }
     case 'hud-hide':
       state.hudHidden = true; save(); renderHud(); break;
     case 'toggle-details':
@@ -1209,15 +1224,40 @@ document.addEventListener('click', e => {
 
 
 function closeSheets() { $('intervals').querySelector('.ivmenu').hidden = true; $('symmenu').hidden = true; $('ivbackdrop').hidden = true; }
+const symSearch = { timer: null, seq: 0, items: [] };
 function renderSymMenu() {
   const list = activeList(), syms = list ? flatSymbols(list) : [];
-  $('symmenu').innerHTML = syms.map(sym => {
-    const q = quotes[sym], chg = q ? (!regular && q.e != null ? q.e : q.c) : null, price = q ? (!regular && q.ep != null ? q.ep : q.p) : null;
+  const q = $('symSearch').value.trim().toUpperCase();
+  $('symLists').innerHTML = state.lists.map(l => `<button class="${l.id === state.activeListId ? 'on' : ''}" data-action="sym-list" data-id="${esc(l.id)}">${esc(l.name)}</button>`).join('');
+  const rows = syms.filter(sym => !q || sym.toUpperCase().includes(q) || (raw[sym]?.description || '').toUpperCase().includes(q)).map(sym => {
+    const qt = quotes[sym], chg = qt ? (!regular && qt.e != null ? qt.e : qt.c) : null, price = qt ? (!regular && qt.ep != null ? qt.ep : qt.p) : null;
     const short = sym.includes(':') ? sym.split(':')[1] : sym;
     return `<button class="${sym === state.symbol ? 'on' : ''}" data-action="sym-pick" data-value="${esc(sym)}"><span class="s">${esc(short)}</span>` +
       `<span class="px ${signCls(chg)}">${price != null ? fmtN(price) : ''}</span><span class="chg ${signCls(chg)}">${chg != null ? fmtPct(chg) : ''}</span></button>`;
-  }).join('');
+  });
+  const found = q ? symSearch.items.filter(it => !syms.includes(it.sym)) : [];
+  const search = !q ? '' : `<div class="sect">Search</div>` + (found.length ? found.map(it => {
+    const short = it.sym.includes(':') ? it.sym.split(':')[1] : it.sym;
+    return `<button class="sr" data-action="sym-pick" data-value="${esc(it.sym)}"><span class="s">${esc(short)}</span><span class="ex">${esc(it.ex || '')}</span><span class="d">${esc(it.desc || '')}</span>` +
+      `<span class="add" data-action="sym-add" data-value="${esc(it.sym)}" title="Add to ${esc(list ? list.name : '')}">＋</span></button>`;
+  }).join('') : `<div class="empty">${symSearch.pending ? 'Searching…' : 'No matches'}</div>`);
+  $('symRows').innerHTML = (q && !rows.length ? '' : rows.join('')) + search;
 }
+$('symSearch').addEventListener('input', () => {
+  const text = $('symSearch').value.trim();
+  clearTimeout(symSearch.timer); symSearch.items = []; symSearch.pending = !!text; renderSymMenu();
+  if (!text) return;
+  symSearch.timer = setTimeout(async () => {
+    const seq = ++symSearch.seq, items = await searchSymbols(text);
+    if (seq !== symSearch.seq) return;
+    symSearch.items = items; symSearch.pending = false; renderSymMenu();
+  }, 250);
+});
+$('symSearch').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const first = $('symRows').querySelector('button[data-action=sym-pick]'); if (first) first.click();
+  e.preventDefault();
+});
 document.addEventListener('click', e => { if (!e.target.closest('#intervals, #mbarSym, #symmenu')) closeSheets(); }, true);
 // Symbol search for the add box: TradingView's search via the relay (full coverage), scanner as fallback.
 const RELAY_HTTP = RELAY_WS ? RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '') : '';
@@ -1502,7 +1542,8 @@ function renderHud() {
     (price != null ? `<span class="px ${signCls(chg)}">${fmtN(price)}</span><span class="chg ${signCls(chg)}">${fmtPct(chg)}</span>` : '') +
     `<span class="x" data-action="hud-hide" title="Hide HUD">×</span>`;
   const sym = state.symbol, short = sym.includes(':') ? sym.split(':')[1] : sym;
-  $('mbarSym').textContent = short;
+  const desc = raw[sym]?.description || '';
+  $('mbarSym').innerHTML = `${esc(short)}<small>${esc(desc.toUpperCase() === short ? '' : desc)}</small>`;
   $('mbarText').innerHTML = `<span class="px ${signCls(chg)}">${price != null ? fmtN(price) : ''}</span><span class="chg ${signCls(chg)}">${price != null ? fmtPct(chg) : ''}</span>` +
     `<span class="cd"><b class="${left <= 10 ? 'soon' : ''}">${fmtCountdown(Math.max(0, Math.round(left)))}</b></span>`;
 }
