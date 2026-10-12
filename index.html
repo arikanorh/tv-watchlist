@@ -279,9 +279,9 @@ function seed() {
 }
 const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'NASDAQ:NDX', 'CAPITALCOM:SPX500': 'SP:SPX', 'TVC:DJI': 'DJ:DJI', 'TVC:UKOIL': 'FX:UKOIL',
   'OANDA:XAGUSD': 'TVC:SILVER', 'AMEX:LEU': 'NYSE:LEU', 'NASDAQ:EUV': 'CBOE:EUV', 'NASDAQ:DXYZ': 'NYSE:DXYZ',
-  'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS' };
+  'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS', 'TVC:VIX': 'CAPITALCOM:VIX' };
 const REMOVED = new Set(['NASDAQ:NDX', 'SP:SPX']);  // no chart in the free widget; pinned CFDs cover them
-const DEFAULT_PINS = ['SKILLING:US100', 'SKILLING:SPX500', 'TVC:VIX', 'FX:UKOIL', 'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT'];
+const DEFAULT_PINS = ['SKILLING:US100', 'SKILLING:SPX500', 'CAPITALCOM:VIX', 'FX:UKOIL', 'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT'];
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
@@ -289,7 +289,7 @@ function load() {
       const fix = x => SYMBOL_FIXES[x] || x;
       s.symbol = fix(s.symbol);
       s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix).filter(x => !REMOVED.has(x)); }));
-      if (!Array.isArray(s.pinned)) s.pinned = DEFAULT_PINS.slice();
+      s.pinned = Array.isArray(s.pinned) ? [...new Set(s.pinned.map(fix))] : DEFAULT_PINS.slice();
       return s;
     }
   } catch (e) {}
