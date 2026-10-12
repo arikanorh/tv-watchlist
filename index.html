@@ -194,24 +194,26 @@
   .row .sym .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row .q { display: contents; }
   .row .px, .row .chg, .row .ext { text-align: right; }
-  .row .px { padding: 3px 6px; border-radius: 5px; margin-right: -6px; }
   .row .ext { font-size: 13px; display: flex; align-items: center; justify-content: flex-end; }
   .row .ext .v { min-width: 50px; text-align: right; }
   .row .px:empty::before, .row .chg:empty::before, .row .ext:empty::before { content: '–'; color: var(--muted); }
   .panel.no-ext .cols, .panel.no-ext .row { grid-template-columns: 1fr 84px 64px; }
   .panel.no-ext .cols span:last-child, .panel.no-ext .ext { display: none; }
-  /* Sentiment tiers tint the Last cell (a pill) instead of the whole row. */
-  .row.s-up-1 .px { background: rgba(8, 153, 129, .16); }   .row.s-up-2 .px { background: rgba(8, 153, 129, .30); }
-  .row.s-up-3 .px { background: rgba(8, 153, 129, .48); }   .row.s-up-4 .px { background: rgba(8, 153, 129, .70); }
-  .row.s-down-1 .px { background: rgba(242, 54, 69, .16); } .row.s-down-2 .px { background: rgba(242, 54, 69, .30); }
-  .row.s-down-3 .px { background: rgba(242, 54, 69, .48); } .row.s-down-4 .px { background: rgba(242, 54, 69, .70); }
-  .row[class*="s-up-"] .px, .row[class*="s-down-"] .px { color: var(--text); }
+  /* Sentiment tiers tint the ticker name (a pill) instead of the whole row. */
+  .row .sym .name { padding: 3px 7px; margin-left: -7px; border-radius: 5px; }
+  .row.s-up-1 .name { background: rgba(8, 153, 129, .16); }   .row.s-up-2 .name { background: rgba(8, 153, 129, .30); }
+  .row.s-up-3 .name { background: rgba(8, 153, 129, .48); }   .row.s-up-4 .name { background: rgba(8, 153, 129, .70); }
+  .row.s-down-1 .name { background: rgba(242, 54, 69, .16); } .row.s-down-2 .name { background: rgba(242, 54, 69, .30); }
+  .row.s-down-3 .name { background: rgba(242, 54, 69, .48); } .row.s-down-4 .name { background: rgba(242, 54, 69, .70); }
   .ss { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
   .ss.pre { background: var(--warn); } .ss.post { background: #4f8cff; } .ss.night { background: #b06cff; }
   /* Row tools: star / info / remove. Hidden until hover on desktop; on the selected row on touch screens. */
   .row .icon { width: 24px; height: 24px; font-size: 13px; opacity: 0; background: transparent; }
-  @media (hover: none) { .row.on .icon { opacity: 1; } }
-  .row .icon.info, .row .icon.rm { background: var(--bg3); }   /* inline after the name on phones, pinned right on desktop */
+  @media (hover: none) { .row.on .icon { opacity: 1; } .row.on .sym { padding-right: 60px; } }
+  /* info / remove sit at the right end of the symbol cell on phones (same grid row, so the row stays one line); desktop pins them to the row's right edge */
+  .row .sym { grid-row: 1; grid-column: 1; }
+  .row .icon.info, .row .icon.rm { grid-row: 1; grid-column: 1; justify-self: end; align-self: center; background: var(--bg3); }
+  .row .icon.info { margin-right: 30px; }
   .row .icon.info { font: italic 600 11px Georgia, serif; }
   .row .icon.star.on { opacity: 1; color: var(--warn); background: transparent; }
   .earn { flex-shrink: 0; font-size: 9px; font-weight: 600; line-height: 1; padding: 2px 4px; border-radius: 3px;
@@ -352,8 +354,8 @@
     body.edit .cols { display: none; }
     body.edit .row { grid-template-columns: 1fr auto 40px; }
     body.edit .row .q, body.edit .row .icon.star, body.edit .row .icon.info { display: none; }
-    body.edit .row .icon.rm { position: static; transform: none; opacity: 1; width: 28px; height: 28px; border-radius: 14px; background: rgba(242, 54, 69, .18); color: var(--down); font-size: 18px; }
-    body.edit .row .hnd { display: flex; width: 40px; height: 44px; margin-right: -12px; align-items: center; justify-content: center; color: var(--muted); cursor: grab; touch-action: none; }
+    body.edit .row .icon.rm { grid-column: 2; opacity: 1; width: 28px; height: 28px; border-radius: 14px; background: rgba(242, 54, 69, .18); color: var(--down); font-size: 18px; }
+    body.edit .row .hnd { grid-column: 3; display: flex; width: 40px; height: 44px; margin-right: -12px; align-items: center; justify-content: center; color: var(--muted); cursor: grab; touch-action: none; }
     body.edit .row .hnd svg { width: 18px; height: 18px; }
     body.edit .gtools { opacity: 1; }
     body.edit .gtools .icon { width: 30px; height: 30px; font-size: 14px; }
@@ -409,10 +411,10 @@
     .cols, .row { grid-template-columns: 1fr 76px 60px 70px; padding: 0 10px; }
     .cols { height: 28px; font-size: 12px; }
     .row { height: 30px; font-size: 13px; }
-    .row .px { padding: 2px 6px; border-radius: 4px; }
+    .row .sym .name { padding: 2px 6px; margin-left: -6px; border-radius: 4px; }
     .row .ext { font-size: 12px; }
     .row .icon { width: 16px; height: 16px; font-size: 12px; }
-    .row .icon.info, .row .icon.rm { position: absolute; top: 50%; transform: translateY(-50%); }
+    .row .icon.info, .row .icon.rm { position: absolute; top: 50%; transform: translateY(-50%); margin: 0; }
     .row .icon.info { right: 22px; }
     .row .icon.rm { right: 2px; }
     .panel.no-ext .cols, .panel.no-ext .row { grid-template-columns: 1fr 76px 60px; }
@@ -521,7 +523,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '0.6';  // bump the minor on every push to main
+const APP_VERSION = '0.7';  // bump the minor on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
 // Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
