@@ -453,7 +453,7 @@ let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, lastPulse = 0, ws
 // TradingView accepts the socket only from localhost / tradingview.com origins; elsewhere go through the relay
 // (relay/worker.js on Cloudflare). Empty RELAY_WS → scanner polling fallback.
 const WS_DIRECT = 'wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart';
-const RELAY_WS = '';
+const RELAY_WS = 'wss://tv-watchlist-relay.tv-watchlist.workers.dev/';
 const IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 let quoteSource = new URLSearchParams(location.search).get('quotes') === 'poll' ? 'poll' : 'ws';
 const frame = o => { const j = JSON.stringify(o); return '~m~' + j.length + '~m~' + j; };
