@@ -122,7 +122,7 @@
   body[data-mview="lists"] .panel { display: flex; }
   body[data-mview="chart"] .chart { display: flex; }
   /* Symbol details: full-screen sheet above the current view, closed with its × */
-  body.details-open .details { display: block; position: fixed; left: 0; right: 0; top: 0; z-index: 50;
+  body.details-open .details { display: flex; flex-direction: column; position: fixed; left: 0; right: 0; top: 0; z-index: 50;
     bottom: calc(var(--nav-h) + max(0px, calc(var(--safe-b) - 12px))); }
   .mnav { position: relative; flex-shrink: 0; display: grid; grid-template-columns: repeat(2, 1fr);
     background: var(--bg2); border-top: 1px solid var(--border);
@@ -224,20 +224,31 @@
   .row .px:empty::before, .row .chg:empty::before, .row .ext:empty::before { content: '–'; color: var(--muted); }
   .panel.no-ext .cols, .panel.no-ext .row { grid-template-columns: 1fr 84px 64px; }
   .panel.no-ext .cols span:last-child, .panel.no-ext .ext { display: none; }
-  /* Sentiment tiers tint the ticker name (a pill) instead of the whole row. */
-  .row .sym .name { padding: 3px 7px; margin-left: -7px; border-radius: 5px; }
-  .row.s-up-1 .name { background: rgba(8, 153, 129, .16); }   .row.s-up-2 .name { background: rgba(8, 153, 129, .30); }
-  .row.s-up-3 .name { background: rgba(8, 153, 129, .48); }   .row.s-up-4 .name { background: rgba(8, 153, 129, .70); }
-  .row.s-down-1 .name { background: rgba(242, 54, 69, .16); } .row.s-down-2 .name { background: rgba(242, 54, 69, .30); }
-  .row.s-down-3 .name { background: rgba(242, 54, 69, .48); } .row.s-down-4 .name { background: rgba(242, 54, 69, .70); }
+  /* Chg% text on one scale: full red (≥5 % down) → neutral text (< 0.5 %) → full green (≥5 % up); solid colors, no opacity. */
+  .row .chg.up, .row .chg.down { color: var(--text); }
+  .row.s-down-1 .chg { color: #d9adb6; } .row.s-down-2 .chg { color: #e28591; } .row.s-down-3 .chg { color: #ea5e6b; font-weight: 600; } .row.s-down-4 .chg { color: #f23645; font-weight: 700; }
+  .row.s-up-1 .chg { color: #9fc5c5; }   .row.s-up-2 .chg { color: #6db7af; }   .row.s-up-3 .chg { color: #3aa898; font-weight: 600; }   .row.s-up-4 .chg { color: #089981; font-weight: 700; }
+  /* Big moves tint the whole row: ≥5 % light, ≥10 % stronger */
+  .row.s-down-4 { background: rgba(242, 54, 69, .10); } .row.s-up-4 { background: rgba(8, 153, 129, .10); }
+  .row.x-down { background: rgba(242, 54, 69, .24); }   .row.x-up { background: rgba(8, 153, 129, .24); }
+  .row.s-down-4.on, .row.x-down.on { background: rgba(242, 54, 69, .34); } .row.s-up-4.on, .row.x-up.on { background: rgba(8, 153, 129, .34); }
   .ss { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
   .ss.pre { background: var(--warn); } .ss.post { background: #4f8cff; } .ss.night { background: #b06cff; }
   /* Row tools: star / info / remove. Hidden until hover on desktop; on the selected row on touch screens. */
   .row .icon { width: 24px; height: 24px; font-size: 13px; opacity: 0; background: transparent; }
-  @media (hover: none) { .row.on .icon { opacity: 1; } .row.on .sym { padding-right: 60px; } }
+  @media (hover: none) { .row.on .icon.star { opacity: 1; } }
+  /* Swipe-to-reveal (phones): the row slides left over two actions */
+  .rowwrap { position: relative; overflow: hidden; }
+  .row { position: relative; z-index: 1; background: var(--bg); touch-action: pan-y; transition: transform .18s ease-out; }
+  .rowwrap.open .row { transform: translateX(-140px); }
+  .racts { position: absolute; top: 0; bottom: 0; right: 0; display: flex; visibility: hidden; }
+  .rowwrap.open .racts, .rowwrap.swiping .racts { visibility: visible; }
+  .racts button { width: 70px; color: #fff; font-size: 13px; font-weight: 600; background: var(--bg3); }
+  .racts .rm { background: var(--down); }
   /* info / remove sit at the right end of the symbol cell on phones (same grid row, so the row stays one line); desktop pins them to the row's right edge */
   .row .sym { grid-row: 1; grid-column: 1; }
   .row .icon.info, .row .icon.rm { grid-row: 1; grid-column: 1; justify-self: end; align-self: center; background: var(--bg3); }
+  @media (hover: none) and (max-width: 767.98px) { .row .icon.info { display: none; } body:not(.edit) .row .icon.rm { display: none; } }
   .row .icon.info { margin-right: 30px; }
   .row .icon.info { font: italic 600 11px Georgia, serif; }
   .row .icon.star.on { opacity: 1; color: var(--warn); background: transparent; }
@@ -320,7 +331,10 @@
 
   /* ---------- Details ---------- */
   .details { position: relative; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); font-variant-numeric: tabular-nums; }
-  .dclose { position: absolute; right: 8px; top: 8px; z-index: 1; }
+  /* Phones: the close control is a full-width bar at the bottom (thumb side); desktop keeps the × top-right */
+  .details #dbody { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .dclose { order: 2; flex-shrink: 0; width: auto; height: 44px; margin: 8px 12px; border-radius: 10px; background: var(--bg3); color: var(--text); font-size: 0; }
+  .dclose::after { content: 'Close'; font-size: 15px; font-weight: 600; }
   .d-head { padding: 12px 14px 10px; padding-right: 48px; border-bottom: 1px solid var(--border); }
   .d-sym { display: flex; align-items: baseline; gap: 8px; }
   .d-sym b { font-size: 20px; }
@@ -429,17 +443,21 @@
     .resizer:hover, .resizer.active { background: var(--accent); }
     body.resizing { cursor: col-resize; user-select: none; }
     body.resizing .chart { pointer-events: none; }
-    body.details-open .details { position: static; width: 280px; flex: none; border-right: 1px solid var(--border); }
+    body.details-open .details { display: block; position: static; width: 280px; flex: none; border-right: 1px solid var(--border); }
+    .details #dbody { overflow: visible; }
+    .dclose { position: absolute; right: 8px; top: 8px; z-index: 1; width: 28px; height: 28px; margin: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 15px; }
+    .dclose::after { content: none; }
     body[data-mview] .chart { display: flex; }
     body.chart-hidden .chart, body.chart-hidden .resizer { display: none !important; }
     body.chart-hidden .panel { width: auto !important; flex: 1; }
     .cols, .row { grid-template-columns: 1fr 76px 60px 70px; padding: 0 10px; }
     .cols { height: 28px; font-size: 12px; }
     .row { height: 30px; font-size: 13px; }
-    .row .sym .name { padding: 2px 6px; margin-left: -6px; border-radius: 4px; }
     .row .ext { font-size: 12px; }
     .row .icon { width: 16px; height: 16px; font-size: 12px; }
     .row .icon.info, .row .icon.rm { position: absolute; top: 50%; transform: translateY(-50%); margin: 0; }
+    .racts { display: none; }
+    .row { transition: none; }
     .row .icon.info { right: 22px; }
     .row .icon.rm { right: 2px; }
     .panel.no-ext .cols, .panel.no-ext .row { grid-template-columns: 1fr 76px 60px; }
@@ -548,7 +566,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '0.8';  // bump the minor on every push to main
+const APP_VERSION = '0.9';  // bump the minor on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
 // Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
@@ -958,8 +976,10 @@ function applySentiment() {
   document.querySelectorAll('#pins .chip, #list .row').forEach(el => {
     const q = quotes[el.dataset.symbol];
     // Outside the regular session the extended-session move (pre/post-market) is what matters.
-    const cls = sentimentClass(q ? (!regular && q.e != null ? q.e : q.c) : null);
-    el.className = el.className.replace(/\bs-(up|down)-\d\b/g, '').replace(/\s+/g, ' ').trim() + (cls ? ' ' + cls : '');
+    const v = q ? (!regular && q.e != null ? q.e : q.c) : null, cls = sentimentClass(v);
+    // ±10 % and beyond also tints the whole row (x-up / x-down).
+    el.className = el.className.replace(/\b(s-(up|down)-\d|x-(up|down))\b/g, '').replace(/\s+/g, ' ').trim() + (cls ? ' ' + cls : '')
+      + (v != null && Math.abs(v) >= 10 ? (v > 0 ? ' x-up' : ' x-down') : '');
   });
 }
 function renderQuotes() {
@@ -1080,7 +1100,7 @@ function render() {
       <span class="x" data-action="unpin" data-symbol="${esc(s)}" title="Unpin">×</span>
     </button>`).join('');
   const single = list.groups.length === 1;
-  const rowHtml = (s, gi) => {
+  const rowInner = (s, gi) => {
     const sym = s.includes(':') ? s.split(':')[1] : s;
     return `<div class="row${s === state.symbol ? ' on' : ''}${noChart(s) ? ' nochart' : ''}" draggable="true" ${noChart(s) ? '' : 'data-action="select"'} data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}${noChart(s) ? ' · no chart in the free widget' : ''}">
         <span class="sym"><span class="name">${esc(sym)}</span><button class="icon star${(state.pinned || []).includes(s) ? ' on' : ''}" data-action="${(state.pinned || []).includes(s) ? 'unpin' : 'pin'}" data-symbol="${esc(s)}" title="${(state.pinned || []).includes(s) ? 'Unpin from top' : 'Pin to top'}">${(state.pinned || []).includes(s) ? '★' : '☆'}</button></span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
@@ -1088,6 +1108,8 @@ function render() {
         <button class="icon rm" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}" title="Remove">×</button>
         <span class="hnd" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9h14M5 15h14"/></svg></span>
       </div>`; };
+  // Phones: swipe a row left to reveal Details / Remove behind it (desktop shows the row's hover icons instead).
+  const rowHtml = (s, gi) => `<div class="rowwrap"><div class="racts"><button data-action="details" data-symbol="${esc(s)}">Details</button><button class="rm" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}">Remove</button></div>${rowInner(s, gi)}</div>`;
   // Sorted view (state.sort = 'chg'): indices / CFDs keep their place, every other symbol is one group ordered by change.
   // Rows keep their real group index so remove / pin still work; reordering is off until the sort is reset.
   document.body.classList.toggle('sorted', state.sort === 'chg');
@@ -1357,6 +1379,40 @@ function toast(text, action, fn) {
   if (action) t.querySelector('button').addEventListener('click', () => { t.remove(); fn(); });
   document.body.appendChild(t); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 4000);
 }
+
+// ---- Phone swipe: drag a row left to reveal its actions; any tap elsewhere closes it ----
+let swipe = null, swipedRecently = false;
+const closeSwipes = except => listEl.querySelectorAll('.rowwrap.open').forEach(w => { if (w !== except) w.classList.remove('open'); });
+listEl.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || editMode || !isPhone()) return;
+  const row = e.target.closest('.row'); if (!row) return;
+  swipe = { row, wrap: row.parentElement, x: e.clientX, y: e.clientY, dx: 0, active: false, wasOpen: row.parentElement.classList.contains('open') };
+});
+listEl.addEventListener('pointermove', e => {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  if (!swipe.active) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; } if (Math.abs(dx) < 12) return;
+    swipe.active = true; swipe.wrap.classList.add('swiping'); swipe.row.style.transition = 'none'; closeSwipes(swipe.wrap); }
+  const base = swipe.wasOpen ? -140 : 0;
+  swipe.dx = Math.max(-140, Math.min(0, base + dx));
+  swipe.row.style.transform = `translateX(${swipe.dx}px)`;
+});
+const endSwipe = () => {
+  if (!swipe) return;
+  const { row, wrap, dx, active } = swipe; swipe = null;
+  if (!active) return;
+  row.style.transition = ''; row.style.transform = ''; wrap.classList.remove('swiping');
+  wrap.classList.toggle('open', dx < -70);
+  swipedRecently = true; setTimeout(() => { swipedRecently = false; }, 300);
+};
+listEl.addEventListener('pointerup', endSwipe);
+listEl.addEventListener('pointercancel', endSwipe);
+document.addEventListener('click', e => {
+  if (swipedRecently) { e.stopPropagation(); e.preventDefault(); return; }   // the swipe is not a tap
+  const w = e.target.closest('.rowwrap');
+  if (w && w.classList.contains('open') && !e.target.closest('.racts')) { w.classList.remove('open'); e.stopPropagation(); e.preventDefault(); return; }
+  closeSwipes(w && e.target.closest('.racts') ? w : null);
+}, true);
 
 // ---- Phone drag: hold the ≡ handle (pointer events, so touch works), drop between rows or onto a group tab ----
 let pdrag = null;
