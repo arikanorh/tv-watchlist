@@ -6,6 +6,8 @@ const UPSTREAM = 'https://data.tradingview.com/socket.io/websocket?from=chart%2F
 // Only these page origins may use the relay.
 const ALLOWED_ORIGINS = [
   'https://arikanorh.github.io',
+  'https://tv-watchlist.pages.dev',
+  'https://dev.tv-watchlist.pages.dev',
   'http://localhost:8787',
   'http://127.0.0.1:8787',
 ];

@@ -102,6 +102,28 @@
   .breadth .meter .t-u1 { background: rgba(8, 153, 129, .28); } .breadth .meter .t-u2 { background: rgba(8, 153, 129, .48); }
   .breadth .meter .t-u3 { background: rgba(8, 153, 129, .72); } .breadth .meter .t-u4 { background: rgba(8, 153, 129, 1); }
   .breadth .stat { white-space: nowrap; flex-shrink: 0; }
+  .breadth .spark { flex-shrink: 0; width: 200px; height: 36px; cursor: pointer; display: block; }
+  .breadth .spark .lbl { font-size: 7px; fill: var(--muted); }
+  .breadth .spark .zero { stroke: var(--muted); stroke-opacity: .5; stroke-dasharray: 2 2; }
+  .breadth .spark .line { fill: none; stroke-width: 1.5; }
+  .breadth .spark .area { opacity: .18; }
+  .breadth .spark .up { stroke: var(--up); } .breadth .spark .down { stroke: var(--down); }
+  .breadth .spark .area.up { fill: var(--up); } .breadth .spark .area.down { fill: var(--down); }
+  .breadth .spark .dot { fill: var(--text); stroke: var(--bg); stroke-width: 1; }
+  .stip { position: fixed; z-index: 20; pointer-events: none; background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 8px; font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+  .stip b { font-weight: 600; }
+  .tpop { position: fixed; z-index: 20; pointer-events: none; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 8px 4px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
+  .tpop .spark { width: 200px; height: 36px; display: block; }
+  .tpop .spark .lbl { font-size: 7px; fill: var(--muted); }
+  .tpop .spark .zero { stroke: var(--muted); stroke-opacity: .5; stroke-dasharray: 2 2; }
+  .tpop .spark .line { fill: none; stroke-width: 1.5; } .tpop .spark .area { opacity: .18; }
+  .tpop .spark .up { stroke: var(--up); } .tpop .spark .down { stroke: var(--down); }
+  .tpop .spark .area.up { fill: var(--up); } .tpop .spark .area.down { fill: var(--down); }
+  .tpop .t { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .stip .up { color: var(--up); } .stip .down { color: var(--down); }
+  .breadth .srange { font-size: 10px; color: var(--muted); flex-shrink: 0; cursor: pointer; }
   .breadth .stat b { font-weight: 600; color: var(--text); }
   .breadth .stat .up { color: var(--up); } .breadth .stat .down { color: var(--down); }
   .grp .chev { display: inline-block; transition: transform .15s; }
@@ -127,15 +149,13 @@
   .chip.s-down-3 { background: rgba(242, 54, 69, .40); }
   .chip.s-down-4 { background: rgba(242, 54, 69, .60); }
   .chip[class*="s-up-"] .px, .chip[class*="s-up-"] .chg, .chip[class*="s-down-"] .px, .chip[class*="s-down-"] .chg { color: var(--text); }
-  .row.s-up-1 { background: rgba(8, 153, 129, .08); }
-  .row.s-up-2 { background: rgba(8, 153, 129, .17); }
-  .row.s-up-3 { background: rgba(8, 153, 129, .30); }
-  .row.s-up-4 { background: rgba(8, 153, 129, .46); }
-  .row.s-down-1 { background: rgba(242, 54, 69, .08); }
-  .row.s-down-2 { background: rgba(242, 54, 69, .17); }
-  .row.s-down-3 { background: rgba(242, 54, 69, .30); }
-  .row.s-down-4 { background: rgba(242, 54, 69, .46); }
-  .row.on[class*="s-"] { box-shadow: inset 0 0 0 1px var(--accent); }
+  /* Sentiment tiers tint the Last cell (a pill) instead of the whole row. */
+  .row .px { padding: 2px 6px; border-radius: 4px; margin-right: -6px; }
+  .row.s-up-1 .px { background: rgba(8, 153, 129, .16); }   .row.s-up-2 .px { background: rgba(8, 153, 129, .30); }
+  .row.s-up-3 .px { background: rgba(8, 153, 129, .48); }   .row.s-up-4 .px { background: rgba(8, 153, 129, .70); }
+  .row.s-down-1 .px { background: rgba(242, 54, 69, .16); } .row.s-down-2 .px { background: rgba(242, 54, 69, .30); }
+  .row.s-down-3 .px { background: rgba(242, 54, 69, .48); } .row.s-down-4 .px { background: rgba(242, 54, 69, .70); }
+  .row[class*="s-up-"] .px, .row[class*="s-down-"] .px { color: var(--text); }
   .chip .sym { font-weight: 600; font-size: 13px; color: var(--text); }
   .chip .sym small { font-weight: 400; font-size: 9px; color: var(--muted); margin-left: 3px; }
   .chip.nochart, .row.nochart { cursor: default; }
@@ -195,7 +215,7 @@
   .row .icon { width: 16px; height: 16px; font-size: 12px; opacity: 0; flex-shrink: 0; background: transparent; }
   .row:hover .icon { opacity: 1; }
   .row .icon:hover { background: var(--bg3); }
-  .row .icon.info { font: italic 600 11px Georgia, serif; }
+  .row .icon.info { position: absolute; right: 22px; top: 7px; background: var(--bg3); font: italic 600 11px Georgia, serif; }
   .row .icon.rm { position: absolute; right: 2px; top: 7px; background: var(--bg3); }
   .row .sym { display: flex; align-items: center; gap: 4px; }
   .row .sym .name { overflow: hidden; text-overflow: ellipsis; }
@@ -205,6 +225,17 @@
   .row .icon.star.on { opacity: 1; color: #f7a600; background: transparent; }
   .empty { padding: 20px 12px; color: var(--muted); text-align: center; }
 
+  .eod { border-top: 1px solid var(--border); background: var(--bg2); font-size: 12px; }
+  .eod:empty { display: none; }
+  .eod-h { display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; user-select: none; }
+  .eod-h b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .eod-h .d { color: var(--muted); white-space: nowrap; }
+  .eod-h .b { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 11px; }
+  .eod-h .x { color: var(--muted); font-size: 13px; margin-left: 4px; }
+  .eod-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; padding: 0 10px 8px; font-variant-numeric: tabular-nums; }
+  .eod-body .col > div { display: flex; justify-content: space-between; padding: 1px 0; }
+  .eod-body .col span:first-child { font-weight: 600; }
+  .eod.collapsed .eod-body { display: none; }
   .selbar { display: grid; grid-template-columns: auto 1fr auto; gap: 0 10px; align-items: center; padding: 6px 10px;
     border-top: 1px solid var(--border); background: var(--bg2); }
   .selbar:empty { display: none; }
@@ -309,12 +340,15 @@
   <div class="tape" id="pins"></div>
   <select class="ivsel" id="intervals" title="Chart interval"></select>
 </div>
-<div class="breadth" id="summary" title="Breadth of the active list, indices excluded · session-aware change"></div>
+<div class="breadth" id="summary"></div>
 <div id="feeders" aria-hidden="true"></div>
+<div class="stip" id="stip" hidden></div>
+<div class="tpop" id="tpop" hidden></div>
 <div class="body">
   <div class="panel" id="panel">
     <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span title="● pre-market · ● post-market · ● overnight">Ext</span></div>
     <div class="list" id="list"></div>
+    <div class="eod" id="eod"></div>
     <div class="selbar" id="selbar"></div>
     <form class="add" id="addForm">
       <div class="ac" id="ac" hidden></div>
@@ -382,7 +416,7 @@ function seed() {
       { id: 'ozet', name: 'Özet', groups: [
         g('All', ['TVC:VIX','FX:UKOIL','TVC:US10Y','OANDA:XAUUSD','TVC:SILVER','BINANCE:BTCUSDT','BINANCE:ETHUSDT','TVC:DXY','NASDAQ:QQQ','AMEX:SPY','AMEX:RSP','AMEX:IWM','DJ:DJI','TVC:NI225','KRX:KOSPI','FX:USDJPY','INDEX:S5FI','AMEX:XLF']),
       ]},
-      { id: 'zorning', name: 'Z-Örning', groups: [
+      { id: 'zorning', name: 'Z-Örning', summary: true, groups: [
         g('Main', ['NASDAQ:LULU','NASDAQ:MRVL','NASDAQ:META','NASDAQ:NVDA']),
         g('Section 1', ['NASDAQ:RXRX','NASDAQ:SPCX','NYSE:LEU','NASDAQ:MU','NASDAQ:GOOGL','NASDAQ:AMZN','NASDAQ:MSFT','NASDAQ:PLTR','NYSE:DXYZ','NASDAQ:ALAB','NASDAQ:AMD','NYSE:NET','NYSE:ANET','NASDAQ:SEZL','NYSE:VST','NASDAQ:SHAZ','NYSE:QXO','NASDAQ:ALMU','AMEX:NASA','NASDAQ:CRDO','NASDAQ:IREN','NASDAQ:KTOS']),
       ]},
@@ -404,7 +438,7 @@ function load() {
       s.symbol = fix(s.symbol);
       s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix).filter(x => !REMOVED.has(x)); }));
       s.pinned = Array.isArray(s.pinned) ? [...new Set(s.pinned.map(fix))] : DEFAULT_PINS.slice();
-      s.lists.forEach(l => { if (l.summary === undefined) l.summary = l.id === 'tr' ? 'BIST:XU100' : ['abd', 'inci'].includes(l.id); });
+      s.lists.forEach(l => { if (l.summary === undefined) l.summary = l.id === 'tr' ? 'BIST:XU100' : ['abd', 'inci', 'zorning'].includes(l.id); });
       return s;
     }
   } catch (e) {}
@@ -538,9 +572,7 @@ function sessionPhase() {
 }
 function renderSession() {
   const [cls, label] = sessionPhase();
-  const tz = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' }).format(new Date());
   document.body.className = document.body.className.replace(/\bsess-\w+\b/g, '').replace(/\s+/g, ' ').trim() + ' sess-' + cls;
-  document.querySelector('.bar').title = `${label} · ${tz} New York`;
 }
 setInterval(renderSession, 30000);
 let regular = false;
@@ -569,6 +601,128 @@ const pct = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 const ORDER = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
 const TIER_LABEL = { '-4': '≤ −5%', '-3': '−5…−2%', '-2': '−2…−1%', '-1': '−1…−0.5%', 0: '±0.5%', 1: '+0.5…1%', 2: '+1…2%', 3: '+2…5%', 4: '≥ +5%' };
 const dirCls = v => v >= 0.5 ? 'up' : v <= -0.5 ? 'down' : '';
+// Sentiment history: one sample per 15 s per list (avg change, indices excluded), kept 8 h in localStorage.
+const HIST_KEY = 'tvwl.hist.v1', HIST_MS = 15000, HIST_KEEP = 8 * 60 * 4;  // one sample / 15 s, 8 h
+let hist = {}; try { hist = JSON.parse(localStorage.getItem(HIST_KEY)) || {}; } catch (_) {}
+function sampleHistory() {
+  const now = Date.now(); let changed = false;
+  for (const l of state.lists) {
+    const b = l.summary ? breadth(summarySymbols(l)) : null;
+    if (!b) continue;
+    const arr = hist[l.id] = hist[l.id] || [];
+    if (arr.length && now - arr[arr.length - 1][0] < HIST_MS - 1000) continue;
+    arr.push([now, +b.avg.toFixed(3), b.up, b.down]);
+    if (arr.length > HIST_KEEP) arr.splice(0, arr.length - HIST_KEEP);
+    changed = true;
+  }
+  if (changed) { try { localStorage.setItem(HIST_KEY, JSON.stringify(hist)); } catch (_) {} }
+}
+setInterval(sampleHistory, HIST_MS);
+function sessionOpenTs() {   // today's 09:30 New York as a timestamp (falls back to 24 h ago on weekends)
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
+  const g = t => +p.find(x => x.type === t).value;
+  const nowNy = (g('hour') % 24) * 60 + g('minute');
+  return Date.now() - Math.max(0, nowNy - (9 * 60 + 30)) * 60000;
+}
+let sparkPts = [], sparkLim = 1;
+const SW = 200, SH = 36, SL = 2, SR = 2, ST = 3, SB = 10;  // chart box, label gutters
+function sparkline(listId) {
+  const range = state.histRange || 'session';
+  const since = range === '1h' ? Date.now() - 3600000 : sessionOpenTs();
+  const pts = (hist[listId] || []).filter(x => x[0] >= since);
+  const iw = SW - SL - SR, ih = SH - ST - SB, ymid = ST + ih / 2;
+  if (pts.length < 2) return `<svg class="spark" viewBox="0 0 ${SW} ${SH}" data-action="hist-range"><line class="zero" x1="${SL}" x2="${SL + iw}" y1="${ymid}" y2="${ymid}"/><text class="lbl" x="${SL + iw / 2}" y="${ymid - 4}" text-anchor="middle">collecting… ${pts.length}/2</text></svg>`;
+  const vals = pts.map(x => x[1]);
+  const lim = Math.max(0.25, ...vals.map(Math.abs));
+  const x = i => (SL + i / (pts.length - 1) * iw).toFixed(1), y = v => (ymid - v / lim * (ih / 2 - 1)).toFixed(1);
+  const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i)} ${y(p[1])}`).join(' ');
+  const last = vals[vals.length - 1], cls = last >= 0 ? 'up' : 'down';
+  const hm = ts => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  sparkPts = pts; sparkLim = lim;
+  return `<svg class="spark" viewBox="0 0 ${SW} ${SH}" data-action="hist-range">
+    <line class="zero" x1="${SL}" x2="${SL + iw}" y1="${ymid}" y2="${ymid}"/>
+    <path class="area ${cls}" d="${path} L${x(pts.length - 1)} ${ymid} L${SL} ${ymid} Z"/><path class="line ${cls}" d="${path}"/>
+    <text class="lbl" x="${SL}" y="${SH - 1}">${hm(pts[0][0])}</text><text class="lbl" x="${SL + iw}" y="${SH - 1}" text-anchor="end">${hm(pts[pts.length - 1][0])}</text>
+    <circle class="dot" r="2.2" cx="-10" cy="-10"/></svg>`;
+}
+let sparkHoverI = -1;
+// Tooltip + marker anchored to the hovered sample's point (re-applied after every re-render).
+function showSparkTip() {
+  const tip = $('stip'), svg = document.querySelector('#summary svg.spark'), dot = svg && svg.querySelector('.dot');
+  if (sparkHoverI < 0 || !dot || sparkPts.length < 2) { tip.hidden = true; if (dot) dot.setAttribute('cx', -10); return; }
+  const i = Math.min(sparkHoverI, sparkPts.length - 1), [ts, v, up, down] = sparkPts[i];
+  const iw = SW - SL - SR, ih = SH - ST - SB, ymid = ST + ih / 2;
+  const cx = SL + i / (sparkPts.length - 1) * iw, cy = ymid - v / sparkLim * (ih / 2 - 1);
+  dot.setAttribute('cx', cx.toFixed(1)); dot.setAttribute('cy', cy.toFixed(1));
+  const r = svg.getBoundingClientRect(), k = r.width / SW;
+  tip.innerHTML = `${new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · <b class="${v >= 0 ? 'up' : 'down'}">${pct(v)}</b> · ${up}↑ ${down}↓`;
+  tip.hidden = false;
+  const px = r.left + cx * k, py = r.top + cy * k;
+  tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 8, px + 8) + 'px';
+  tip.style.top = (py - tip.offsetHeight / 2) + 'px';
+}
+$('summary').addEventListener('mousemove', e => {
+  const svg = e.target.closest('svg.spark');
+  if (!svg || sparkPts.length < 2) { sparkHoverI = -1; showSparkTip(); return; }
+  const r = svg.getBoundingClientRect();
+  const fx = ((e.clientX - r.left) / r.width * SW - SL) / (SW - SL - SR);
+  sparkHoverI = Math.max(0, Math.min(sparkPts.length - 1, Math.round(fx * (sparkPts.length - 1))));
+  showSparkTip();
+});
+$('summary').addEventListener('mouseleave', () => { sparkHoverI = -1; showSparkTip(); });
+// Hovering a list tab shows that list's sentiment chart (same range as the strip) without switching to it.
+$('tabs').addEventListener('mouseover', e => {
+  const tab = e.target.closest('.tab'); const pop = $('tpop');
+  if (!tab) return;
+  const l = state.lists.find(x => x.id === tab.dataset.id);
+  if (!l || !l.summary || l.summary !== true) { pop.hidden = true; return; }
+  const keepPts = sparkPts, keepLim = sparkLim;           // sparkline() writes hover state; restore the strip's
+  const b = breadth(summarySymbols(l));
+  pop.innerHTML = `<div class="t"><span>${esc(l.name)} · ${(state.histRange || 'session') === '1h' ? 'last hour' : 'since open'}</span><span>${b ? `${b.up}↑ ${b.flat}– ${b.down}↓ · ${pct(b.avg)}` : ''}</span></div>` + sparkline(l.id).replace(' data-action="hist-range"', '');
+  sparkPts = keepPts; sparkLim = keepLim;
+  pop.hidden = false;
+  const r = tab.getBoundingClientRect();
+  pop.style.left = Math.min(window.innerWidth - pop.offsetWidth - 8, r.left) + 'px';
+  pop.style.top = (r.bottom + 6) + 'px';
+});
+$('tabs').addEventListener('mouseleave', () => { $('tpop').hidden = true; });
+// End-of-day card: at/after the 16:00 New York close, snapshot each summarised list (breadth + top 3 up/down);
+// shown until the next close. Captured from the daily change still streaming after the bell.
+const EOD_KEY = 'tvwl.eod.v1';
+let eod = {}; try { eod = JSON.parse(localStorage.getItem(EOD_KEY)) || {}; } catch (_) {}
+function nyDateParts() {
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, weekday: 'short', year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
+  const g = t => p.find(x => x.type === t).value;
+  return { key: `${g('year')}-${g('month')}-${g('day')}`, label: `${g('weekday')} ${+g('day')} ${g('month')}`, wd: g('weekday'), mins: (+g('hour') % 24) * 60 + +g('minute') };
+}
+function captureEod() {
+  const d = nyDateParts();
+  if (['Sat', 'Sun'].includes(d.wd) || d.mins < 16 * 60) return;
+  let changed = false;
+  for (const l of state.lists) {
+    if (!l.summary || eod[l.id]?.date === d.key) continue;
+    const syms = summarySymbols(l).filter(sy => quotes[sy] && quotes[sy].c != null);
+    if (syms.length < 2) continue;
+    const b = breadth(syms); if (!b) continue;
+    const ranked = syms.map(sy => [sy, quotes[sy].c]).sort((a, b2) => b2[1] - a[1]);
+    eod[l.id] = { date: d.key, label: d.label, up: b.up, flat: b.flat, down: b.down, avg: +b.avg.toFixed(2),
+      top: ranked.slice(0, 3), bottom: ranked.slice(-3).reverse(), dismissed: false };
+    changed = true;
+  }
+  if (changed) { try { localStorage.setItem(EOD_KEY, JSON.stringify(eod)); } catch (_) {} renderEod(); }
+}
+setInterval(captureEod, 60000);
+function renderEod() {
+  const el = $('eod'), l = activeList(), e = eod[l.id];
+  if (!e || e.dismissed) { el.innerHTML = ''; return; }
+  const short = sy => sy.includes(':') ? sy.split(':')[1] : sy;
+  const col = (rows, cls) => `<div class="col">${rows.map(([sy, c]) => `<div><span>${esc(short(sy))}</span><span class="${cls}">${pct(c)}</span></div>`).join('')}</div>`;
+  el.className = 'eod' + (e.collapsed ? ' collapsed' : '');
+  el.innerHTML = `<div class="eod-h" data-action="eod-toggle"><b>Close</b><span class="d">${esc(e.label)}</span>
+      <span class="b"><span class="up">${e.up}↑</span> ${e.flat}– <span class="down">${e.down}↓</span> · <b class="${dirCls(e.avg)}">${pct(e.avg)}</b></span>
+      <span class="x" data-action="eod-dismiss" title="Dismiss">×</span></div>
+    <div class="eod-body">${col(e.top, 'up')}${col(e.bottom, 'down')}</div>`;
+}
 function applySummaries() {
   for (const l of state.lists) {
     const el = document.querySelector(`.badge[data-list="${l.id}"]`); if (!el) continue;
@@ -588,8 +742,10 @@ function applySummaries() {
   const b = activeList().summary === true ? breadth(summarySymbols(activeList())) : null;
   const el = $('summary');
   if (!b) { el.innerHTML = ''; return; }
-  el.innerHTML = `<span class="stat"><span class="up">${b.up}↑</span> ${b.flat}– <span class="down">${b.down}↓</span> · <b class="${dirCls(b.avg)}">${pct(b.avg)}</b></span>` +
+  el.innerHTML = sparkline(activeList().id) + `<span class="srange" data-action="hist-range" title="Click to switch range">${(state.histRange || 'session') === '1h' ? '1h' : 'open'}</span>` +
+    `<span class="stat"><span class="up">${b.up}↑</span> ${b.flat}– <span class="down">${b.down}↓</span> · <b class="${dirCls(b.avg)}">${pct(b.avg)}</b></span>` +
     `<span class="meter" style="grid-template-columns:${ORDER.map(t => (b.tiers[t] || 0) + 'fr').join(' ')}">${ORDER.map(t => `<span class="t-${t < 0 ? 'd' + -t : t > 0 ? 'u' + t : 0}" title="${TIER_LABEL[t]}: ${b.tiers[t] || 0}"></span>`).join('')}</span>`;
+  showSparkTip();
 }
 // Earnings within 7 days: bordered day-count tag next to the symbol (filled when ≤ 1 day). Hover shows the date.
 function applyEarnings() {
@@ -617,6 +773,7 @@ function applySentiment() {
   });
 }
 function renderQuotes() {
+  if (Object.keys(quotes).length) { sampleHistory(); captureEod(); }
   applySentiment();
   regular = isRegularSession();
   $('panel').classList.toggle('no-ext', regular);
@@ -704,8 +861,7 @@ function onQuote(sym, v) {
   const upd = $('upd');
   upd.textContent = '↻ ' + new Date().toLocaleTimeString('en-GB');
   if (now - lastPulse > 1500) { lastPulse = now; upd.classList.remove('pulse'); void upd.offsetWidth; upd.classList.add('pulse'); }
-  clearTimeout(renderTimer);
-  renderTimer = setTimeout(renderQuotes, 250);
+  if (!renderTimer) renderTimer = setTimeout(() => { renderTimer = null; renderQuotes(); }, 250);
 }
 function setStatus(st) { $('status').className = 'status ' + st; $('status').title = { live: 'Live stream connected', off: 'Reconnecting…', poll: 'Polling every 10s (live socket not allowed on this host); CFDs stream via widget' }[st]; }
 function refreshQuotes() { if (quoteSource === 'poll') return pollNow(); wsRetry = 0; wsConnect(); }
@@ -736,7 +892,8 @@ function render() {
   const rowHtml = (s, gi) => {
     const sym = s.includes(':') ? s.split(':')[1] : s;
     return `<div class="row${s === state.symbol ? ' on' : ''}${noChart(s) ? ' nochart' : ''}" draggable="true" ${noChart(s) ? '' : 'data-action="select"'} data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}${noChart(s) ? ' · no chart in the free widget' : ''}">
-        <span class="sym"><span class="name">${esc(sym)}</span><button class="icon star${(state.pinned || []).includes(s) ? ' on' : ''}" data-action="${(state.pinned || []).includes(s) ? 'unpin' : 'pin'}" data-symbol="${esc(s)}" title="${(state.pinned || []).includes(s) ? 'Unpin from top' : 'Pin to top'}">${(state.pinned || []).includes(s) ? '★' : '☆'}</button><button class="icon info" data-action="details" data-symbol="${esc(s)}" title="Details">i</button></span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
+        <span class="sym"><span class="name">${esc(sym)}</span><button class="icon star${(state.pinned || []).includes(s) ? ' on' : ''}" data-action="${(state.pinned || []).includes(s) ? 'unpin' : 'pin'}" data-symbol="${esc(s)}" title="${(state.pinned || []).includes(s) ? 'Unpin from top' : 'Pin to top'}">${(state.pinned || []).includes(s) ? '★' : '☆'}</button></span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
+        <button class="icon info" data-action="details" data-symbol="${esc(s)}" title="Details">i</button>
         <button class="icon rm" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}" title="Remove">×</button>
       </div>`; };
   // Groups: a vertical tab on the left of the group's rows (click = collapse); single-group lists have no tab.
@@ -751,6 +908,7 @@ function render() {
     </div>`).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
   : `<div class="empty">No groups yet</div><div class="grp" data-action="add-group">+ group</div>`;
   renderSelbar();
+  renderEod();
   applySentiment();
 }
 function renderSelbar() {
@@ -871,6 +1029,15 @@ document.addEventListener('click', e => {
       applyDetails(); break;
     case 'add-selected':
       addSymbol(state.symbol); break;
+    case 'hist-range':
+      state.histRange = (state.histRange || 'session') === 'session' ? '1h' : 'session'; save(); applySummaries(); break;
+    case 'eod-toggle': {
+      const e2 = eod[activeList().id]; if (e2) { e2.collapsed = !e2.collapsed; localStorage.setItem(EOD_KEY, JSON.stringify(eod)); renderEod(); } break;
+    }
+    case 'eod-dismiss': {
+      e.stopPropagation();
+      const e2 = eod[activeList().id]; if (e2) { e2.dismissed = true; localStorage.setItem(EOD_KEY, JSON.stringify(eod)); renderEod(); } break;
+    }
     case 'hud-hide':
       state.hudHidden = true; save(); renderHud(); break;
     case 'toggle-details':
@@ -1024,10 +1191,25 @@ function parseInterval(text) {
   if (u === 'w') return n === 1 ? 'W' : n + 'W';
   return null;
 }
+const COMMANDS = [
+  ['go SYM', 'Open a symbol on the chart', a => { if (a) { state.symbol = a.toUpperCase(); update(!noChart(state.symbol)); } }],
+  ['add SYM', 'Add a symbol to the active list', a => a && addSymbol(a)],
+  ['remove SYM', 'Remove a symbol from the active list', a => { const sy = a.toUpperCase(); activeList().groups.forEach(g => { g.symbols = g.symbols.filter(x => x !== sy); }); update(false); wsSync(); }],
+  ['pin SYM', 'Pin a symbol to the top bar', a => { const sy = a.toUpperCase(); if (sy && !state.pinned.includes(sy)) { state.pinned.push(sy); update(false); wsSync(); } }],
+  ['unpin SYM', 'Unpin a symbol', a => { state.pinned = state.pinned.filter(x => x !== a.toUpperCase()); update(false); wsSync(); }],
+  ['list NAME', 'Switch to a watchlist', a => { const l = state.lists.find(x => x.name.toLowerCase().startsWith(a.toLowerCase())); if (l) { state.activeListId = l.id; update(false); wsSync(); } }],
+  ['interval 2h', 'Set the chart interval', a => { const v = parseInterval(a); if (v) { state.interval = v; save(); renderIntervals(); send('set-interval', { interval: v }); } }],
+  ['range 1h|open', 'Sentiment chart range', a => { state.histRange = /^1h/i.test(a) ? '1h' : 'session'; save(); applySummaries(); }],
+  ['details', 'Toggle the details panel', () => { state.detailsOpen = !state.detailsOpen; save(); applyDetails(); }],
+  ['chart', 'Show / hide the chart', () => { state.chartHidden = !state.chartHidden; save(); applyChartHidden(); renderHud(); }],
+  ['hud', 'Show / hide the chart HUD', () => { state.hudHidden = !state.hudHidden; save(); renderHud(); }],
+  ['lists', 'Manage watchlists', () => { renderListDlg(); $('listDlg').showModal(); }],
+  ['reconnect', 'Reconnect the quote stream', () => refreshQuotes()],
+];
 function openCmd(mode, seed) {
   cmd.mode = mode; cmd.items = []; cmd.index = -1;
-  $('cmdMode').textContent = mode === 'symbol' ? 'Symbol' : 'Interval';
-  $('cmdInput').placeholder = mode === 'symbol' ? 'Search symbol' : 'e.g. 15, 2h, 1d, 1w';
+  $('cmdMode').textContent = mode === 'symbol' ? 'Symbol' : mode === 'interval' ? 'Interval' : 'Command';
+  $('cmdInput').placeholder = mode === 'symbol' ? 'Search symbol' : mode === 'interval' ? 'e.g. 15, 2h, 1d, 1w' : 'pin NBIS · list İnci · hud · details';
   $('cmdInput').value = seed; $('cmdHint').textContent = '';
   $('cmdList').innerHTML = mode === 'symbol' ? '' : `<div class="cmd-foot">Number = minutes · h = hours · d = days · w = weeks · Enter applies</div>`;
   const d = $('cmd'); if (!d.open) d.showModal();
@@ -1036,6 +1218,12 @@ function openCmd(mode, seed) {
 }
 function renderCmd() {
   const box = $('cmdList');
+  if (cmd.mode === 'command') {
+    box.innerHTML = cmd.items.map((c, i) => `<div class="ac-item${i === cmd.index ? ' on' : ''}" data-i="${i}"><span class="s">/${esc(c[0])}</span><span class="ex"></span><span class="d">${esc(c[1])}</span></div>`).join('')
+      + `<div class="cmd-foot">Enter = run · Esc = close</div>`;
+    box.querySelector('.ac-item.on')?.scrollIntoView({ block: 'nearest' });
+    return;
+  }
   if (cmd.mode !== 'symbol') return;
   box.innerHTML = cmd.items.length ? cmd.items.map((it, i) => `<div class="ac-item${i === cmd.index ? ' on' : ''}" data-i="${i}">
       <span class="s">${esc(it.sym)}</span><span class="ex">${esc(it.type || '')}</span><span class="d">${esc(it.desc || '')}</span></div>`).join('')
@@ -1045,6 +1233,11 @@ function renderCmd() {
 }
 function onCmdInput() {
   const text = $('cmdInput').value.trim();
+  if (cmd.mode === 'command') {
+    const word = text.replace(/^\//, '').split(/\s+/)[0].toLowerCase();
+    cmd.items = COMMANDS.filter(c => !word || c[0].split(' ')[0].startsWith(word));
+    cmd.index = cmd.items.length ? 0 : -1; renderCmd(); return;
+  }
   if (cmd.mode === 'interval') {
     const v = parseInterval(text);
     $('cmdHint').textContent = v ? '→ ' + intervalLabel(v) : (text ? 'invalid' : '');
@@ -1060,6 +1253,11 @@ function onCmdInput() {
   }, 200);
 }
 function pickCmd(addToList) {
+  if (cmd.mode === 'command') {
+    const c = cmd.items[cmd.index]; if (!c) return;
+    const arg = $('cmdInput').value.trim().replace(/^\//, '').split(/\s+/).slice(1).join(' ');
+    $('cmd').close(); c[2](arg); return;
+  }
   if (cmd.mode === 'interval') {
     const v = parseInterval($('cmdInput').value); if (!v) return;
     state.interval = v; save(); renderIntervals(); send('set-interval', { interval: v });
@@ -1127,6 +1325,7 @@ document.addEventListener('keydown', e => {
   if (t.closest && (t.closest('input, textarea, select, dialog[open]'))) return;
   if (/^[a-zA-Z]$/.test(e.key)) { openCmd('symbol', e.key.toUpperCase()); e.preventDefault(); return; }
   if (/^[0-9]$/.test(e.key)) { openCmd('interval', e.key); e.preventDefault(); return; }
+  if (e.key === '/') { openCmd('command', '/'); e.preventDefault(); return; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     const i = state.lists.findIndex(l => l.id === state.activeListId);
     const j = (i + (e.key === 'ArrowRight' ? 1 : -1) + state.lists.length) % state.lists.length;
