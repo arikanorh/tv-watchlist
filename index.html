@@ -355,11 +355,11 @@
     .breadth { display: none !important; }
     .resizer { display: none; }
     .toggle { display: none; }
-    /* Compact header on the list and chart views only: tabs + status, no list manager / chart toggle;
-       pinned chips on one line (symbol + change only). The lists view has no header. */
+    /* Compact header (tabs + status, no list manager / chart toggle) on the chart view only;
+       pinned tape (symbol + change on one line) on the lists and chart views. The list view has neither. */
     .bar, .taperow { display: none; }
-    body[data-mview="list"] .bar, body[data-mview="chart"] .bar { display: flex; padding: 4px 8px; }
-    body[data-mview="list"] .taperow, body[data-mview="chart"] .taperow { display: flex; }
+    body[data-mview="chart"] .bar { display: flex; padding: 4px 8px; }
+    body[data-mview="lists"] .taperow, body[data-mview="chart"] .taperow { display: flex; }
     .bar [data-action="manage-lists"], .bar #chartToggle { display: none; }
     .tabs { flex: 1; }
     .tab { padding: 5px 10px; font-size: 13px; }
@@ -512,7 +512,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '0.3';  // bump the minor on every push to main
+const APP_VERSION = '0.4';  // bump the minor on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
 // Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
