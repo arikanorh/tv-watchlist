@@ -1223,7 +1223,16 @@ document.addEventListener('click', e => {
 });
 
 
-function closeSheets() { $('intervals').querySelector('.ivmenu').hidden = true; $('symmenu').hidden = true; $('ivbackdrop').hidden = true; }
+function closeSheets() {
+  $('intervals').querySelector('.ivmenu').hidden = true; $('symmenu').hidden = true; $('ivbackdrop').hidden = true;
+  if (document.activeElement === $('symSearch')) $('symSearch').blur();
+  unshift();
+}
+// iOS: focusing an input inside the fixed body scrolls the document to reveal it; after the keyboard closes the
+// layout stays shifted and taps land one or two rows above their targets. Snap the document back to the top.
+function unshift() { if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0); }
+document.addEventListener('focusout', () => setTimeout(unshift, 60));
+window.visualViewport?.addEventListener('resize', () => setTimeout(unshift, 60));
 const symSearch = { timer: null, seq: 0, items: [] };
 function renderSymMenu() {
   const list = activeList(), syms = list ? flatSymbols(list) : [];
