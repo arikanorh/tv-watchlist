@@ -45,6 +45,7 @@
   .status { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
   .status.live { background: var(--up); }
   .status.off { background: var(--down); }
+  .status.poll { background: #f7a600; }
   .upd.pulse { animation: pulse .6s ease-out; }
   @keyframes pulse { 0% { color: var(--text); background: var(--accent-bg); } 100% { color: var(--muted); background: transparent; } }
   dialog { background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
@@ -168,6 +169,8 @@
   .d-bar-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
   .d-empty { padding: 24px 14px; color: var(--muted); font-size: 13px; }
   .d-stale { color: var(--muted); font-size: 11px; margin-top: 6px; }
+  #feeders { position: fixed; left: -2000px; top: 0; width: 320px; pointer-events: none; }
+  #feeders > div { width: 320px; height: 220px; }
   .resizer { width: 5px; flex-shrink: 0; cursor: col-resize; background: var(--border); }
   .resizer:hover, .resizer.active { background: var(--accent); }
   body.resizing { cursor: col-resize; user-select: none; }
@@ -211,6 +214,7 @@
   </button>
 </div>
 <div class="tape" id="pins"></div>
+<div id="feeders" aria-hidden="true"></div>
 <div class="body">
   <div class="panel" id="panel">
     <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span title="● pre-market · ● post-market · ● overnight">Ext</span></div>
@@ -307,7 +311,7 @@ function send(name, data) {
 }
 window.addEventListener('message', e => {
   const f = $('chartWrap').querySelector('iframe');
-  if (!f || f.contentWindow !== e.source) return;
+  if (!f || f.contentWindow !== e.source) return onFeederMessage(e);
   if (!chart.ready) {
     chart.ready = true;
     for (const k in chart.pending) send(k, chart.pending[k]);
@@ -445,16 +449,18 @@ const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session'
   'market_cap_basic', 'earnings_release_next_date', 'price_target_average',
   'description', 'exchange', 'type', 'currency_code'];
 const raw = {};
-let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, lastPulse = 0;
+let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, lastPulse = 0, wsEverOpen = false;
+let quoteSource = new URLSearchParams(location.search).get('quotes') === 'poll' ? 'poll' : 'ws';
 const frame = o => { const j = JSON.stringify(o); return '~m~' + j.length + '~m~' + j; };
 const wsSend = o => { if (ws && ws.readyState === 1) ws.send(frame(o)); };
 function wsConnect() {
   clearTimeout(wsTimer);
+  if (quoteSource === 'poll') return startPolling();
   if (ws) { ws.onclose = null; ws.close(); }
   wsSubscribed = [];
   ws = new WebSocket('wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart');
   ws.onopen = () => {
-    wsRetry = 0;
+    wsRetry = 0; wsEverOpen = true;
     wsSend({ m: 'set_auth_token', p: ['unauthorized_user_token'] });
     wsSend({ m: 'quote_create_session', p: ['qs'] });
     wsSend({ m: 'quote_set_fields', p: ['qs', ...QUOTE_FIELDS] });
@@ -470,11 +476,14 @@ function wsConnect() {
   };
   ws.onclose = () => {
     setStatus('off');
+    // TradingView only accepts the socket from allow-listed origins (localhost, tradingview.com). Elsewhere: poll.
+    if (!wsEverOpen && wsRetry >= 1) { quoteSource = 'poll'; return startPolling(); }
     wsTimer = setTimeout(wsConnect, Math.min(30000, 1000 * 2 ** wsRetry++));
   };
 }
 // Subscribe exactly the active list's symbols.
 function wsSync() {
+  if (quoteSource === 'poll') return pollNow();
   if (!ws || ws.readyState !== 1) return;
   const want = [...new Set([...(state.pinned || []), ...flatSymbols(activeList())])];
   const add = want.filter(x => !wsSubscribed.includes(x)), del = wsSubscribed.filter(x => !want.includes(x));
@@ -498,8 +507,8 @@ function onQuote(sym, v) {
   clearTimeout(renderTimer);
   renderTimer = setTimeout(renderQuotes, 250);
 }
-function setStatus(st) { $('status').className = 'status ' + st; $('status').title = st === 'live' ? 'Live stream connected' : 'Reconnecting…'; }
-function refreshQuotes() { wsRetry = 0; wsConnect(); }
+function setStatus(st) { $('status').className = 'status ' + st; $('status').title = { live: 'Live stream connected', off: 'Reconnecting…', poll: 'Polling every 10s (live socket not allowed on this host); CFDs stream via widget' }[st]; }
+function refreshQuotes() { if (quoteSource === 'poll') return pollNow(); wsRetry = 0; wsConnect(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (!ws || ws.readyState !== 1)) refreshQuotes(); });
 
 function render() {
@@ -719,6 +728,80 @@ $('resizer').addEventListener('pointerdown', e => {
 });
 
 
+// Fallback quote source for hosts the websocket rejects: scanner REST polling (any origin, no streaming)
+// plus hidden chart widgets whose quoteUpdate stream covers symbols the scanner lacks (broker CFDs).
+const POLL_MS = 10000, FEEDER_MAX = 4;
+const SCAN_COLS = ['close', 'change', 'premarket_close', 'premarket_change', 'premarket_time', 'postmarket_close', 'postmarket_change', 'postmarket_time',
+  'open', 'high', 'low', 'volume', 'average_volume_10d_calc', 'market_cap_basic', 'price_52_week_high', 'price_52_week_low',
+  'Perf.W', 'Perf.Y', 'earnings_release_next_date', 'price_target_average', 'description', 'exchange', 'type', 'currency'];
+let pollTimer = null;
+const feeders = {};
+function startPolling() {
+  setStatus('poll');
+  clearInterval(pollTimer);
+  pollNow();
+  pollTimer = setInterval(() => { if (!document.hidden) pollNow(); }, POLL_MS);
+}
+async function pollNow() {
+  const tickers = [...new Set([...(state.pinned || []), ...flatSymbols(activeList())])];
+  if (!tickers.length) return;
+  let data;
+  try {
+    const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify({ symbols: { tickers }, columns: SCAN_COLS }) });
+    data = (await r.json()).data;
+  } catch (e) { console.warn('scanner', e); return; }
+  const [phase] = sessionPhase();
+  const found = new Set();
+  for (const row of data) {
+    found.add(row.s);
+    const d = Object.fromEntries(SCAN_COLS.map((c, i) => [c, row.d[i]]));
+    const pre = (d.premarket_time || 0) >= (d.postmarket_time || 0);
+    const ext = pre ? ['premarket_close', 'premarket_change'] : ['postmarket_close', 'postmarket_change'];
+    const hasExt = d[ext[0]] != null;
+    onQuote(row.s, {
+      lp: d.close, ch: d.change == null ? null : d.close - d.close / (1 + d.change / 100), chp: d.change,
+      rtc: hasExt ? d[ext[0]] : null, rchp: hasExt ? d[ext[1]] : null,
+      current_session: !hasExt ? 'market' : phase === 'pre' ? 'pre_market' : phase === 'post' ? 'post_market' : phase === 'open' ? 'market' : 'out_of_session',
+      open_price: d.open, high_price: d.high, low_price: d.low, volume: d.volume, average_volume: d.average_volume_10d_calc,
+      market_cap_basic: d.market_cap_basic, price_52_week_high: d.price_52_week_high, price_52_week_low: d.price_52_week_low,
+      price_percent_change_1_week: d['Perf.W'], price_percent_change_52_week: d['Perf.Y'],
+      earnings_release_next_date: d.earnings_release_next_date, price_target_average: d.price_target_average,
+      description: d.description, exchange: d.exchange, type: d.type, currency_code: d.currency, update_mode: 'polled',
+    });
+  }
+  syncFeeders(tickers.filter(t => !found.has(t)));
+}
+// Hidden widgets: one per scanner-missing symbol, asked to stream quotes via the TradingView iframe protocol.
+const QUOTE_SUB = JSON.stringify({ provider: 'TradingView', type: 'get', name: 'quoteSubscribe', id: 1, client_id: 'tvwl', data: {} });
+function syncFeeders(missing) {
+  for (const sym in feeders) if (!missing.includes(sym)) { feeders[sym].el.remove(); delete feeders[sym]; }
+  for (const sym of missing.slice(0, FEEDER_MAX)) {
+    if (feeders[sym]) continue;
+    const el = document.createElement('div');
+    el.id = 'feed_' + Math.random().toString(36).slice(2, 8);
+    $('feeders').appendChild(el);
+    feeders[sym] = { el };
+    new TradingView.widget({ container_id: el.id, width: 320, height: 220, symbol: sym, interval: '1', theme: 'dark', locale: 'en',
+      hide_top_toolbar: true, hide_legend: true, hide_side_toolbar: true, allow_symbol_change: false, save_image: false, support_host: 'https://www.tradingview.com' });
+    setTimeout(() => { const f = el.querySelector('iframe'); if (f) f.contentWindow.postMessage(QUOTE_SUB, '*'); }, 4000);
+  }
+  // Re-ask every poll so a stalled stream resumes.
+  for (const sym in feeders) { const f = feeders[sym].el.querySelector('iframe'); if (f) f.contentWindow.postMessage(QUOTE_SUB, '*'); }
+}
+function onFeederMessage(e) {
+  if (typeof e.data !== 'string' || !e.data.includes('quoteUpdate')) return;
+  let m; try { m = JSON.parse(e.data); } catch (_) { return; }
+  if (m.name !== 'quoteUpdate') return;
+  for (const sym in feeders) {
+    const f = feeders[sym].el.querySelector('iframe');
+    if (f && f.contentWindow === e.source) {
+      const d = m.data;
+      onQuote(sym, { lp: d.last_price, ch: d.change, chp: d.change_percent, current_session: 'market', description: d.description, exchange: d.exchange, volume: d.volume, update_mode: 'streaming' });
+      return;
+    }
+  }
+}
+
 // Details panel: quote sheet for the selected symbol, built from the merged websocket fields in `raw`.
 const fmtN = (v, d = 2) => v == null ? '–' : new Intl.NumberFormat('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
 const fmtBig = v => v == null ? '–' : v >= 1e12 ? (v / 1e12).toFixed(2) + 'T' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'K' : String(v);
@@ -757,7 +840,7 @@ function renderDetails() {
   const extLine = extended
     ? `<div class="d-ext"><i class="ss ${q.ss}"></i>${q.es} ${v('extp', fmtPct(q.e), signCls(q.e))}<span class="d-sep">·</span>Close ${v('close', fmtN(r.lp))}</div>`
     : '';
-  const stale = r.update_mode && r.update_mode.startsWith('delayed') ? `<div class="d-stale">Delayed ${Math.round(parseInt(r.update_mode.split('_').pop(), 10) / 60) || 15} min</div>` : '';
+  const stale = r.update_mode === 'polled' ? `<div class="d-stale">Polled every 10s</div>` : r.update_mode && r.update_mode.startsWith('delayed') ? `<div class="d-stale">Delayed ${Math.round(parseInt(r.update_mode.split('_').pop(), 10) / 60) || 15} min</div>` : '';
   const html = `
     <div class="d-head">
       <div class="d-sym"><b>${esc(short)}</b><small>${esc(r.exchange || ex)}</small></div>
