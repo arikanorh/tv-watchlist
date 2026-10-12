@@ -22,23 +22,30 @@
   .bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; min-width: 0;
     border-bottom: 1px solid var(--border); background: var(--bg2); }
   .tabs { flex: 0 1 auto; }
-  .ivs { margin-left: 8px; padding-left: 10px; border-left: 1px solid var(--border); }
+  /* US session as the top bar's background tint */
+  body.sess-open .bar { background: rgba(8, 153, 129, .16); }
+  body.sess-pre .bar { background: rgba(247, 166, 0, .16); }
+  body.sess-post .bar { background: rgba(79, 140, 255, .16); }
+  body.sess-night .bar { background: rgba(176, 108, 255, .16); }
+  body.sess-closed .bar { background: var(--bg2); }
   #chartToggle svg { display: block; }
   #chartToggle .i-show, #chartToggle.off .i-hide { display: none; }
   #chartToggle.off .i-show { display: block; }
   .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
   .tabs::-webkit-scrollbar { display: none; }
-  .tab { padding: 5px 12px; border-radius: 6px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+  .tab { padding: 5px 12px; border-radius: 6px; color: var(--muted); white-space: nowrap; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .badge:empty { display: none; }
+  .badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .badge.up i { background: var(--up); } .badge.down i { background: var(--down); }
+  .badge.up { color: var(--up); } .badge.down { color: var(--down); }
   .tab:hover { background: var(--bg3); color: var(--text); }
   .tab.on { background: var(--bg3); color: #fff; }
   .icon { width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center;
     justify-content: center; color: var(--muted); font-size: 15px; }
   .icon:hover { background: var(--bg3); color: var(--text); }
   .spacer { flex: 1; }
-  .ivs { display: flex; gap: 2px; }
-  .iv { padding: 4px 8px; border-radius: 6px; color: var(--muted); font-size: 12px; }
-  .iv:hover { background: var(--bg3); color: var(--text); }
-  .iv.on { background: var(--accent-bg); color: #fff; }
   .upd { white-space: nowrap; font-size: 14px; font-weight: 500; color: var(--muted); padding: 4px 10px; border-radius: 6px; font-variant-numeric: tabular-nums; }
   .upd:hover { background: var(--bg3); color: var(--text); }
   .upd.err { color: var(--down); }
@@ -56,6 +63,8 @@
   .dlg-row { display: flex; align-items: center; gap: 6px; padding: 6px 12px; }
   .dlg-row input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
   .dlg-row .count { color: var(--muted); font-size: 11px; width: 48px; text-align: right; }
+  .dlg-row .sum { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .dlg-row .sum input { accent-color: var(--accent); margin: 0; }
   .dlg-row .icon { color: var(--muted); }
   .dlg-row .icon:hover { color: var(--down); }
   .dlg-row .move { font-size: 11px; width: 22px; }
@@ -74,14 +83,28 @@
     text-transform: uppercase; color: var(--text); background: var(--bg2); cursor: pointer; user-select: none; }
   .grp .chev { color: var(--muted); font-size: 10px; }
   .grp .name { flex: 1; }
+  .breadth { display: flex; align-items: center; gap: 12px; padding: 5px 10px; font-size: 12px; color: var(--muted);
+    font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .breadth:empty { display: none; }
+  .breadth .meter { flex: 1; min-width: 0; height: 6px; display: grid; border-radius: 3px; overflow: hidden; background: var(--bg3); }
+  .breadth .meter .t-d4 { background: rgba(242, 54, 69, 1); }   .breadth .meter .t-d3 { background: rgba(242, 54, 69, .72); }
+  .breadth .meter .t-d2 { background: rgba(242, 54, 69, .48); } .breadth .meter .t-d1 { background: rgba(242, 54, 69, .28); }
+  .breadth .meter .t-0 { background: var(--bg3); }
+  .breadth .meter .t-u1 { background: rgba(8, 153, 129, .28); } .breadth .meter .t-u2 { background: rgba(8, 153, 129, .48); }
+  .breadth .meter .t-u3 { background: rgba(8, 153, 129, .72); } .breadth .meter .t-u4 { background: rgba(8, 153, 129, 1); }
+  .breadth .stat { white-space: nowrap; flex-shrink: 0; }
+  .breadth .stat b { font-weight: 600; color: var(--text); }
+  .breadth .stat .up { color: var(--up); } .breadth .stat .down { color: var(--down); }
   .grp .chev { display: inline-block; transition: transform .15s; }
   .grp.collapsed .chev { transform: rotate(-90deg); }
   .grp .icon { width: 22px; height: 22px; font-size: 12px; opacity: 0; }
   .grp:hover .icon { opacity: 1; }
-  .tape { display: flex; gap: 2px; padding: 3px 8px; overflow-x: auto; scrollbar-width: none; background: var(--bg2);
-    border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  .taperow { display: flex; align-items: center; background: var(--bg2); border-bottom: 1px solid var(--border); }
+  .tape { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 3px 8px; overflow-x: auto; scrollbar-width: none;
+    font-variant-numeric: tabular-nums; }
+  .ivsel { flex-shrink: 0; margin: 0 8px 0 4px; background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 6px; font-size: 12px; font-weight: 500; }
   .tape::-webkit-scrollbar { display: none; }
-  .tape:empty { display: none; }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 7px; border-radius: 6px;
     white-space: nowrap; color: var(--text); flex-shrink: 0; line-height: 1.1; }
   .chip:hover { background: var(--bg3); }
@@ -134,11 +157,6 @@
   .ss.pre { background: #f7a600; }
   .ss.post { background: #4f8cff; }
   .ss.night { background: #b06cff; }
-  .sess { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 12px; color: var(--muted);
-    padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); }
-  .sess .ss { margin: 0; width: 7px; height: 7px; }
-  .sess .ss.open { background: var(--up); }
-  .sess .ss.closed { background: var(--muted); }
   .panel.no-ext .cols, .panel.no-ext .row { grid-template-columns: 1fr 76px 60px; }
   .panel.no-ext .cols span:last-child, .panel.no-ext .ext { display: none; }
   .row .px.up, .row .chg.up, .row .ext.up { color: var(--up); }
@@ -146,16 +164,35 @@
   .row .px:empty::before, .row .chg:empty::before, .row .ext:empty::before { content: '–'; color: var(--muted); }
   .row.dragging { opacity: .4; }
   .row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
-  .grp.drop-into { box-shadow: inset 0 0 0 1px var(--accent); }
+  .gtab.drop-into { box-shadow: inset 0 0 0 1px var(--accent); }
+  .group { border-top: 1px solid var(--border); }
+  .gtab { position: relative; display: flex; align-items: center; gap: 6px; height: 18px; padding: 0 10px;
+    background: var(--bg3); cursor: pointer; user-select: none; font-size: 10px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text); }
+  .gtab:hover { filter: brightness(1.2); }
+  .gtab .chev { color: var(--muted); font-size: 9px; transition: transform .15s; }
+  .group.collapsed .chev { transform: rotate(-90deg); }
+  .gname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gtools { display: flex; gap: 2px; opacity: 0; }
+  .gtab:hover .gtools { opacity: 1; }
+  .gtools .icon { width: 16px; height: 16px; font-size: 11px; }
+  .grows { flex: 1; min-width: 0; }
+  .gcount { padding: 8px 10px; font-size: 12px; color: var(--muted); }
   .flash { animation: cell .9s ease-out; border-radius: 3px; }
   .f-up { --fl: rgba(8, 153, 129, .45); }
   .f-down { --fl: rgba(242, 54, 69, .45); }
   .f-same { --fl: rgba(41, 98, 255, .35); }
   @keyframes cell { 0% { background: var(--fl); } 100% { background: transparent; } }
-  .row .icon { position: absolute; right: 2px; top: 6px; width: 18px; height: 18px; font-size: 12px; opacity: 0;
-    background: var(--bg3); }
+  .row .icon { width: 16px; height: 16px; font-size: 12px; opacity: 0; flex-shrink: 0; background: transparent; }
   .row:hover .icon { opacity: 1; }
-  .row .icon.star { right: 22px; }
+  .row .icon:hover { background: var(--bg3); }
+  .row .icon.info { font: italic 600 11px Georgia, serif; }
+  .row .icon.rm { position: absolute; right: 2px; top: 7px; background: var(--bg3); }
+  .row .sym { display: flex; align-items: center; gap: 4px; }
+  .row .sym .name { overflow: hidden; text-overflow: ellipsis; }
+  .earn { flex-shrink: 0; font-size: 9px; font-weight: 600; line-height: 1; padding: 2px 4px; border-radius: 3px;
+    color: #f7a600; border: 1px solid rgba(247, 166, 0, .55); letter-spacing: .02em; }
+  .earn.soon { background: #f7a600; color: #131722; border-color: #f7a600; }
   .row .icon.star.on { opacity: 1; color: #f7a600; background: transparent; }
   .empty { padding: 20px 12px; color: var(--muted); text-align: center; }
 
@@ -164,11 +201,11 @@
     border-radius: 6px; padding: 5px 6px; text-transform: uppercase; font-size: 12px; }
   .add button { background: var(--accent); color: #fff; border-radius: 6px; width: 28px; }
 
-  .details { display: none; width: 280px; flex-shrink: 0; overflow-y: auto; background: var(--bg);
+  .details { position: relative; display: none; width: 280px; flex-shrink: 0; overflow-y: auto; background: var(--bg);
     border-right: 1px solid var(--border); font-variant-numeric: tabular-nums; }
   body.details-open .details { display: block; }
-  #detailsToggle.on { color: var(--text); background: var(--bg3); }
-  .d-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--border); }
+  .dclose { position: absolute; right: 8px; top: 8px; z-index: 1; }
+  .d-head { padding: 12px 14px 10px; padding-right: 40px; border-bottom: 1px solid var(--border); }
   .d-sym { display: flex; align-items: baseline; gap: 8px; }
   .d-sym b { font-size: 18px; }
   .d-sym small { color: var(--muted); font-size: 12px; }
@@ -208,11 +245,8 @@
     .panel.hidden { display: none; }
     .toggle { display: inline-flex; }
     .bar { padding: 4px 8px; gap: 4px; }
-    .ivs { display: none; }
     .tabs { flex: 1 1 auto; }
     .upd { font-size: 12px; padding: 4px 6px; }
-    .sess { padding: 6px; gap: 0; }
-    .sess > span { display: none; }
     .chart { min-height: 0; }
   }
 </style>
@@ -221,21 +255,20 @@
 <div class="bar">
   <button class="icon toggle" data-action="toggle-panel" title="Toggle list">☰</button>
   <div class="tabs" id="tabs"></div>
-  <div class="ivs" id="intervals"></div>
+  <button class="icon" data-action="manage-lists" title="Manage lists">⋯</button>
   <span class="spacer"></span>
   <span class="status off" id="status"></span>
   <button class="upd" id="upd" data-action="refresh" title="Last tick. Click to reconnect.">–</button>
-  <span class="sess" id="sess" title="US stock market session (New York time)"><i class="ss closed"></i><span>–</span></span>
-  <button class="icon" data-action="manage-lists" title="Manage lists">⋯</button>
-  <button class="icon" id="detailsToggle" data-action="toggle-details" title="Show details">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M13 9h5M13 13h5"/></svg>
-  </button>
   <button class="icon" id="chartToggle" data-action="toggle-chart" title="Hide chart">
     <svg class="i-hide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
     <svg class="i-show" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
   </button>
 </div>
-<div class="tape" id="pins"></div>
+<div class="taperow">
+  <div class="tape" id="pins"></div>
+  <select class="ivsel" id="intervals" title="Chart interval"></select>
+</div>
+<div class="breadth" id="summary" title="Breadth of the active list, indices excluded · session-aware change"></div>
 <div id="feeders" aria-hidden="true"></div>
 <div class="body">
   <div class="panel" id="panel">
@@ -247,7 +280,10 @@
     </form>
   </div>
   <div class="resizer" id="resizer"></div>
-  <aside class="details" id="details" aria-label="Symbol details"></aside>
+  <aside class="details" id="details" aria-label="Symbol details">
+    <button class="icon dclose" data-action="toggle-details" title="Close details">×</button>
+    <div id="dbody"></div>
+  </aside>
   <div class="chart" id="chartWrap"></div>
 </div>
 
@@ -267,7 +303,9 @@
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
 const KEY = 'tvwl.state.v2';
-const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
+const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
+// Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
+const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : (/^\d/.test(v) ? v : '1' + v));
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 function seed() {
@@ -275,15 +313,15 @@ function seed() {
   return {
     activeListId: 'abd', interval: '60', symbol: 'NASDAQ:NBIS', pinned: DEFAULT_PINS.slice(),
     lists: [
-      { id: 'abd', name: 'ABD', groups: [
+      { id: 'abd', name: 'ABD', summary: true, groups: [
         g('Index', ['SKILLING:US100', 'SKILLING:SPX500', 'CME_MINI:NQ1!', 'CME_MINI:ES1!', 'CBOT_MINI:YM1!', 'OKX:US100USDT.P', 'OKX:US500USDT.P']),
         g('Spot', ['NASDAQ:NBIS','NASDAQ:CRWV','NYSE:BE','NASDAQ:CEG','NYSE:MOD','NASDAQ:AVGO','NASDAQ:ASTS','NASDAQ:UPST','NYSE:AMPX','NYSE:KRMN']),
         g('Moon sh', ['NASDAQ:ONDS','NASDAQ:RCAT','NASDAQ:GRRR','NYSE:TE','NASDAQ:ASPI','NASDAQ:EOSE','NYSE:ORCL','NYSE:NKE']),
       ]},
-      { id: 'inci', name: 'İnci', groups: [
+      { id: 'inci', name: 'İnci', summary: true, groups: [
         g('All', ['NASDAQ:RKLB','NYSE:PL','NASDAQ:APP','CBOE:EUV','NASDAQ:COHU','NYSE:RBRK','NASDAQ:SOFI','NASDAQ:QS','NYSE:NOW','NASDAQ:AVAV','NASDAQ:EOSE','NYSE:RDDT','NASDAQ:CBRS']),
       ]},
-      { id: 'tr', name: 'TR', groups: [
+      { id: 'tr', name: 'TR', summary: 'BIST:XU100', groups: [
         g('FX', ['TVC:DXY','FX:EURUSD','FX:USDTRY','FX:EURTRY']),
         g('BIST', ['BIST:XU100','BIST:XU030D1!','BIST:XBANK','BIST:DMLKT','BIST:ENPRA']),
         g('Altın & Gümüş', ['OANDA:XAUUSD','TVC:SILVER','TVC:GOLDSILVER','OANDA:XAUEUR']),
@@ -314,6 +352,7 @@ function load() {
       s.symbol = fix(s.symbol);
       s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix).filter(x => !REMOVED.has(x)); }));
       s.pinned = Array.isArray(s.pinned) ? [...new Set(s.pinned.map(fix))] : DEFAULT_PINS.slice();
+      s.lists.forEach(l => { if (l.summary === undefined) l.summary = l.id === 'tr' ? 'BIST:XU100' : ['abd', 'inci'].includes(l.id); });
       return s;
     }
   } catch (e) {}
@@ -325,6 +364,7 @@ let state = load();
 const $ = id => document.getElementById(id);
 const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
 const flatSymbols = list => list.groups.flatMap(g => g.symbols);
+const allSymbols = () => [...new Set([...(state.pinned || []), ...state.lists.flatMap(flatSymbols)])];
 
 // Widget iframe accepts {name:'set-symbol',data:{symbol}} / {name:'set-interval',data:{interval}} via postMessage.
 const chart = { ready: false, pending: {} };
@@ -342,15 +382,23 @@ window.addEventListener('message', e => {
     chart.pending = {};
   }
   // The widget streams quoteUpdate for the symbol currently on the chart (JSON string, provider TradingView).
-  if (typeof e.data === 'string' && e.data.includes('quoteUpdate')) {
+  if (typeof e.data === 'string' && e.data.startsWith('{')) {
     try {
       const m = JSON.parse(e.data);
-      if (m.name === 'quoteUpdate') {
-        onChartSymbol(m.data);
-      }
+      if (m.name === 'quoteUpdate') onChartSymbol(m.data);
+      if (m.name === 'symbolInfo' && m.type === 'on') onSymbolInfo(m.data);
     } catch (_) {}
   }
 });
+
+// Chart → interval sync: the widget has no change event, so ask it for symbolInfo every 2 s and mirror its interval.
+const SYMBOL_INFO = JSON.stringify({ provider: 'TradingView', type: 'get', name: 'symbolInfo', id: 7, client_id: 'tvwl', data: {} });
+setInterval(() => { const f = $('chartWrap').querySelector('iframe'); if (f && chart.ready && !document.hidden) f.contentWindow.postMessage(SYMBOL_INFO, '*'); }, 2000);
+function onSymbolInfo(d) {
+  if (!d || !d.interval || d.interval === state.interval) return;
+  state.interval = d.interval; save();
+  renderIntervals();
+}
 
 // Chart → list sync: when the symbol is changed inside the widget, highlight it if listed, otherwise prefill the add box.
 const resolved = {};
@@ -399,6 +447,8 @@ function mountChart() {
     allow_symbol_change: true, details: false, hotlist: false, calendar: false,
     hide_side_toolbar: true,
     support_host: 'https://www.tradingview.com',
+    // Note: the free embed forces mainSeriesProperties.showCountdown=false at load, so neither `overrides`
+    // nor `use_localstorage_for_settings` can keep the widget's own countdown across reloads.
   });
 }
 function showSymbol() { send('set-symbol', { symbol: state.symbol }); }
@@ -442,7 +492,8 @@ function sessionPhase() {
 function renderSession() {
   const [cls, label] = sessionPhase();
   const tz = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' }).format(new Date());
-  $('sess').innerHTML = `<i class="ss ${cls}"></i><span>${label}<span class="tz"> · ${tz} NY</span></span>`;
+  document.body.className = document.body.className.replace(/\bsess-\w+\b/g, '').replace(/\s+/g, ' ').trim() + ' sess-' + cls;
+  document.querySelector('.bar').title = `${label} · ${tz} New York`;
 }
 setInterval(renderSession, 30000);
 let regular = false;
@@ -454,7 +505,63 @@ function sentimentClass(c) {
   const tier = SENTIMENT_TIERS.filter(t => a >= t).length;
   return tier ? `s-${c > 0 ? 'up' : 'down'}-${tier}` : '';
 }
+const effChange = q => q ? (!regular && q.e != null ? q.e : q.c) : null;
+const NON_EQUITY = new Set(['index', 'cfd', 'futures', 'economic']);
+// Symbols that count toward a list's sentiment: everything except indices and index CFDs.
+const summarySymbols = list => flatSymbols(list).filter(sy => !NON_EQUITY.has(raw[sy]?.type));
+// Tier of a change: -4..-1 (down, strongest first), 0 (flat, |x| < 0.5), 1..4 (up). Same thresholds as the row tint.
+const tierOf = x => { const t = SENTIMENT_TIERS.filter(th => Math.abs(x) >= th).length; return x < 0 ? -t : t; };
+function breadth(symbols) {
+  const v = symbols.map(sy => effChange(quotes[sy])).filter(x => x != null);
+  if (!v.length) return null;
+  const up = v.filter(x => x >= 0.5).length, down = v.filter(x => x <= -0.5).length, flat = v.length - up - down;
+  const tiers = {}; for (const x of v) { const t = tierOf(x); tiers[t] = (tiers[t] || 0) + 1; }
+  return { up, down, flat, n: v.length, avg: v.reduce((a, b) => a + b, 0) / v.length, tiers };
+}
+const pct = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+const ORDER = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+const TIER_LABEL = { '-4': '≤ −5%', '-3': '−5…−2%', '-2': '−2…−1%', '-1': '−1…−0.5%', 0: '±0.5%', 1: '+0.5…1%', 2: '+1…2%', 3: '+2…5%', 4: '≥ +5%' };
+const dirCls = v => v >= 0.5 ? 'up' : v <= -0.5 ? 'down' : '';
+function applySummaries() {
+  for (const l of state.lists) {
+    const el = document.querySelector(`.badge[data-list="${l.id}"]`); if (!el) continue;
+    // summary: true → breadth of the list's equities; a symbol string → that symbol's change (e.g. TR → BIST:XU100).
+    if (typeof l.summary === 'string') {
+      const v = effChange(quotes[l.summary]);
+      el.className = 'badge ' + (v == null ? '' : dirCls(v));
+      el.innerHTML = v == null ? '' : `<i></i>${pct(v)}`;
+      el.title = `${l.name}: ${l.summary} ${v == null ? '' : pct(v)}`;
+      continue;
+    }
+    const b = l.summary ? breadth(summarySymbols(l)) : null;
+    el.className = 'badge ' + (b ? dirCls(b.avg) : '');
+    el.innerHTML = b ? `<i></i>${pct(b.avg)}` : '';
+    el.title = b ? `${l.name}: ${b.up}↑ ${b.flat}– ${b.down}↓ · average ${pct(b.avg)} (indices excluded)` : '';
+  }
+  const b = activeList().summary === true ? breadth(summarySymbols(activeList())) : null;
+  const el = $('summary');
+  if (!b) { el.innerHTML = ''; return; }
+  el.innerHTML = `<span class="stat"><span class="up">${b.up}↑</span> ${b.flat}– <span class="down">${b.down}↓</span> · <b class="${dirCls(b.avg)}">${pct(b.avg)}</b></span>` +
+    `<span class="meter" style="grid-template-columns:${ORDER.map(t => (b.tiers[t] || 0) + 'fr').join(' ')}">${ORDER.map(t => `<span class="t-${t < 0 ? 'd' + -t : t > 0 ? 'u' + t : 0}" title="${TIER_LABEL[t]}: ${b.tiers[t] || 0}"></span>`).join('')}</span>`;
+}
+// Earnings within 7 days: bordered day-count tag next to the symbol (filled when ≤ 1 day). Hover shows the date.
+function applyEarnings() {
+  const now = Date.now();
+  document.querySelectorAll('#list .row').forEach(row => {
+    const t = raw[row.dataset.symbol]?.earnings_release_next_date;
+    const days = t ? Math.round((t * 1000 - now) / 864e5) : null;
+    const show = days != null && days >= 0 && days <= 7;
+    let tag = row.querySelector('.earn');
+    if (!show) { if (tag) tag.remove(); return; }
+    if (!tag) { tag = document.createElement('i'); tag.className = 'earn'; const sym = row.querySelector('.sym'); sym.insertBefore(tag, sym.querySelector('.icon')); }
+    tag.textContent = days === 0 ? 'today' : days + 'd';
+    tag.classList.toggle('soon', days <= 1);
+    tag.title = 'Earnings ' + fmtDays(t);
+  });
+}
 function applySentiment() {
+  applySummaries();
+  applyEarnings();
   document.querySelectorAll('#pins .chip, #list .row').forEach(el => {
     const q = quotes[el.dataset.symbol];
     // Outside the regular session the extended-session move (pre/post-market) is what matters.
@@ -531,7 +638,7 @@ function wsConnect() {
 function wsSync() {
   if (quoteSource === 'poll') return pollNow();
   if (!ws || ws.readyState !== 1) return;
-  const want = [...new Set([...(state.pinned || []), ...flatSymbols(activeList())])];
+  const want = allSymbols();
   const add = want.filter(x => !wsSubscribed.includes(x)), del = wsSubscribed.filter(x => !want.includes(x));
   if (del.length) wsSend({ m: 'quote_remove_symbols', p: ['qs', ...del] });
   if (add.length) wsSend({ m: 'quote_add_symbols', p: ['qs', ...add] });
@@ -557,15 +664,18 @@ function setStatus(st) { $('status').className = 'status ' + st; $('status').tit
 function refreshQuotes() { if (quoteSource === 'poll') return pollNow(); wsRetry = 0; wsConnect(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (!ws || ws.readyState !== 1)) refreshQuotes(); });
 
+function renderIntervals() {
+  const ivs = INTERVALS.some(x => x[1] === state.interval) ? INTERVALS : [...INTERVALS, [intervalLabel(state.interval), state.interval]];
+  $('intervals').innerHTML = ivs.map(([label, v]) => `<option value="${v}"${v === state.interval ? ' selected' : ''}>${label}</option>`).join('');
+}
 function render() {
   const list = activeList();
   state.activeListId = list.id;
 
   $('tabs').innerHTML = state.lists.map(l =>
-    `<button class="tab${l.id === list.id ? ' on' : ''}" data-action="list" data-id="${l.id}">${esc(l.name)}</button>`).join('');
+    `<button class="tab${l.id === list.id ? ' on' : ''}" data-action="list" data-id="${l.id}">${esc(l.name)}<span class="badge" data-list="${l.id}"></span></button>`).join('');
 
-  $('intervals').innerHTML = INTERVALS.map(([label, v]) =>
-    `<button class="iv${v === state.interval ? ' on' : ''}" data-action="interval" data-value="${v}">${label}</button>`).join('');
+  renderIntervals();
 
   const pins = state.pinned || [];
   const shortOf = s => s.includes(':') ? s.split(':')[1] : s;
@@ -576,20 +686,22 @@ function render() {
       <span class="x" data-action="unpin" data-symbol="${esc(s)}" title="Unpin">×</span>
     </button>`).join('');
   const single = list.groups.length === 1;
-  $('list').innerHTML = list.groups.length ? list.groups.map((g, gi) => `
-    ${single ? '' : `<div class="grp${g.collapsed ? ' collapsed' : ''}" data-action="toggle-group" data-group="${gi}">
-      <span class="chev">▾</span><span class="name">${esc(g.name)}</span>
-      <button class="icon" data-action="rename-group" data-group="${gi}" title="Rename group">✎</button>
-      <button class="icon" data-action="delete-group" data-group="${gi}" title="Delete group">×</button>
-    </div>`}
-    ${g.collapsed && !single ? '' : g.symbols.map(s => {
-      const sym = s.includes(':') ? s.split(':')[1] : s;
-      return `<div class="row${s === state.symbol ? ' on' : ''}${noChart(s) ? ' nochart' : ''}" draggable="true" ${noChart(s) ? '' : 'data-action="select"'} data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}${noChart(s) ? ' · no chart in the free widget' : ''}">
-        <span class="sym">${esc(sym)}</span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
-        <button class="icon star${(state.pinned || []).includes(s) ? ' on' : ''}" data-action="${(state.pinned || []).includes(s) ? 'unpin' : 'pin'}" data-symbol="${esc(s)}" title="${(state.pinned || []).includes(s) ? 'Unpin from top' : 'Pin to top'}">${(state.pinned || []).includes(s) ? '★' : '☆'}</button>
-        <button class="icon" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}" title="Remove">×</button>
-      </div>`; }).join('')}
-  `).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
+  const rowHtml = (s, gi) => {
+    const sym = s.includes(':') ? s.split(':')[1] : s;
+    return `<div class="row${s === state.symbol ? ' on' : ''}${noChart(s) ? ' nochart' : ''}" draggable="true" ${noChart(s) ? '' : 'data-action="select"'} data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}${noChart(s) ? ' · no chart in the free widget' : ''}">
+        <span class="sym"><span class="name">${esc(sym)}</span><button class="icon star${(state.pinned || []).includes(s) ? ' on' : ''}" data-action="${(state.pinned || []).includes(s) ? 'unpin' : 'pin'}" data-symbol="${esc(s)}" title="${(state.pinned || []).includes(s) ? 'Unpin from top' : 'Pin to top'}">${(state.pinned || []).includes(s) ? '★' : '☆'}</button><button class="icon info" data-action="details" data-symbol="${esc(s)}" title="Details">i</button></span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
+        <button class="icon rm" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}" title="Remove">×</button>
+      </div>`; };
+  // Groups: a vertical tab on the left of the group's rows (click = collapse); single-group lists have no tab.
+  $('list').innerHTML = list.groups.length ? list.groups.map((g, gi) => single
+    ? g.symbols.map(s => rowHtml(s, gi)).join('')
+    : `<div class="group${g.collapsed ? ' collapsed' : ''}">
+      <div class="gtab" data-action="toggle-group" data-group="${gi}" title="${esc(g.name)} · click to ${g.collapsed ? 'expand' : 'collapse'}">
+        <span class="chev">▾</span><span class="gname">${esc(g.name)}</span>
+        <span class="gtools"><button class="icon" data-action="rename-group" data-group="${gi}" title="Rename group">✎</button><button class="icon" data-action="delete-group" data-group="${gi}" title="Delete group">×</button></span>
+      </div>
+      <div class="grows">${g.collapsed ? `<div class="gcount">${g.symbols.length} symbols</div>` : g.symbols.map(s => rowHtml(s, gi)).join('')}</div>
+    </div>`).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
   : `<div class="empty">No groups yet</div><div class="grp" data-action="add-group">+ group</div>`;
   applySentiment();
 }
@@ -611,7 +723,7 @@ listEl.addEventListener('dragend', () => { drag = null; clearDrop(); });
 const clearDrop = () => listEl.querySelectorAll('.drop-before, .drop-into, .dragging').forEach(el => el.classList.remove('drop-before', 'drop-into', 'dragging'));
 listEl.addEventListener('dragover', e => {
   if (!drag) return;
-  const row = e.target.closest('.row'), grp = e.target.closest('.grp[data-action="toggle-group"]');
+  const row = e.target.closest('.row'), grp = e.target.closest('.gtab');
   if (!row && !grp) return;
   e.preventDefault(); e.dataTransfer.dropEffect = 'move';
   clearDrop();
@@ -619,7 +731,7 @@ listEl.addEventListener('dragover', e => {
 });
 listEl.addEventListener('drop', e => {
   if (!drag) return;
-  const row = e.target.closest('.row'), grp = e.target.closest('.grp[data-action="toggle-group"]');
+  const row = e.target.closest('.row'), grp = e.target.closest('.gtab');
   if (!row && !grp) return;
   e.preventDefault();
   if (row && row.dataset.symbol === drag.sym) { drag = null; clearDrop(); return; }
@@ -649,8 +761,6 @@ document.addEventListener('click', e => {
       const g = list.groups[gi]; g.symbols = g.symbols.filter(s => s !== el.dataset.symbol);
       update(false); wsSync(); break;
     }
-    case 'interval':
-      state.interval = el.dataset.value; update(false); send('set-interval', { interval: state.interval }); break;
     case 'toggle-group':
       list.groups[gi].collapsed = !list.groups[gi].collapsed; update(false); break;
     case 'add-group': {
@@ -695,6 +805,11 @@ document.addEventListener('click', e => {
       [state.lists[i], state.lists[j]] = [state.lists[j], state.lists[i]];
       update(false); renderListDlg(); break;
     }
+    case 'details':
+      e.stopPropagation();
+      state.symbol = el.dataset.symbol; state.detailsOpen = true; save(); render();
+      if (!noChart(state.symbol)) showSymbol();
+      applyDetails(); break;
     case 'toggle-details':
       state.detailsOpen = !state.detailsOpen; save(); applyDetails(); break;
     case 'toggle-chart':
@@ -705,6 +820,7 @@ document.addEventListener('click', e => {
 });
 
 
+$('intervals').addEventListener('change', e => { state.interval = e.target.value; update(false); send('set-interval', { interval: state.interval }); });
 $('symInput').addEventListener('input', () => { autofilled = false; });
 $('addForm').addEventListener('submit', e => {
   e.preventDefault();
@@ -720,8 +836,6 @@ $('addForm').addEventListener('submit', e => {
 
 function applyDetails() {
   document.body.classList.toggle('details-open', !!state.detailsOpen);
-  $('detailsToggle').classList.toggle('on', !!state.detailsOpen);
-  $('detailsToggle').title = state.detailsOpen ? 'Hide details' : 'Show details';
   if (state.detailsOpen) renderDetails();
 }
 
@@ -737,6 +851,7 @@ function renderListDlg() {
   $('dlgRows').innerHTML = state.lists.map((l, i) => `
     <div class="dlg-row">
       <input value="${esc(l.name)}" data-rename="${l.id}" aria-label="List name">
+      <label class="sum" title="Show sentiment summary (tab badge + breadth bar)"><input type="checkbox" data-summary="${l.id}" ${l.summary ? 'checked' : ''}>Σ</label>
       <span class="count">${flatSymbols(l).length} sym</span>
       <button class="icon move" data-action="dlg-move" data-id="${l.id}" data-dir="-1" title="Move up" ${i === 0 ? 'disabled' : ''}>▲</button>
       <button class="icon move" data-action="dlg-move" data-id="${l.id}" data-dir="1" title="Move down" ${i === state.lists.length - 1 ? 'disabled' : ''}>▼</button>
@@ -744,6 +859,12 @@ function renderListDlg() {
     </div>`).join('');
 }
 $('dlgRows').addEventListener('change', e => {
+  if (e.target.dataset.summary) {
+    const l = state.lists.find(x => x.id === e.target.dataset.summary);
+    if (typeof l.summary === 'string') l.summarySymbol = l.summary;   // remember the symbol mode across toggles
+    l.summary = e.target.checked ? (l.summarySymbol || true) : false;
+    update(false); return;
+  }
   const id = e.target.dataset.rename; if (!id) return;
   const name = e.target.value.trim();
   if (!name) { e.target.value = state.lists.find(l => l.id === id).name; return; }
@@ -766,6 +887,28 @@ $('newListForm').addEventListener('submit', e => {
   update(false); wsSync(); renderListDlg();
 });
 $('listDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+// Keyboard: ↑/↓ move through the active list's chartable tickers, ←/→ switch watchlists.
+document.addEventListener('keydown', e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target;
+  if (t.closest && (t.closest('input, textarea, select, dialog[open]'))) return;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const i = state.lists.findIndex(l => l.id === state.activeListId);
+    const j = (i + (e.key === 'ArrowRight' ? 1 : -1) + state.lists.length) % state.lists.length;
+    state.activeListId = state.lists[j].id; update(false); wsSync();
+    document.querySelector('.tab.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    e.preventDefault();
+  } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    const syms = flatSymbols(activeList()).filter(sy => !noChart(sy));
+    if (!syms.length) return;
+    const i = syms.indexOf(state.symbol);
+    const j = i < 0 ? 0 : (i + (e.key === 'ArrowDown' ? 1 : -1) + syms.length) % syms.length;
+    state.symbol = syms[j]; update(true);
+    document.querySelector('.row.on')?.scrollIntoView({ block: 'nearest' });
+    e.preventDefault();
+  }
+});
 
 // Panel width: drag the divider; persisted in state.
 if (state.panelWidth) $('panel').style.width = state.panelWidth + 'px';
@@ -794,7 +937,7 @@ function startPolling() {
   pollTimer = setInterval(() => { if (!document.hidden) pollNow(); }, POLL_MS);
 }
 async function pollNow() {
-  const tickers = [...new Set([...(state.pinned || []), ...flatSymbols(activeList())])];
+  const tickers = allSymbols();
   if (!tickers.length) return;
   let data;
   try {
@@ -872,7 +1015,7 @@ function rangeBar(lo, hi, v) {
 let detailsSym = null;
 function renderDetails() {
   if (!state.detailsOpen) return;
-  const el = $('details'), sym = state.symbol, r = raw[sym], q = quotes[sym];
+  const el = $('dbody'), sym = state.symbol, r = raw[sym], q = quotes[sym];
   if (!sym || !r || r.lp == null) {
     detailsSym = null;
     el.innerHTML = `<div class="d-empty">${sym ? 'Waiting for data for ' + esc(sym) + '…' : 'Select a symbol in the list to see its details.'}</div>`;
