@@ -355,8 +355,14 @@
     .breadth { display: none !important; }
     .resizer { display: none; }
     .toggle { display: none; }
-    /* Compact header: no list manager / chart toggle; pinned chips on one line (symbol + change only). */
-    .bar, .taperow { display: none; }   /* no top bar / pinned tape on phones */
+    /* Compact header on the list and chart views only: tabs + status, no list manager / chart toggle;
+       pinned chips on one line (symbol + change only). The lists view has no header. */
+    .bar, .taperow { display: none; }
+    body[data-mview="list"] .bar, body[data-mview="chart"] .bar { display: flex; padding: 4px 8px; }
+    body[data-mview="list"] .taperow, body[data-mview="chart"] .taperow { display: flex; }
+    .bar [data-action="manage-lists"], .bar #chartToggle { display: none; }
+    .tabs { flex: 1; }
+    .tab { padding: 5px 10px; font-size: 13px; }
     .chart #tv_chart { position: relative; flex: 1; min-height: 0; }
     .hud { display: none !important; }
     .mbar { display: flex; align-items: baseline; gap: 12px; flex-shrink: 0; padding: 10px 14px;
@@ -412,7 +418,6 @@
     .chip .chg { font-size: 11px; }
     /* Views: exactly one of list / details / chart fills the screen, picked by the bottom nav. */
     .panel, .details, .chart { width: auto !important; max-height: none; border-right: 0; flex: 1; min-height: 0; }
-    .tabs { display: none; }
     body[data-mview] .mlists, body[data-mview] .panel, body[data-mview] .details, body[data-mview] .chart { display: none; }
     body[data-mview="lists"] .mlists { display: block; flex: 1; overflow-y: auto; }
     body[data-mview="list"] .panel { display: flex; }
@@ -449,8 +454,8 @@
 <div class="taperow">
   <div class="tape" id="pins"></div>
   <div class="ivsel" id="intervals"><button class="ivbtn" data-action="iv-toggle" title="Chart interval"></button><div class="ivmenu" hidden></div></div>
-  <div class="ivbackdrop" id="ivbackdrop" hidden data-action="iv-close"></div>
 </div>
+<div class="ivbackdrop" id="ivbackdrop" hidden data-action="iv-close"></div>
 <div class="breadth" id="summary"></div>
 <div id="feeders" aria-hidden="true"></div>
 <div class="stip" id="stip" hidden></div>
@@ -507,7 +512,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '0.2';  // bump the minor on every push to main
+const APP_VERSION = '0.3';  // bump the minor on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
 // Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
