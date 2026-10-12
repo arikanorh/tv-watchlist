@@ -309,17 +309,42 @@
   .chart { flex: 1; min-width: 0; position: relative; }
   #tv_chart { position: absolute; inset: 0; }
 
+  .mnav { display: none; }
+  .mlists { display: none; }
+  .ml-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .ml-row.on { box-shadow: inset 3px 0 0 var(--accent); }
+  .ml-row.s-up-1 { background: rgba(8, 153, 129, .10); }   .ml-row.s-up-2 { background: rgba(8, 153, 129, .20); }
+  .ml-row.s-up-3 { background: rgba(8, 153, 129, .34); }   .ml-row.s-up-4 { background: rgba(8, 153, 129, .50); }
+  .ml-row.s-down-1 { background: rgba(242, 54, 69, .10); } .ml-row.s-down-2 { background: rgba(242, 54, 69, .20); }
+  .ml-row.s-down-3 { background: rgba(242, 54, 69, .34); } .ml-row.s-down-4 { background: rgba(242, 54, 69, .50); }
+  .ml-row[class*="s-"] .b { color: var(--text); }
+  .ml-row .n { grid-column: 1; grid-row: 1; font-size: 15px; font-weight: 600; }
+  .ml-row .c { grid-column: 1; grid-row: 2; font-size: 11px; color: var(--muted); }
+  .ml-row .b { grid-column: 2; grid-row: 1 / span 2; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+  .ml-row .b small { display: block; font-size: 11px; color: var(--muted); }
   @media (max-width: 768px) {
-    .body { flex-direction: column; }
-    .panel { width: auto !important; max-height: 40dvh; border-bottom: 1px solid var(--border); }
-    .details { width: auto; max-height: 45dvh; border-right: 0; border-bottom: 1px solid var(--border); }
+    .body { flex-direction: column; padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
+    .breadth { display: none !important; }
     .resizer { display: none; }
-    .panel.hidden { display: none; }
-    .toggle { display: inline-flex; }
+    .toggle { display: none; }
     .bar { padding: 4px 8px; gap: 4px; }
     .tabs { flex: 1 1 auto; }
     .upd { font-size: 12px; padding: 4px 6px; }
-    .chart { min-height: 0; }
+    /* Views: exactly one of list / details / chart fills the screen, picked by the bottom nav. */
+    .panel, .details, .chart { width: auto !important; max-height: none; border-right: 0; flex: 1; min-height: 0; }
+    .tabs { display: none; }
+    body[data-mview] .mlists, body[data-mview] .panel, body[data-mview] .details, body[data-mview] .chart { display: none; }
+    body[data-mview="lists"] .mlists { display: block; flex: 1; overflow-y: auto; }
+    body[data-mview="list"] .panel { display: flex; }
+    body[data-mview="chart"]:not(.chart-hidden) .chart { display: block; }
+    /* Symbol details: full-screen overlay above the current view, closed with its × */
+    body[data-mview].details-open .details { display: block; position: fixed; left: 0; right: 0; top: 0; bottom: calc(52px + env(safe-area-inset-bottom, 0px)); z-index: 9; }
+    .mnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: grid; grid-template-columns: repeat(3, 1fr);
+      background: var(--bg2); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .mnav button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; color: var(--muted); font-size: 11px; }
+    .mnav button svg { width: 20px; height: 20px; }
+    .mnav button.on { color: var(--text); }
+    .mnav button.on svg { color: var(--accent); }
   }
 </style>
 </head>
@@ -345,6 +370,7 @@
 <div class="stip" id="stip" hidden></div>
 <div class="tpop" id="tpop" hidden></div>
 <div class="body">
+  <div class="mlists" id="mlists"></div>
   <div class="panel" id="panel">
     <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span title="● pre-market · ● post-market · ● overnight">Ext</span></div>
     <div class="list" id="list"></div>
@@ -367,6 +393,11 @@
   </div>
 </div>
 
+<nav class="mnav" id="mnav" aria-label="Views">
+  <button data-action="mview" data-view="lists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>Listeler</button>
+  <button data-action="mview" data-view="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Liste</button>
+  <button data-action="mview" data-view="chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 5-8 4 5"/></svg>Grafik</button>
+</nav>
 <dialog id="listDlg">
   <div class="dlg-head"><span>Watchlists</span><button class="icon" data-action="close-dlg" title="Close">×</button></div>
   <div id="dlgRows"></div>
@@ -724,6 +755,7 @@ function renderEod() {
     <div class="eod-body">${col(e.top, 'up')}${col(e.bottom, 'down')}</div>`;
 }
 function applySummaries() {
+  if (document.body.dataset.mview === 'lists') renderMLists();
   for (const l of state.lists) {
     const el = document.querySelector(`.badge[data-list="${l.id}"]`); if (!el) continue;
     // summary: true → breadth of the list's equities; a symbol string → that symbol's change (e.g. TR → BIST:XU100).
@@ -909,7 +941,18 @@ function render() {
   : `<div class="empty">No groups yet</div><div class="grp" data-action="add-group">+ group</div>`;
   renderSelbar();
   renderEod();
+  renderMLists();
   applySentiment();
+}
+function renderMLists() {
+  $('mlists').innerHTML = state.lists.map(l => {
+    const b = l.summary === true ? breadth(summarySymbols(l)) : null;
+    const v = typeof l.summary === 'string' ? effChange(quotes[l.summary]) : (b ? b.avg : null);
+    return `<div class="ml-row${l.id === state.activeListId ? ' on' : ''} ${sentimentClass(v)}" data-action="mlist" data-id="${l.id}">
+      <span class="n">${esc(l.name)}</span>
+      <span class="b ${v == null ? '' : dirCls(v)}">${v == null ? '' : pct(v)}<small>${b ? `${b.up}↑ ${b.flat}– ${b.down}↓` : typeof l.summary === 'string' ? esc(l.summary.split(':')[1]) : ''}</small></span>
+      <span class="c">${flatSymbols(l).length} symbols · ${l.groups.length} group${l.groups.length === 1 ? '' : 's'}</span>
+    </div>`; }).join('');
 }
 function renderSelbar() {
   const sym = state.symbol, el = $('selbar');
@@ -972,7 +1015,8 @@ document.addEventListener('click', e => {
   const gi = +el.dataset.group;
   switch (el.dataset.action) {
     case 'select':
-      state.symbol = el.dataset.symbol; update(true); break;
+      state.symbol = el.dataset.symbol; update(true);
+      if (window.innerWidth < 768 && !state.chartHidden) setMobileView('chart'); break;
     case 'remove': {
       e.stopPropagation();
       const g = list.groups[gi]; g.symbols = g.symbols.filter(s => s !== el.dataset.symbol);
@@ -1044,8 +1088,10 @@ document.addEventListener('click', e => {
       state.detailsOpen = !state.detailsOpen; save(); applyDetails(); break;
     case 'toggle-chart':
       state.chartHidden = !state.chartHidden; save(); applyChartHidden(); renderHud(); break;
-    case 'toggle-panel':
-      $('panel').classList.toggle('hidden'); break;
+    case 'mview':
+      setMobileView(el.dataset.view); break;
+    case 'mlist':
+      state.activeListId = el.dataset.id; update(false); wsSync(); setMobileView('list'); break;
   }
 });
 
@@ -1129,6 +1175,12 @@ function applyDetails() {
   if (state.detailsOpen) renderDetails();
 }
 
+// Mobile: which of the three views is on screen (desktop shows all side by side and ignores this).
+function setMobileView(v) {
+  state.mview = v; save();
+  document.body.dataset.mview = v;
+  document.querySelectorAll('.mnav button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+}
 function applyChartHidden() {
   document.body.classList.toggle('chart-hidden', !!state.chartHidden);
   $('chartToggle').classList.toggle('off', !!state.chartHidden);
@@ -1526,12 +1578,15 @@ render();
 renderQuotes();
 renderSession();
 applyDetails();
+if (window.innerWidth < 768 && state.detailsOpen) { state.detailsOpen = false; applyDetails(); }
+setMobileView(['lists', 'list', 'chart'].includes(state.mview) ? state.mview : 'list');
 mountChart();
 renderHud();
 wsConnect();
 
 // Dev live reload: on localhost, poll the file's Last-Modified and reload when it changes. No-op elsewhere.
-if (['localhost', '127.0.0.1'].includes(location.hostname)) (async () => {
+const IS_LAN = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+if (['localhost', '127.0.0.1'].includes(location.hostname) || IS_LAN) (async () => {
   const stamp = async () => { try { const r = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store' }); return r.headers.get('last-modified') || r.headers.get('etag'); } catch (_) { return null; } };
   let last = await stamp();
   setInterval(async () => { const now = await stamp(); if (now && last && now !== last) location.reload(); if (now) last = now; }, 1000);

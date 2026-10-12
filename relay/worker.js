@@ -3,7 +3,8 @@
 // Browser <-> this worker <-> data.tradingview.com. Messages pass through untouched.
 
 const UPSTREAM = 'https://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart';
-// Only these page origins may use the relay.
+// Only these page origins may use the relay (plus private-LAN dev servers, e.g. a phone on the same Wi-Fi).
+const LAN_ORIGIN = /^http:\/\/(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)[\d.]+(:\d+)?$/;
 const ALLOWED_ORIGINS = [
   'https://arikanorh.github.io',
   'https://tv-watchlist.pages.dev',
@@ -12,6 +13,7 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:8787',
 ];
 
+const allowed = o => ALLOWED_ORIGINS.includes(o) || LAN_ORIGIN.test(o);
 const SEARCH = 'https://symbol-search.tradingview.com/symbol_search/v3/';
 
 export default {
@@ -21,7 +23,7 @@ export default {
 
     // GET /search?text=…  → TradingView symbol search (origin-locked upstream, so proxied here).
     if (url.pathname === '/search') {
-      if (!ALLOWED_ORIGINS.includes(origin)) return new Response('forbidden', { status: 403 });
+      if (!allowed(origin)) return new Response('forbidden', { status: 403 });
       const cors = { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' };
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
       const text = (url.searchParams.get('text') || '').slice(0, 40);
@@ -34,7 +36,7 @@ export default {
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('tv-watchlist relay: websocket endpoint, GET /search?text=', { status: 200 });
     }
-    if (!ALLOWED_ORIGINS.includes(origin)) return new Response('forbidden', { status: 403 });
+    if (!allowed(origin)) return new Response('forbidden', { status: 403 });
 
     const up = await fetch(UPSTREAM, { headers: { Upgrade: 'websocket', Origin: 'https://www.tradingview.com' } });
     const upstream = up.webSocket;
