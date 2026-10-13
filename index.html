@@ -155,9 +155,9 @@
   .lchip .mm { width: 100%; height: 3px; margin-top: 4px; display: grid; gap: 0; border-radius: 2px; overflow: hidden; }
   .lchip .mm .d { background: var(--down); } .lchip .mm .f { background: rgba(255, 255, 255, .18); } .lchip .mm .u { background: var(--up); }
   .phead .hint { grid-column: 1 / -1; margin-top: 6px; font-size: 12px; color: var(--accent); }
-  .strip { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 8px 12px; overflow-x: auto; scrollbar-width: none;
-    border-top: 1px solid var(--border); background: var(--bg2); }
-  .strip::-webkit-scrollbar { display: none; }
+  .strip { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg2); }
+  .strip .chips { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .strip .chips::-webkit-scrollbar { display: none; }
   .lchip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 72px; padding: 6px 12px 7px; border-radius: 12px;
     background: var(--bg3); color: var(--muted); border: 1px solid transparent; }
   .lchip b { font-size: 14px; font-weight: 600; color: var(--text); }
@@ -167,7 +167,7 @@
   .lchip.on[class*="s-"] { border-color: var(--text); }
   .lchip.add { align-items: center; justify-content: center; min-width: 44px; font-size: 20px; background: none; border: 1px dashed var(--bg3); }
   /* Actions ride at the right end of the strip (sticky, so they stay put while the chips scroll) */
-  .strip .acts { position: sticky; right: -12px; flex: none; display: flex; gap: 6px; margin-left: auto; padding-left: 10px; background: linear-gradient(90deg, transparent, var(--bg2) 12px); }
+  .strip .acts { flex: none; display: flex; gap: 6px; padding-left: 8px; border-left: 1px solid var(--border); }
   .strip .acts .pill { height: 40px; padding: 0 12px; font-size: 14px; }
   .strip .acts .pill.sq { width: 40px; }
   .bbar { flex-shrink: 0; display: none; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg2); }
@@ -226,8 +226,9 @@
   .panel.no-ext .cols span:last-child, .panel.no-ext .ext { display: none; }
   /* Chg% text on one scale: full red (≥5 % down) → neutral text (< 0.5 %) → full green (≥5 % up); solid colors, no opacity. */
   .row .chg.up, .row .chg.down { color: var(--text); }
-  .row.s-down-1 .chg { color: #d9adb6; } .row.s-down-2 .chg { color: #e28591; } .row.s-down-3 .chg { color: #ea5e6b; font-weight: 600; } .row.s-down-4 .chg { color: #f23645; font-weight: 700; }
-  .row.s-up-1 .chg { color: #9fc5c5; }   .row.s-up-2 .chg { color: #6db7af; }   .row.s-up-3 .chg { color: #3aa898; font-weight: 600; }   .row.s-up-4 .chg { color: #089981; font-weight: 700; }
+  /* c-* tiers come from the Chg% value itself; s-* (row sentiment) may follow the extended move outside regular hours */
+  .row.c-down-1 .chg { color: #d9adb6; } .row.c-down-2 .chg { color: #e28591; } .row.c-down-3 .chg { color: #ea5e6b; font-weight: 600; } .row.c-down-4 .chg { color: #f23645; font-weight: 700; }
+  .row.c-up-1 .chg { color: #9fc5c5; }   .row.c-up-2 .chg { color: #6db7af; }   .row.c-up-3 .chg { color: #3aa898; font-weight: 600; }   .row.c-up-4 .chg { color: #089981; font-weight: 700; }
   /* Big moves tint the whole row: ≥5 % light, ≥10 % stronger */
   .row.s-down-4 { background: rgba(242, 54, 69, .10); } .row.s-up-4 { background: rgba(8, 153, 129, .10); }
   .row.x-down { background: rgba(242, 54, 69, .24); }   .row.x-up { background: rgba(8, 153, 129, .24); }
@@ -273,17 +274,6 @@
   .f-up { --fl: rgba(8, 153, 129, .45); } .f-down { --fl: rgba(242, 54, 69, .45); } .f-same { --fl: rgba(41, 98, 255, .35); }
   @keyframes cell { 0% { background: var(--fl); } 100% { background: transparent; } }
   /* End-of-day summary card */
-  .eod { border-top: 1px solid var(--border); background: var(--bg2); font-size: 12px; }
-  .eod:empty { display: none; }
-  .eod-h { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; user-select: none; }
-  .eod-h b { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
-  .eod-h .d { color: var(--muted); white-space: nowrap; }
-  .eod-h .b { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 11px; }
-  .eod-h .x { color: var(--muted); font-size: 13px; margin-left: 4px; }
-  .eod-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; padding: 0 12px 8px; font-variant-numeric: tabular-nums; }
-  .eod-body .col > div { display: flex; justify-content: space-between; padding: 1px 0; }
-  .eod-body .col span:first-child { font-weight: 600; }
-  .eod.collapsed .eod-body { display: none; }
   /* Selected symbol strip under the list (+ add when it is not in this list) */
   .selbar { display: none; grid-template-columns: auto 1fr auto; gap: 0 10px; align-items: center; padding: 8px 12px;
     border-top: 1px solid var(--border); background: var(--bg2); }
@@ -520,7 +510,6 @@
     <div class="phead" id="phead"></div>
     <div class="cols"><span>Symbol</span><span>Last</span><span class="sortable" data-action="sort-chg" title="Sort by change (indices stay on top); click again to restore your order">Chg%</span><span title="● pre-market · ● post-market · ● overnight">Ext</span></div>
     <div class="list" id="list"></div>
-    <div class="eod" id="eod"></div>
     <div class="selbar" id="selbar"></div>
     <div class="strip" id="strip"></div>
     <div class="bbar" id="bbar"></div>
@@ -566,7 +555,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '0.9';  // bump the minor on every push to main
+const APP_VERSION = '0.10';  // bump the minor on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
 // Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
@@ -762,8 +751,15 @@ function sessionPhase() {
   if (m < 16 * 60) return ['open', 'Market open'];
   return ['post', 'Post-market'];
 }
+let lastPhase = null;
 function renderSession() {
   const [cls, label] = sessionPhase();
+  if (lastPhase && lastPhase !== cls && (lastPhase === 'night' || cls === 'night')) {
+    wsSync();
+    if (cls !== 'night') Object.keys(raw).filter(k => k.startsWith('BOATS:')).forEach(k => delete raw[k]);   // stale overnight prints
+    for (const k of Object.keys(raw)) if (!k.startsWith('BOATS:')) onQuote(k, {});
+  }
+  lastPhase = cls;
   document.body.className = document.body.className.replace(/\bsess-\w+\b/g, '').replace(/\s+/g, ' ').trim() + ' sess-' + cls;
 }
 setInterval(renderSession, 30000);
@@ -779,7 +775,10 @@ function sentimentClass(c) {
 const effChange = q => q ? (!regular && q.e != null ? q.e : q.c) : null;
 const NON_EQUITY = new Set(['index', 'cfd', 'futures', 'economic']);
 // Symbols that count toward a list's sentiment: everything except indices and index CFDs.
-const summarySymbols = list => flatSymbols(list).filter(sy => !NON_EQUITY.has(raw[sy]?.type));
+// Symbols that make up a list's day %, breadth and history. Crypto (Krip) counts only USDT pairs, so dominance,
+// market-cap totals, DXY and cross pairs (ETHBTC, XRPETH) stay out of the average.
+const SUMMARY_MATCH = { krip: /USDT$/ };
+const summarySymbols = list => flatSymbols(list).filter(sy => SUMMARY_MATCH[list.id] ? SUMMARY_MATCH[list.id].test(sy) : !NON_EQUITY.has(raw[sy]?.type));
 // Tier of a change: -4..-1 (down, strongest first), 0 (flat, |x| < 0.5), 1..4 (up). Same thresholds as the row tint.
 const tierOf = x => { const t = SENTIMENT_TIERS.filter(th => Math.abs(x) >= th).length; return x < 0 ? -t : t; };
 function breadth(symbols) {
@@ -796,7 +795,7 @@ const dirCls = v => v >= 0.5 ? 'up' : v <= -0.5 ? 'down' : '';
 // Sentiment history: one sample per 15 s per list (avg change, indices excluded), kept 8 h in localStorage.
 // One sample / 15 s for the last 2 h, thinned to 1 / min beyond that, kept for 24 h (≈ 480 + 1320 samples per list).
 const HIST_KEY = 'tvwl.hist.v1', HIST_MS = 15000, HIST_FINE_MS = 2 * 3600000, HIST_COARSE_MS = 60000, HIST_MAX_MS = 24 * 3600000;
-const HIST_RANGES = [['1h', 'last hour'], ['4h', 'last 4 h'], ['session', 'this session (pre → post)'], ['24h', 'last 24 h']];
+const HIST_RANGES = [['1h', 'last hour'], ['4h', 'last 4 h'], ['session', 'this session (day 04–20 ET or overnight 20–04 ET)'], ['24h', 'last 24 h']];
 const histRange = () => HIST_RANGES.some(r => r[0] === state.histRange) ? state.histRange : 'session';
 const histSince = () => { const r = histRange(); return r === 'session' ? sessionOpenTs() : Date.now() - { '1h': 1, '4h': 4, '24h': 24 }[r] * 3600000; };
 const histLabel = () => HIST_RANGES.find(r => r[0] === histRange())[1];
@@ -824,13 +823,14 @@ function sampleHistory() {
   if (changed) { try { localStorage.setItem(HIST_KEY, JSON.stringify(hist)); } catch (_) {} }
 }
 setInterval(sampleHistory, HIST_MS);
-// Start of the current US trading day as a timestamp: 04:00 New York (pre-market open). Pre → regular → post all count
-// as one session; before 04:00 (overnight) it is the previous day's 04:00, so the chart still shows yesterday's full day.
+// Start of the session we are in, New York time: the day session runs 04:00 → 20:00 (pre → regular → post), the
+// overnight session 20:00 → 04:00. The sentiment chart's "day" range starts here.
 function sessionOpenTs() {
   const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
   const g = t => +p.find(x => x.type === t).value;
-  const nowNy = (g('hour') % 24) * 60 + g('minute'), open = 4 * 60;
-  return Date.now() - (nowNy >= open ? nowNy - open : nowNy + 24 * 60 - open) * 60000;
+  const nowNy = (g('hour') % 24) * 60 + g('minute');
+  const open = nowNy >= 4 * 60 && nowNy < 20 * 60 ? 4 * 60 : 20 * 60;
+  return Date.now() - ((nowNy - open + 24 * 60) % (24 * 60)) * 60000;
 }
 let sparkPts = [], sparkLim = 1;
 const SH = 36, SL = 2, SR = 2, ST = 3, SB = 10;  // chart box height, label gutters (width is per call; 200 on desktop)
@@ -893,43 +893,6 @@ $('tabs').addEventListener('mouseover', e => {
   pop.style.top = (r.bottom + 6) + 'px';
 });
 $('tabs').addEventListener('mouseleave', () => { $('tpop').hidden = true; });
-// End-of-day card: at/after the 16:00 New York close, snapshot each summarised list (breadth + top 3 up/down);
-// shown until the next close. Captured from the daily change still streaming after the bell.
-const EOD_KEY = 'tvwl.eod.v1';
-let eod = {}; try { eod = JSON.parse(localStorage.getItem(EOD_KEY)) || {}; } catch (_) {}
-function nyDateParts() {
-  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, weekday: 'short', year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
-  const g = t => p.find(x => x.type === t).value;
-  return { key: `${g('year')}-${g('month')}-${g('day')}`, label: `${g('weekday')} ${+g('day')} ${g('month')}`, wd: g('weekday'), mins: (+g('hour') % 24) * 60 + +g('minute') };
-}
-function captureEod() {
-  const d = nyDateParts();
-  if (['Sat', 'Sun'].includes(d.wd) || d.mins < 16 * 60) return;
-  let changed = false;
-  for (const l of state.lists) {
-    if (!l.summary || eod[l.id]?.date === d.key) continue;
-    const syms = summarySymbols(l).filter(sy => quotes[sy] && quotes[sy].c != null);
-    if (syms.length < 2) continue;
-    const b = breadth(syms); if (!b) continue;
-    const ranked = syms.map(sy => [sy, quotes[sy].c]).sort((a, b2) => b2[1] - a[1]);
-    eod[l.id] = { date: d.key, label: d.label, up: b.up, flat: b.flat, down: b.down, avg: +b.avg.toFixed(2),
-      top: ranked.slice(0, 3), bottom: ranked.slice(-3).reverse(), dismissed: false };
-    changed = true;
-  }
-  if (changed) { try { localStorage.setItem(EOD_KEY, JSON.stringify(eod)); } catch (_) {} renderEod(); }
-}
-setInterval(captureEod, 60000);
-function renderEod() {
-  const el = $('eod'), l = activeList(), e = eod[l.id];
-  if (!e || e.dismissed) { el.innerHTML = ''; return; }
-  const short = sy => sy.includes(':') ? sy.split(':')[1] : sy;
-  const col = (rows, cls) => `<div class="col">${rows.map(([sy, c]) => `<div><span>${esc(short(sy))}</span><span class="${cls}">${pct(c)}</span></div>`).join('')}</div>`;
-  el.className = 'eod' + (e.collapsed ? ' collapsed' : '');
-  el.innerHTML = `<div class="eod-h" data-action="eod-toggle"><b>Close</b><span class="d">${esc(e.label)}</span>
-      <span class="b"><span class="up">${e.up}↑</span> ${e.flat}– <span class="down">${e.down}↓</span> · <b class="${dirCls(e.avg)}">${pct(e.avg)}</b></span>
-      <span class="x" data-action="eod-dismiss" title="Dismiss">×</span></div>
-    <div class="eod-body">${col(e.top, 'up')}${col(e.bottom, 'down')}</div>`;
-}
 function applySummaries() {
   if (document.body.dataset.mview === 'lists' && isPhone()) renderPanelChrome();
   for (const l of state.lists) {
@@ -950,7 +913,7 @@ function applySummaries() {
   const b = activeList().summary === true ? breadth(summarySymbols(activeList())) : null;
   const el = $('summary');
   if (!b) { el.innerHTML = ''; return; }
-  el.innerHTML = sparkline(activeList().id) + `<span class="srange" data-action="hist-range" title="Click to switch range">${histRange() === 'session' ? 'day' : histRange()}</span>` +
+  el.innerHTML = sparkline(activeList().id) + `<span class="srange" data-action="hist-range" title="Click to switch range">${histRange() === 'session' ? (overnightNow() ? 'night' : 'day') : histRange()}</span>` +
     `<span class="stat"><span class="up">${b.up}↑</span> ${b.flat}– <span class="down">${b.down}↓</span> · <b class="${dirCls(b.avg)}">${pct(b.avg)}</b></span>` +
     `<span class="meter" style="grid-template-columns:${ORDER.map(t => (b.tiers[t] || 0) + 'fr').join(' ')}">${ORDER.map(t => `<span class="t-${t < 0 ? 'd' + -t : t > 0 ? 'u' + t : 0}" title="${TIER_LABEL[t]}: ${b.tiers[t] || 0}"></span>`).join('')}</span>`;
   showSparkTip();
@@ -978,12 +941,13 @@ function applySentiment() {
     // Outside the regular session the extended-session move (pre/post-market) is what matters.
     const v = q ? (!regular && q.e != null ? q.e : q.c) : null, cls = sentimentClass(v);
     // ±10 % and beyond also tints the whole row (x-up / x-down).
-    el.className = el.className.replace(/\b(s-(up|down)-\d|x-(up|down))\b/g, '').replace(/\s+/g, ' ').trim() + (cls ? ' ' + cls : '')
+    const ccls = sentimentClass(q ? q.c : null).replace(/^s-/, 'c-');   // colors the Chg% number by its own value
+    el.className = el.className.replace(/\b([sc]-(up|down)-\d|x-(up|down))\b/g, '').replace(/\s+/g, ' ').trim() + (cls ? ' ' + cls : '') + (ccls ? ' ' + ccls : '')
       + (v != null && Math.abs(v) >= 10 ? (v > 0 ? ' x-up' : ' x-down') : '');
   });
 }
 function renderQuotes() {
-  if (Object.keys(quotes).length) { sampleHistory(); captureEod(); }
+  if (Object.keys(quotes).length) sampleHistory();
   applySentiment();
   regular = isRegularSession();
   $('panel').classList.toggle('no-ext', regular);
@@ -1038,7 +1002,11 @@ function wsConnect() {
     for (const part of String(e.data).split(/~m~\d+~m~/).filter(Boolean)) {
       if (part.startsWith('~h~')) { ws.send('~m~' + part.length + '~m~' + part); continue; }
       let m; try { m = JSON.parse(part); } catch (_) { continue; }
-      if (m.m === 'qsd' && m.p[1]?.s === 'ok') onQuote(m.p[1].n, m.p[1].v);
+      if (m.m === 'qsd' && m.p[1]?.s === 'ok') {
+        const n = m.p[1].n;
+        if (n.startsWith('BOATS:')) { raw[n] = Object.assign(raw[n] || {}, m.p[1].v); allSymbols().filter(x => boatsOf(x) === n).forEach(x => onQuote(x, {})); }
+        else onQuote(n, m.p[1].v);
+      }
     }
   };
   ws.onclose = () => {
@@ -1049,10 +1017,17 @@ function wsConnect() {
   };
 }
 // Subscribe exactly the active list's symbols.
+// Overnight (20:00–04:00 ET): US stocks trade on Blue Ocean ATS, which TradingView carries as a separate BOATS:<ticker>
+// symbol. Its price never reaches the primary listing's quote, so we subscribe the BOATS twins only during the overnight
+// phase and drop them again when it ends.
+const US_EX = new Set(['NASDAQ', 'NYSE', 'AMEX', 'NYSEARCA', 'ARCA', 'BATS']);
+const boatsOf = sym => { const [ex, t] = sym.split(':'); return t && US_EX.has(ex) && !NON_EQUITY.has(raw[sym]?.type) ? 'BOATS:' + t : null; };
+const overnightNow = () => sessionPhase()[0] === 'night';
 function wsSync() {
   if (quoteSource === 'poll') return pollNow();
   if (!ws || ws.readyState !== 1) return;
-  const want = allSymbols();
+  const base = allSymbols();
+  const want = overnightNow() ? [...new Set([...base, ...base.map(boatsOf).filter(Boolean)])] : base;
   const add = want.filter(x => !wsSubscribed.includes(x)), del = wsSubscribed.filter(x => !want.includes(x));
   if (del.length) wsSend({ m: 'quote_remove_symbols', p: ['qs', ...del] });
   if (add.length) wsSend({ m: 'quote_add_symbols', p: ['qs', ...add] });
@@ -1063,10 +1038,13 @@ function onQuote(sym, v) {
   const r = raw[sym] = Object.assign(raw[sym] || {}, v);
   if (r.lp == null) return;
   // Session marker: pre-market (amber), post-market (blue), overnight/BOATS (purple); none during the regular session.
-  const ss = r.current_session === 'pre_market' ? 'pre' : r.current_session === 'post_market' ? 'post'
+  const bo = overnightNow() && boatsOf(sym) ? raw[boatsOf(sym)] : null;
+  const night = bo?.lp != null;
+  const ss = night ? 'night' : r.current_session === 'pre_market' ? 'pre' : r.current_session === 'post_market' ? 'post'
     : r.current_session !== 'market' && r.rtc != null ? 'night' : '';
   const ext = { pre: 'Pre-market', post: 'Post-market', night: 'Overnight' }[ss] || '';
-  quotes[sym] = { p: r.lp, c: r.chp ?? 0, e: r.rchp ?? null, ep: r.rtc ?? null, es: ext, ss };
+  const ep = night ? bo.lp : r.rtc ?? null, e = night ? (bo.lp - r.lp) / r.lp * 100 : r.rchp ?? null;
+  quotes[sym] = { p: r.lp, c: r.chp ?? 0, e, ep, es: ext, ss };
   const now = Date.now();
   const upd = $('upd');
   upd.textContent = '↻ ' + new Date().toLocaleTimeString('en-GB');
@@ -1133,7 +1111,6 @@ function render() {
     </div>`).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
   : `<div class="empty">No groups yet</div><div class="grp" data-action="add-group">+ group</div>`;
   renderSelbar();
-  renderEod();
   renderMLists();
   applySentiment();
 }
@@ -1144,18 +1121,18 @@ const ticksHtml = syms => syms.map(sy => effChange(quotes[sy])).filter(x => x !=
   .map(x => { const t = tierOf(x); return `<i class="t-${t < 0 ? 'd' + -t : t > 0 ? 'u' + t : 0}"></i>`; }).join('');
 // Phone chrome around the list: head (name, day, breadth) on top; list strip + action bar at the bottom.
 function renderPanelChrome() {
-  const l = activeList(), syms = flatSymbols(l), b = breadth(syms), v = listValue(l);
+  const l = activeList(), syms = summarySymbols(l), b = breadth(syms), v = listValue(l);
   const hw = Math.max(120, Math.round((($('phead').clientWidth || 360) - 24 - 12) / 2));   // right column = half the head
   $('phead').innerHTML = `<div class="pinfo"><b>${esc(l.name)}</b><span class="big ${v == null ? '' : dirCls(v)}">${v == null ? '' : pct(v)}</span>
       ${b ? `<span class="meter ticks">${ticksHtml(syms)}</span>` : ''}</div>
-    <span class="hist">${(hist[l.id] || []).length ? sparkline(l.id, Math.round(hw * SH / 40)) + `<span class="srange">${histRange() === 'session' ? 'day' : histRange()}</span>` : ''}</span>
+    <span class="hist">${(hist[l.id] || []).length ? sparkline(l.id, Math.round(hw * SH / 40)) + `<span class="srange">${histRange() === 'session' ? (overnightNow() ? 'night' : 'day') : histRange()}</span>` : ''}</span>
     ${editMode ? `<span class="hint">Tap a row for options · drag ≡ to reorder · tap a group name to rename</span>` : ''}`;
-  const strip = $('strip'), x = strip.scrollLeft;
-  strip.innerHTML = state.lists.map(li => { const lv = listValue(li); return `<button class="lchip${li.id === state.activeListId ? ' on' : ''} ${sentimentClass(lv)}" data-action="list" data-id="${esc(li.id)}">
-      <b>${esc(li.name)}</b><small class="${lv == null ? '' : dirCls(lv)}">${lv == null ? flatSymbols(li).length + ' sym' : pct(lv)}</small>${(bb => bb ? `<span class="mm" style="grid-template-columns:${bb.down}fr ${bb.flat}fr ${bb.up}fr"><i class="d"></i><i class="f"></i><i class="u"></i></span>` : '')(breadth(flatSymbols(li)))}</button>`; }).join('')
-    + `<button class="lchip add" data-action="manage-lists" title="Manage lists">⋯</button>`
+  const strip = $('strip'), x = strip.querySelector('.chips')?.scrollLeft || 0;
+  strip.innerHTML = '<div class="chips">' + state.lists.map(li => { const lv = listValue(li); return `<button class="lchip${li.id === state.activeListId ? ' on' : ''} ${sentimentClass(lv)}" data-action="list" data-id="${esc(li.id)}">
+      <b>${esc(li.name)}</b><small class="${lv == null ? '' : dirCls(lv)}">${lv == null ? flatSymbols(li).length + ' sym' : pct(lv)}</small>${(bb => bb ? `<span class="mm" style="grid-template-columns:${bb.down}fr ${bb.flat}fr ${bb.up}fr"><i class="d"></i><i class="f"></i><i class="u"></i></span>` : '')(breadth(summarySymbols(li)))}</button>`; }).join('')
+    + `<button class="lchip add" data-action="manage-lists" title="Manage lists">⋯</button></div>`
     + `<span class="acts"><button class="pill primary sq" data-action="open-search" title="Add symbol">+</button><button class="pill sq${state.sort === 'chg' ? ' on' : ''}" data-action="sort-chg" title="${state.sort === 'chg' ? 'Restore your order' : 'Sort by change'}">⇅</button><button class="pill sq" data-action="edit-toggle" title="Edit list">✎</button></span>`;
-  strip.scrollLeft = x;
+  strip.querySelector('.chips').scrollLeft = x;
   $('bbar').innerHTML = `<button class="pill" data-action="add-group">+ Group</button><button class="pill" data-action="rename-list">Rename</button><button class="pill danger sq" data-action="delete-list" title="Delete list">🗑</button><button class="pill primary" data-action="edit-toggle">Done</button>`;
 }
 function renderMLists() { renderPanelChrome(); }
@@ -1304,13 +1281,6 @@ document.addEventListener('click', e => {
       addSymbol(state.symbol); break;
     case 'hist-range':
       state.histRange = HIST_RANGES[(HIST_RANGES.findIndex(r => r[0] === histRange()) + 1) % HIST_RANGES.length][0]; save(); applySummaries(); break;
-    case 'eod-toggle': {
-      const e2 = eod[activeList().id]; if (e2) { e2.collapsed = !e2.collapsed; localStorage.setItem(EOD_KEY, JSON.stringify(eod)); renderEod(); } break;
-    }
-    case 'eod-dismiss': {
-      e.stopPropagation();
-      const e2 = eod[activeList().id]; if (e2) { e2.dismissed = true; localStorage.setItem(EOD_KEY, JSON.stringify(eod)); renderEod(); } break;
-    }
     case 'iv-toggle': {
       e.stopPropagation();
       const m = $('intervals').querySelector('.ivmenu'), open = m.hidden;
@@ -1941,6 +1911,8 @@ function flashNode(node, cls) {
 }
 
 // Boot (after every module above is defined).
+try { localStorage.removeItem('tvwl.eod.v1'); } catch (_) {}   // the end-of-day card is gone; drop its old snapshots
+state.histRange = 'session';   // the sentiment chart always opens on the current session
 render();
 renderQuotes();
 renderSession();

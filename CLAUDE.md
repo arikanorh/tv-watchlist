@@ -30,13 +30,17 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 2. If the socket never opens (`wsEverOpen` false after a retry) → `quoteSource='poll'`: `pollNow()` hits the scanner REST every `POLL_MS` (10 s); symbols the scanner lacks (broker CFDs like `SKILLING:US100`) get hidden mini chart widgets (`syncFeeders()`, max 4) that stream `quoteUpdate` after a `quoteSubscribe` postMessage. `?quotes=poll` forces this mode for testing.
 `renderQuotes()` is throttled (250 ms), patches cells in place and flashes changed ones (`.flash.f-up/f-down/f-same`). `onQuote` also stamps the top-bar tick time and pulses it (max every 1.5 s). Status dot: green live, red reconnecting, amber polling.
 
-**Sessions** — `isRegularSession()` (09:30–16:00 ET Mon–Fri) hides the Ext column; `sessionPhase()` drives the top-bar badge (pre/open/post/overnight/closed). Outside regular hours Last shows the extended price (`rtc`), Ext shows `rchp` with a colored dot (amber pre, blue post, purple overnight). Overnight behaviour is inferred, not yet observed live.
+**Sessions** — `isRegularSession()` (09:30–16:00 ET Mon–Fri) hides the Ext column; `sessionPhase()` drives the top-bar badge (pre/open/post/overnight/closed). Outside regular hours Last shows the extended price (`rtc`), Ext shows `rchp` with a colored dot (amber pre, blue post, purple overnight). Overnight (20:00–04:00 ET) the primary quote has no extended price, so `wsSync()` also subscribes each US stock's `BOATS:<ticker>` twin and `onQuote` takes the overnight price from it (change vs the regular close); the twins are dropped when the phase ends. The sentiment chart's default "session" range starts at 04:00 (day) or 20:00 (overnight) ET.
 
 **Details panel** — `renderDetails()` builds a quote sheet for `state.symbol` from `raw`; same-symbol updates are patched per `[data-k]` cell with flash; range bars for day and 52 weeks; stock-only "Company" block. Toggle persisted in `state.detailsOpen`.
 
 **Layout** — CSS is mobile-first: the base rules describe a phone, `@media (min-width: 768px)` lays the same pieces out side by side. Phone: two views behind a bottom nav (`body[data-mview]` = `lists` / `chart`). The lists view is the list panel with phone chrome: `#phead` (name, day %, breadth meter) on top, the table, then `#strip` (one chip per watchlist, tinted) and `#bbar` (Edit · + Symbol · ⋯) at the bottom, thumb side. Edit mode (`body.edit`, `editMode`) turns rows into a management surface: tap a row → options sheet (`openRowOpts`: move/copy, pin, top, details, remove with undo toast), drag the ≡ handle (pointer events on `#list`), group tools visible, action bar becomes + Group · Rename · 🗑 · Done. Sheets render into `#overlay`; the list manager `<dialog>` opens as a bottom sheet. Pinned tape on lists + chart, tabs bar on chart only, details as a full-screen sheet. Desktop: top bar (tabs, ⋯ lists, status, tick time, chart toggle) → tape → breadth → body: list panel (draggable width, persisted as `--panel-w`) | resizer | details | chart. The chart always carries a bottom **chart bar** (`#mbar`: symbol + company → opens the search palette; price, change, bar countdown; interval picker `#intervals` → bottom sheet on phones, dropdown on desktop). `@media (hover: hover)` holds hover-only affordances; on touch screens the selected row shows its tools.
 
 **Dev conveniences** — on localhost the page polls its own `Last-Modified` every second and reloads itself (live reload); off localhost this is inert.
+
+## Vocabulary
+
+The owner calls a watchlist's aggregate move **sentiment**: *sentiment yüzdesi* = the list's day % (`listValue`, from `summarySymbols`: equities only, TR → XU100, Krip → USDT pairs only); *sentiment grafiği* = its history sparkline (`sparkline`, ranges 1h / 4h / session / 24h); *sentiment bar'ı* = the breadth bar (`breadth`, one tick per symbol via `ticksHtml`).
 
 ## Development workflow
 
@@ -58,6 +62,5 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 
 - Symbol search endpoint is origin-locked to tradingview.com (403 elsewhere); the scanner `name match` filter could power an autocomplete.
 - `OANDA:XAUEUR`, `FX_IDC:XAUTRYG`, `INDEX:S5FI` have no scanner data (websocket covers them).
-- Overnight (BOATS) session labelling unverified between 20:00–04:00 ET.
 - Touch drag & drop for reordering on phones.
 - Column picker for extra fields (volume, 1W, 52W, market cap) is a natural next step; the websocket already delivers them.

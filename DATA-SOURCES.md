@@ -49,7 +49,7 @@ First frame is a session info object (`session_id`, `release`, …). Then:
 | `update_mode` | `streaming` · `delayed_streaming_900` (BIST = 15 min delay) |
 | `pro_name`, `short_name`, `description`, `exchange`, `listed_exchange`, `type`, `currency`, `logoid` | identity |
 | `session-regular`, `session-premarket`, `session-postmarket`, `session-extended`, `timezone` | session hours ("0930-1600") |
-| `exchange_traded_night_name` | `BOATS` for US stocks with overnight trading (overnight price field not yet identified) |
+| `exchange_traded_night_name` | `BOATS` for US stocks with overnight trading; the overnight price lives on the separate `BOATS:<ticker>` symbol (§4c) |
 | `price_52_week_high/low`, `all_time_high/low`, `price_percent_change_1_week`, `price_percent_change_52_week` | performance |
 | `market_cap_basic`, `total_revenue`, `net_income`, `earnings_release_next_date`, `price_target_*`, `recommendation_*` | fundamentals / analyst |
 
@@ -127,7 +127,9 @@ Groups are inline markers: an entry starting with `###` begins a section; symbol
 
 ## 4c. Overnight (BOATS) session
 
-Websocket fields: `exchange_traded_night_name: "BOATS"`, `session-id: "us_stocks_overnight"`, `subsessions: [{id:"night", session:"2000-0400", private:true}, {id:"24h", …}, …]`. Outside regular hours `rtc/rch/rchp` carry the current extended price; `current_session` reported `pre_market` at 04:4x ET. Whether the night window reports a distinct phase is still unverified (observe `market-status.phase` between 20:00 and 04:00 ET). TradingView's own watchlist "Ext" column = `rchp`.
+Websocket fields: `exchange_traded_night_name: "BOATS"`, `session-id: "us_stocks_overnight"`, `subsessions: [{id:"night", session:"2000-0400", private:true}, {id:"24h", …}, …]`. Outside regular hours `rtc/rch/rchp` carry the current extended price; `current_session` reported `pre_market` at 04:4x ET. TradingView's own watchlist "Ext" column = `rchp`.
+
+Observed 2026-10-13 00:53 ET: the primary listing (e.g. `NASDAQ:NBIS`) reports `current_session: "night"` but `rtc/rch/rchp` are `null` and `lp` stays at the regular close; the overnight print never reaches it. The anonymous quote socket streams `BOATS:NBIS` (`exchange: "BOATS"`, `current_session: "market"`, live `lp`/`lp_time`/`volume`). Its own `ch/chp` are measured against BOATS's previous session, so the app computes the overnight change against the primary's `lp` instead. The scanner REST has no `BOATS:` symbols. The app subscribes `BOATS:` twins of US stocks only while `sessionPhase()` is `night` (`boatsOf`, `overnightNow` in index.html).
 
 ## 5. Useful ticker notes
 - 24h Nasdaq 100 / S&P 500 proxies with quotes: `SKILLING:US100`, `SKILLING:SPX500` (CFD), `OKX:US100USDT.P`, `OKX:US500USDT.P` (perp), `CME_MINI:NQ1!`, `CME_MINI:ES1!` (futures, ~23h, 10-min delay).
