@@ -559,7 +559,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '0.12';  // bump the minor on every push to main
+const APP_VERSION = '0.13';  // bump the minor on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
 // Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
@@ -572,7 +572,7 @@ function seed() {
     activeListId: 'abd', interval: '60', symbol: 'NASDAQ:NBIS', pinned: DEFAULT_PINS.slice(),
     lists: [
       { id: 'abd', name: 'ABD', summary: true, groups: [
-        g('Index', ['SKILLING:US100', 'SKILLING:SPX500', 'CME_MINI:NQ1!', 'CME_MINI:ES1!', 'CBOT_MINI:YM1!', 'OKX:US100USDT.P', 'OKX:US500USDT.P']),
+        g('Index', ['SKILLING:US100', 'SKILLING:SPX500']),
         g('Spot', ['NASDAQ:NBIS','NASDAQ:CRWV','NYSE:BE','NASDAQ:CEG','NYSE:MOD','NASDAQ:AVGO','NASDAQ:ASTS','NASDAQ:UPST','NYSE:AMPX','NYSE:KRMN']),
         g('Moon sh', ['NASDAQ:ONDS','NASDAQ:RCAT','NASDAQ:GRRR','NYSE:TE','NASDAQ:ASPI','NASDAQ:EOSE','NYSE:ORCL','NYSE:NKE']),
       ]},
@@ -617,6 +617,13 @@ function load() {
       s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix).filter(x => !REMOVED.has(x)); }));
       s.pinned = Array.isArray(s.pinned) ? [...new Set(s.pinned.map(fix))] : DEFAULT_PINS.slice();
       s.lists.forEach(l => { if (l.summary === undefined) l.summary = l.id === 'tr' ? 'BIST:XU100' : ['abd', 'inci', 'zorning'].includes(l.id); });
+      // One-time edits to stored lists (each runs once per device, so later manual changes stick).
+      s.migrated = Array.isArray(s.migrated) ? s.migrated : [];
+      if (!s.migrated.includes('abd-index-trim')) {   // ABD Index keeps only US100 and SPX500
+        const drop = new Set(['CME_MINI:NQ1!', 'CME_MINI:ES1!', 'CBOT_MINI:YM1!', 'OKX:US100USDT.P', 'OKX:US500USDT.P']);
+        s.lists.filter(l => l.id === 'abd').forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.filter(x => !drop.has(x)); }));
+        s.migrated.push('abd-index-trim');
+      }
       if (!s.lists.some(l => l.id === 'krip')) {
         const k = seed().lists.find(l => l.id === 'krip'), i = s.lists.findIndex(l => l.id === 'inci');
         s.lists.splice(i < 0 ? s.lists.length : i + 1, 0, k);
