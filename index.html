@@ -28,8 +28,9 @@
   body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent; padding-top: env(safe-area-inset-top, 0px); }
   @media (display-mode: standalone) { body { position: fixed; inset: 0; height: auto; } }
-  /* iOS home-screen apps can size the page short of the screen bottom (see fitStandalone()); should a strip of the
-     root canvas still show under the bottom nav, it is painted in the nav's color so it blends in. */
+  /* iOS home-screen apps can stop the page short of the screen bottom (see fitStandalone()); the nav then needs no
+     home-indicator padding, and any root canvas that shows is painted in the nav's color. */
+  body.ios-gap .mnav { padding-bottom: 0; }
   @media (max-width: 767.98px) { html { background: var(--bg2); } body { background: var(--bg); } }
   button, input, select { font: inherit; color: inherit; }
   button { background: none; border: 0; cursor: pointer; padding: 0; }
@@ -558,7 +559,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '0.11';  // bump the minor on every push to main
+const APP_VERSION = '0.12';  // bump the minor on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
 // Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
@@ -1424,16 +1425,17 @@ listEl.addEventListener('pointercancel', () => { if (pdrag) { pdrag = null; clea
 function closeSheets() { $('intervals').querySelector('.ivmenu').hidden = true; $('ivbackdrop').hidden = true; unshift(); }
 // iOS: focusing an input inside the fixed body scrolls the document to reveal it; after the keyboard closes the
 // layout stays shifted and taps land one or two rows above their targets. Snap the document back to the top.
-// iOS home-screen app: with the translucent status bar the page is drawn from the very top of the screen, but the
-// viewport it reports can be shorter than the screen by the status bar's height, which leaves an empty strip under the
-// bottom nav. When the reported height falls short of the screen by a status-bar-sized amount, stretch the (fixed)
-// body down to the screen edge. It measures every time, so it does nothing once iOS reports the full height.
+// iOS home-screen app: the web view can stop short of the screen bottom (by about the status bar's height). The strip
+// below it is native, painted with the manifest's background_color (set to the nav color), and it already sits over the
+// home indicator, so the nav's own bottom padding is wasted there. Detect that case and drop the padding (body.ios-gap).
+// Nothing is moved or stretched, so taps keep landing where they should; it measures every time and turns itself off
+// once iOS gives the page the full screen.
 function fitStandalone() {
   if (!matchMedia('(display-mode: standalone)').matches && !navigator.standalone) return;
   const portrait = matchMedia('(orientation: portrait)').matches;
   const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
   const gap = Math.round(full - window.innerHeight);
-  document.body.style.bottom = gap > 0 && gap <= 100 ? -gap + 'px' : '';   // > 100 would be the keyboard, not the bug
+  document.body.classList.toggle('ios-gap', gap > 0 && gap <= 100);   // > 100 would be the keyboard, not the bug
 }
 fitStandalone();
 window.addEventListener('resize', fitStandalone);
