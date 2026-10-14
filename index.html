@@ -130,12 +130,19 @@
   /* Chart pane */
   .chartpane { position: relative; }
   #tv_chart { position: relative; flex: 1; min-height: 0; }
-  .cbar { position: relative; flex-shrink: 0; display: flex; gap: 8px; padding: 8px 10px; background: var(--bg2); border-top: 1px solid var(--line); }
+  .cbar { position: relative; flex-shrink: 0; display: flex; gap: 8px; padding: 8px 10px; background: var(--bg2); }
   .sbtn { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 12px; background: var(--bg3); color: var(--muted); }
   .sbtn svg { width: 18px; height: 18px; flex-shrink: 0; }
   .sbtn b { color: var(--text); font-weight: 600; }
-  .ivbtn { flex: none; min-width: 64px; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg3); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .ivmenu { display: none; }
+  /* Interval: segmented control. Phones: under the chart (thumb side). Desktop: on top of the chart. */
+  .seg { order: 2; flex-shrink: 0; display: flex; gap: 4px; padding: 8px 10px 0; background: var(--bg2); border-top: 1px solid var(--line); }
+  .seg button { flex: 1; height: 36px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); background: var(--bg3); font-variant-numeric: tabular-nums; }
+  .seg button.on { color: #fff; background: var(--accent); }
+  #tv_chart { order: 1; }
+  .cbar { order: 3; }
+  .infobtn { flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--bg3); display: flex; align-items: center; justify-content: center; }
+  .infobtn svg { width: 20px; height: 20px; }
+  body.details-open .infobtn { background: var(--accent-bg); color: var(--accent); }
 
   /* Bottom nav (phones) */
   .nav { position: relative; flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; background: var(--bg2); border-top: 1px solid var(--line);
@@ -159,9 +166,6 @@
   .opt { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 0 16px; border-top: 1px solid var(--line); text-align: left; font-size: 16px; flex-shrink: 0; }
   .opt .c { margin-left: auto; font-size: 12px; color: var(--muted); }
   .opt.on { color: var(--accent); } .opt.danger { color: var(--down); }
-  .ivgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 4px 16px 8px; }
-  .ivgrid button { height: 48px; border-radius: 10px; background: var(--bg); font-size: 16px; font-weight: 600; color: var(--muted); }
-  .ivgrid button.on { background: var(--accent); color: #fff; }
   /* search */
   .sres { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .sr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 9px 12px 9px 16px; border-top: 1px solid var(--line); cursor: pointer; }
@@ -189,6 +193,42 @@
     max-width: calc(100vw - 24px); padding: 11px 16px; border-radius: 10px; background: var(--bg3); font-size: 14px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
   .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .toast button { color: var(--accent); font-weight: 600; flex-shrink: 0; }
+  /* Sentiment chart (desktop): the active list's sentiment % over time, above the table */
+  .sent { display: none; }
+  .sent-h { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+  .sent-h b { font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .sent-h .rng { margin-left: auto; height: 22px; padding: 0 8px; border-radius: 6px; background: var(--bg3); font-size: 11px; font-weight: 600; color: var(--text); }
+  .sent-c { position: relative; margin-top: 4px; }
+  .sent svg { width: 100%; height: 58px; overflow: visible; }
+  .sent .zero { stroke: var(--muted); stroke-opacity: .45; stroke-dasharray: 3 3; }
+  .sent .line { fill: none; stroke-width: 1.6; }
+  .sent .area { opacity: .16; }
+  .sent .up { stroke: var(--up); fill: var(--up); } .sent .down { stroke: var(--down); fill: var(--down); }
+  .sent .lbl { font-size: 10px; fill: var(--muted); }
+  .sent .dot { fill: var(--text); stroke: var(--bg); stroke-width: 1.5; }
+  .sent .tip { position: absolute; top: -4px; transform: translate(-50%, -100%); padding: 3px 7px; border-radius: 5px; background: var(--bg3);
+    font-size: 11px; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .sent .none { height: 58px; display: flex; align-items: center; font-size: 12px; color: var(--muted); }
+  /* Details: a bottom sheet on phones (rendered into the sheet), a column between list and chart on desktop */
+  .detailspane { display: none; }
+  .dt-head { padding: 2px 16px 12px; }
+  .dt-head .dsc { font-size: 13px; color: var(--muted); }
+  .dt-px { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .dt-px b { font-size: 26px; font-weight: 600; }
+  .dt-px span { font-size: 15px; }
+  .dt-px small { font-size: 12px; color: var(--muted); }
+  .dt-ext { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dt-sec { padding: 10px 16px 12px; border-top: 1px solid var(--line); flex-shrink: 0; }
+  .dt-sec h4 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .kv > span:first-child { color: var(--muted); white-space: nowrap; }
+  .kv > span:last-child { text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kv small { font-size: 12px; margin-left: 4px; }
+  .rb { margin: 6px 0 8px; }
+  .rbt { position: relative; height: 4px; border-radius: 2px; background: var(--bg3); }
+  .rbt i { position: absolute; top: -4px; width: 12px; height: 12px; border-radius: 50%; background: var(--text); transform: translateX(-50%); }
+  .rbl { display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dt-empty { padding: 16px; color: var(--muted); }
   #feeders { position: fixed; left: -2000px; top: 0; width: 320px; pointer-events: none; }
   #feeders > div { width: 320px; height: 220px; }
 
@@ -203,6 +243,15 @@
     body[data-view] .pane { display: flex; }
     .listpane { flex: none; width: 420px; border-right: 1px solid var(--line); }
     body.chart-hidden .chartpane { display: none; }
+    body[data-view] .detailspane { display: none; }
+    .sent { display: block; flex-shrink: 0; padding: 8px 14px 6px; border-bottom: 1px solid var(--line); background: var(--bg); }
+    body.details-open[data-view] .detailspane { display: flex; flex: none; width: 300px; border-right: 1px solid var(--line); background: var(--bg); }
+    .detailspane .dt-top { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 4px 16px; font-size: 12px; font-weight: 600; color: var(--muted); }
+    .detailspane .dt-top button { width: 28px; height: 28px; border-radius: 6px; color: var(--muted); }
+    .detailspane .dt-top button:hover { background: var(--bg3); color: var(--text); }
+    .detailspane #dbody { flex: 1; min-height: 0; overflow-y: auto; }
+    .kv { font-size: 13px; padding: 3px 0; }
+    .dt-px b { font-size: 24px; }
     body.chart-hidden .listpane { flex: 1; width: auto; border-right: 0; }
     .row { height: 36px; font-size: 14px; }
     .row .more { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border-radius: 6px; background: var(--bg3);
@@ -213,12 +262,13 @@
     .row.on:hover { background: var(--accent-bg); }
     .chip { padding: 5px 10px; min-width: 60px; }
     .ib { width: 38px; height: 38px; border-radius: 10px; }
-    .sbtn, .ivbtn { height: 38px; border-radius: 10px; }
-    .ivmenu.open { display: grid; position: absolute; right: 10px; bottom: calc(100% + 6px); z-index: 20; grid-template-columns: repeat(4, 56px); gap: 4px; padding: 6px;
-      background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
-    .ivmenu button { height: 34px; border-radius: 6px; background: var(--bg); color: var(--muted); font-weight: 600; }
-    .ivmenu button:hover { color: var(--text); background: var(--bg3); }
-    .ivmenu button.on { background: var(--accent); color: #fff; }
+    .sbtn, .infobtn { height: 38px; border-radius: 10px; }
+    .infobtn { width: 38px; }
+    .cbar { border-top: 1px solid var(--line); }
+    .seg { order: 0; align-items: center; gap: 2px; padding: 6px 10px; border-top: 0; border-bottom: 1px solid var(--line); }
+    .seg button { flex: none; height: 28px; min-width: 40px; padding: 0 10px; border-radius: 6px; font-size: 13px; background: none; }
+    .seg button:hover { color: var(--text); background: var(--bg3); }
+    .seg button.on { color: #fff; background: var(--accent); }
     .sheet { left: 50%; right: auto; top: 10vh; bottom: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); max-height: 78vh;
       border-radius: 14px; border: 1px solid var(--line); padding-bottom: 8px; }
     .sheet::before { display: none; }
@@ -244,6 +294,7 @@
 
 <main class="main">
   <section class="pane listpane" aria-label="Watchlist">
+    <div class="sent" id="sent"></div>
     <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span class="x" title="Pre-market · post-market · overnight">Ext</span></div>
     <div class="rows" id="rows"></div>
     <div class="dock">
@@ -255,12 +306,16 @@
       </div>
     </div>
   </section>
+  <aside class="pane detailspane" aria-label="Symbol details">
+    <div class="dt-top"><span>Details</span><button data-act="details" aria-label="Close details">✕</button></div>
+    <div id="dbody"></div>
+  </aside>
   <section class="pane chartpane" id="chartWrap" aria-label="Chart">
+    <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <div id="tv_chart"></div>
     <div class="cbar">
       <button class="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><b id="cbSym"></b><span>Search</span></button>
-      <button class="ivbtn" data-act="interval" id="ivBtn" title="Chart interval"></button>
-      <div class="ivmenu" id="ivMenu"></div>
+      <button class="infobtn" data-act="details" aria-label="Details" title="Details"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button>
     </div>
   </section>
 </main>
@@ -281,7 +336,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '1.0';  // bump on every push to main
+const APP_VERSION = '1.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -333,6 +388,10 @@ const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'SKILLING:US100', 'CAPITALCOM:SPX500'
 const REMOVED = new Set(['NASDAQ:NDX', 'SP:SPX']);   // no chart in the free widget
 // The free widget has no chart for plain indices and BIST; these stay quote-only.
 const noChart = sym => /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|BIST:)/.test(sym);
+// Some symbols quote fine but the free widget won't chart them; chart an equivalent feed instead.
+// TVC:US10Y (US 10Y yield) spins forever in the embed; PYTH:US10Y carries the same yield and charts.
+const CHART_ALIAS = { 'TVC:US10Y': 'PYTH:US10Y' };
+const chartSymbol = sym => CHART_ALIAS[sym] || sym;
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
@@ -349,7 +408,7 @@ function load() {
         s.migrated.push('abd-index-trim');
       }
       // Leftovers from the previous design (pinned tape, details panel, history chart, edit mode).
-      for (const k of ['pinned', 'detailsOpen', 'hudHidden', 'histRange', 'panelWidth', 'mview']) delete s[k];
+      for (const k of ['pinned', 'hudHidden', 'histRange', 'panelWidth', 'mview']) delete s[k];
       if (!['list', 'chart'].includes(s.view)) s.view = 'list';
       return s;
     }
@@ -358,7 +417,7 @@ function load() {
 }
 let state = load();
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {} }
-for (const k of ['tvwl.hist.v1', 'tvwl.eod.v1']) { try { localStorage.removeItem(k); } catch (_) {} }
+try { localStorage.removeItem('tvwl.eod.v1'); } catch (_) {}
 const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
 const flatSymbols = list => list.groups.flatMap(g => g.symbols);
 const allSymbols = () => [...new Set(state.lists.flatMap(flatSymbols))];
@@ -423,8 +482,90 @@ function listValue(l) {
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 
+// ================= Sentiment history (desktop chart) =================
+// One sample per list every 15 s while the app is open; the last 2 h at full rate, older samples thinned to 1/min, 24 h kept.
+const HIST_KEY = 'tvwl.hist.v1', HIST_MS = 15000, HIST_FINE_MS = 2 * 3600000, HIST_COARSE_MS = 60000, HIST_MAX_MS = 24 * 3600000;
+let hist = {}; try { hist = JSON.parse(localStorage.getItem(HIST_KEY)) || {}; } catch (_) {}
+function pruneHistory(arr, now) {
+  const out = []; let lastCoarse = 0;
+  for (const x of arr) {
+    if (now - x[0] > HIST_MAX_MS) continue;
+    if (now - x[0] > HIST_FINE_MS) { if (x[0] - lastCoarse < HIST_COARSE_MS - 1000) continue; lastCoarse = x[0]; }
+    out.push(x);
+  }
+  return out;
+}
+function sampleHistory() {
+  const now = Date.now(); let changed = false;
+  for (const l of state.lists) {
+    const v = listValue(l); if (v == null) continue;
+    const arr = hist[l.id] || [];
+    if (arr.length && now - arr[arr.length - 1][0] < HIST_MS - 1000) continue;
+    arr.push([now, +v.toFixed(3)]);
+    hist[l.id] = pruneHistory(arr, now); changed = true;
+  }
+  if (changed) { try { localStorage.setItem(HIST_KEY, JSON.stringify(hist)); } catch (_) {} }
+}
+// Start of the session we are in (New York): day 04:00 → 20:00 (pre, regular, post), overnight 20:00 → 04:00.
+function sessionOpenTs() {
+  const { m } = nyParts();
+  const open = m >= 240 && m < 1200 ? 240 : 1200;
+  return Date.now() - ((m - open + 1440) % 1440) * 60000;
+}
+const HIST_RANGES = ['session', '1h', '4h', '24h'];
+const histRange = () => HIST_RANGES.includes(state.histRange) ? state.histRange : 'session';
+const histSince = () => histRange() === 'session' ? sessionOpenTs() : Date.now() - { '1h': 1, '4h': 4, '24h': 24 }[histRange()] * 3600000;
+const rangeLabel = () => histRange() === 'session' ? (sessionPhase()[0] === 'night' ? 'Overnight' : 'Today') : histRange();
+let spark = { pts: [], x: null, y: null, hover: -1 };
+function renderSentiment() {
+  const el = $('sent'); if (!el || isPhone()) return;
+  const l = activeList();
+  const head = `<div class="sent-h"><b>Sentiment</b><span>${esc(l.name)}</span><button class="rng" data-act="hist-range" title="Change range">${rangeLabel()}</button></div>`;
+  if (!l.summary) { el.innerHTML = head + '<div class="none">Sentiment is off for this list (⋯ → Σ).</div>'; return; }
+  const pts = (hist[l.id] || []).filter(p => p[0] >= histSince());
+  if (pts.length < 2) { el.innerHTML = head + '<div class="none">Collecting… the chart fills while the app is open.</div>'; return; }
+  const W = Math.max(120, el.clientWidth - 28), H = 58, T = 4, B = 14, ih = H - T - B;
+  const vals = pts.map(p => p[1]), lim = Math.max(0.25, ...vals.map(Math.abs));
+  const t0 = pts[0][0], t1 = pts[pts.length - 1][0];
+  const x = t => ((t - t0) / Math.max(1, t1 - t0) * W), y = v => T + ih / 2 - v / lim * (ih / 2 - 1);
+  const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ');
+  const last = vals[vals.length - 1], cls = last >= 0 ? 'up' : 'down', zy = y(0).toFixed(1);
+  const hm = t => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  spark = { pts, x, y, hover: spark.hover };
+  el.innerHTML = head + `<div class="sent-c"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" id="sentSvg">
+      <line class="zero" x1="0" x2="${W}" y1="${zy}" y2="${zy}"/>
+      <path class="area ${cls}" d="${path} L${x(t1).toFixed(1)} ${zy} L0 ${zy} Z" stroke="none"/><path class="line ${cls}" d="${path}"/>
+      <text class="lbl" x="0" y="${H - 2}">${hm(t0)}</text><text class="lbl" x="${W}" y="${H - 2}" text-anchor="end">${hm(t1)}</text>
+      <text class="lbl" x="${W}" y="10" text-anchor="end">±${lim.toFixed(2)}%</text>
+      <circle class="dot" r="3" cx="-10" cy="-10" id="sentDot"/></svg><div class="tip" id="sentTip" hidden></div></div>`;
+  showSparkTip();
+}
+function showSparkTip() {
+  const dot = $('sentDot'), tip = $('sentTip'); if (!dot || !tip) return;
+  const i = spark.hover;
+  if (i < 0 || i >= spark.pts.length) { tip.hidden = true; dot.setAttribute('cx', -10); return; }
+  const [t, v] = spark.pts[i], cx = spark.x(t), cy = spark.y(v);
+  dot.setAttribute('cx', cx.toFixed(1)); dot.setAttribute('cy', cy.toFixed(1));
+  const svg = $('sentSvg'), k = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+  tip.innerHTML = `${new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · <span class="${dir(v)}">${pct(v)}</span>`;
+  tip.style.left = Math.max(30, Math.min(svg.clientWidth - 30, cx * k)) + 'px';
+  tip.hidden = false;
+}
+$('sent').addEventListener('mousemove', e => {
+  const svg = e.target.closest('#sentSvg'); if (!svg || spark.pts.length < 2) return;
+  const r = svg.getBoundingClientRect(), t = spark.pts[0][0] + (e.clientX - r.left) / r.width * (spark.pts[spark.pts.length - 1][0] - spark.pts[0][0]);
+  let best = 0; spark.pts.forEach((p, i) => { if (Math.abs(p[0] - t) < Math.abs(spark.pts[best][0] - t)) best = i; });
+  spark.hover = best; showSparkTip();
+});
+$('sent').addEventListener('mouseleave', () => { spark.hover = -1; showSparkTip(); });
+
 // ================= Quotes: websocket (relay off localhost), scanner polling fallback =================
-const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date'];
+const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date',
+  // details panel
+  'open_price', 'high_price', 'low_price', 'prev_close_price', 'volume', 'average_volume', 'price_52_week_high', 'price_52_week_low', 'all_time_high',
+  'price_percent_change_1_week', 'price_percent_change_52_week', 'market_cap_basic', 'price_earnings_ttm', 'price_earnings_fy', 'earnings_per_share_diluted_ttm',
+  'price_sales_current', 'price_book_ratio', 'dividends_yield_current', 'beta_1_year', 'total_revenue', 'net_margin_ttm', 'sector', 'industry', 'country',
+  'price_target_average', 'currency_code'];
 const raw = {}, quotes = {};
 let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, wsEverOpen = false, lastPulse = 0, lastData = 0;
 const WS_DIRECT = 'wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart';
@@ -512,7 +653,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && qu
 // Polling fallback: scanner REST every 10 s; symbols the scanner lacks (broker CFDs) stream from hidden mini widgets.
 const POLL_MS = 10000, FEEDER_MAX = 4;
 const SCAN_COLS = ['close', 'change', 'premarket_close', 'premarket_change', 'premarket_time', 'postmarket_close', 'postmarket_change', 'postmarket_time',
-  'earnings_release_next_date', 'description', 'exchange', 'type'];
+  'earnings_release_next_date', 'description', 'exchange', 'type', 'open', 'high', 'low', 'volume', 'market_cap_basic', 'price_earnings_ttm',
+  'price_52_week_high', 'price_52_week_low', 'sector', 'industry', 'currency'];
 let pollTimer = null;
 const feeders = {};
 function startPolling() {
@@ -541,6 +683,8 @@ async function pollNow() {
       lp: d.close, chp: d.change, rtc: hasExt ? d[ext[0]] : null, rchp: hasExt ? d[ext[1]] : null,
       current_session: !hasExt ? 'market' : phase === 'pre' ? 'pre_market' : phase === 'post' ? 'post_market' : phase === 'open' ? 'market' : 'out_of_session',
       earnings_release_next_date: d.earnings_release_next_date, description: d.description, exchange: d.exchange, type: d.type, update_mode: 'polled',
+      open_price: d.open, high_price: d.high, low_price: d.low, volume: d.volume, market_cap_basic: d.market_cap_basic, price_earnings_ttm: d.price_earnings_ttm,
+      price_52_week_high: d.price_52_week_high, price_52_week_low: d.price_52_week_low, sector: d.sector, industry: d.industry, currency_code: d.currency,
     });
   }
   syncFeeders(tickers.filter(t => !found.has(t)));
@@ -598,7 +742,7 @@ function mountChart() {
   chart.hiddenAtMount = $('chartWrap').offsetWidth === 0;   // hidden pane (phones start on the list) or no layout yet
   new TradingView.widget({
     autosize: true, container_id: 'tv_chart',
-    symbol: state.symbol || flatSymbols(activeList())[0] || 'BINANCE:BTCUSDT', interval: state.interval,
+    symbol: chartSymbol(state.symbol || flatSymbols(activeList())[0] || 'BINANCE:BTCUSDT'), interval: state.interval,
     timezone: 'Etc/UTC', theme: 'dark', style: '1', locale: 'en',
     allow_symbol_change: false, details: false, hotlist: false, calendar: false,
     hide_side_toolbar: true, hide_top_toolbar: true, hide_legend: true, hide_volume: true,
@@ -608,11 +752,11 @@ function mountChart() {
     support_host: 'https://www.tradingview.com',
   });
 }
-const showSymbol = () => send('set-symbol', { symbol: state.symbol });
+const showSymbol = () => send('set-symbol', { symbol: chartSymbol(state.symbol) });
 function setChartInterval(v) { state.interval = v; save(); send('set-interval', { interval: v }); renderHeader(); }
 
 // ================= Rendering =================
-function render() { renderChips(); renderRows(); renderHeader(); $('sortBtn').classList.toggle('on', state.sort === 'chg'); }
+function render() { renderChips(); renderRows(); renderHeader(); renderSentiment(); $('sortBtn').classList.toggle('on', state.sort === 'chg'); }
 function renderChips() {
   const el = $('chips'), x = el.scrollLeft;
   el.innerHTML = state.lists.map(l => `<button class="chip${l.id === state.activeListId ? ' on' : ''}" data-act="list" data-id="${esc(l.id)}"><b>${esc(l.name)}</b><small data-lv="${esc(l.id)}"></small></button>`).join('');
@@ -704,16 +848,83 @@ function renderHeader() {
   $('hsChg').className = 'chg ' + (q ? dir(q.c) : '');
   const desc = r.description || '';
   $('hsDesc').textContent = desc.toUpperCase() === short(sym) ? '' : desc;
-  $('ivBtn').textContent = intervalLabel(state.interval);
+  const seg = $('seg');
+  if (seg.dataset.iv !== state.interval) {
+    seg.dataset.iv = state.interval;
+    seg.innerHTML = INTERVALS.map(([lbl, v]) => `<button class="${v === state.interval ? 'on' : ''}" data-iv="${v}">${lbl}</button>`).join('');
+  }
 }
+let lastSpark = 0;
 function renderQuotes() {
   regular = isRegularSession();
+  if (Object.keys(quotes).length) sampleHistory();
+  if (Date.now() - lastSpark > 5000) { lastSpark = Date.now(); renderSentiment(); }
   document.body.classList.toggle('regular', regular);
   // In sorted view, re-order at most every 3 s and never under a finger or an open sheet.
   if (state.sort === 'chg' && Date.now() - lastSortRender > 3000 && !press && $('sheet').hidden) renderRows();
   else patchRows(true);
   patchChips();
   renderHeader();
+  renderDetails();
+}
+
+// ================= Details =================
+const fmtBig = v => v == null ? null : Math.abs(v) >= 1e12 ? (v / 1e12).toFixed(2) + 'T' : Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(2) + 'B'
+  : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(0) + 'K' : String(Math.round(v));
+const num = (v, d = 2) => v == null || isNaN(v) ? null : v.toFixed(d);
+const kv = (k, v) => v == null || v === '' ? '' : `<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+const signed = v => v == null ? '' : `<span class="${dir(v)}">${pct(v)}</span>`;
+function rangeBar(lo, hi, v) {
+  if (lo == null || hi == null || v == null || hi <= lo) return '';
+  const x = Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
+  return `<div class="rb"><div class="rbt"><i style="left:${x.toFixed(1)}%"></i></div><div class="rbl"><span>${fmtPrice(lo)}</span><span>${fmtPrice(hi)}</span></div></div>`;
+}
+function detailsHtml(sym) {
+  const r = raw[sym], q = quotes[sym];
+  if (!r || !q) return '<div class="dt-empty">Waiting for data…</div>';
+  const desc = r.description && r.description.toUpperCase() !== short(sym) ? r.description : '';
+  const ext = !regular && q.ep != null ? `<div class="dt-ext"><i class="ss ${q.ss}"></i>${{ pre: 'Pre-market', post: 'Post-market', night: 'Overnight' }[q.ss] || 'Extended'} ${fmtPrice(q.ep)} ${signed(q.e)}</div>` : '';
+  const ch = r.ch ?? (r.prev_close_price != null ? r.lp - r.prev_close_price : null);
+  let h = `<div class="dt-head">${desc ? `<div class="dsc">${esc(desc)}</div>` : ''}
+    <div class="dt-px"><b>${fmtPrice(r.lp)}</b><span class="${dir(q.c)}">${ch != null ? (ch > 0 ? '+' : '') + fmtPrice(ch) + ' ' : ''}${pct(q.c)}</span><small>${esc(r.currency_code || '')}</small></div>${ext}</div>`;
+  const vol = r.volume != null ? fmtBig(r.volume) + (r.average_volume ? ` <small class="${r.volume >= r.average_volume ? 'up' : ''}">${(r.volume / r.average_volume).toFixed(1)}× avg</small>` : '') : null;
+  const today = rangeBar(r.low_price, r.high_price, r.lp) + kv('Open', fmtPrice(r.open_price)) + kv('Prev close', fmtPrice(r.prev_close_price)) + kv('Volume', vol);
+  if (today) h += `<div class="dt-sec"><h4>Today</h4>${today}</div>`;
+  const fromAth = r.all_time_high ? (r.lp - r.all_time_high) / r.all_time_high * 100 : null;
+  const year = rangeBar(r.price_52_week_low, r.price_52_week_high, r.lp) + kv('1 week', signed(r.price_percent_change_1_week)) + kv('52 weeks', signed(r.price_percent_change_52_week))
+    + kv('From all-time high', fromAth != null ? signed(fromAth) : null);
+  if (year) h += `<div class="dt-sec"><h4>52 weeks</h4>${year}</div>`;
+  const pe = r.price_earnings_ttm ?? r.price_earnings_fy;
+  const val = kv('Market cap', fmtBig(r.market_cap_basic)) + kv('P/E', num(pe, 1)) + kv('EPS (TTM)', num(r.earnings_per_share_diluted_ttm))
+    + kv('P/S', num(r.price_sales_current, 1)) + kv('P/B', num(r.price_book_ratio, 1))
+    + kv('Dividend yield', r.dividends_yield_current ? num(r.dividends_yield_current) + '%' : null) + kv('Beta (1Y)', num(r.beta_1_year));
+  if (val) h += `<div class="dt-sec"><h4>Valuation</h4>${val}</div>`;
+  const e = r.earnings_release_next_date, days = e ? Math.round((e * 1000 - Date.now()) / 864e5) : null;
+  const tgt = r.price_target_average ? fmtPrice(r.price_target_average) + ` <small class="${dir(r.price_target_average - r.lp)}">${pct((r.price_target_average - r.lp) / r.lp * 100)}</small>` : null;
+  const co = kv('Sector', esc(r.sector || '')) + kv('Industry', esc(r.industry || '')) + kv('Country', esc(r.country || ''))
+    + kv('Revenue (TTM)', fmtBig(r.total_revenue)) + kv('Net margin', r.net_margin_ttm != null ? num(r.net_margin_ttm, 1) + '%' : null)
+    + kv('Next earnings', days != null && days >= 0 ? new Date(e * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (days === 0 ? ', today' : `, in ${days}d`) : null)
+    + kv('Analyst target', tgt);
+  if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
+  return h;
+}
+const detailsTitle = sym => `${short(sym)} · ${raw[sym]?.exchange || sym.split(':')[0]}`;
+// Phones: a bottom sheet. Desktop: the column between list and chart (state.detailsOpen).
+function toggleDetails(sym = state.symbol) {
+  if (isPhone()) { openSheet('details', detailsTitle(sym), detailsHtml(sym)); detailsSym = sym; return; }
+  if (sym !== state.symbol) selectSymbol(sym, false);
+  state.detailsOpen = sym !== state.symbol ? true : !state.detailsOpen; save(); applyDetails();
+}
+let detailsSym = null;
+function applyDetails() {
+  document.body.classList.toggle('details-open', !!state.detailsOpen && !isPhone());
+  renderDetails();
+}
+function renderDetails() {
+  if (sheetKind === 'details' && detailsSym) {
+    const b = $('shBody'), y = b.scrollTop; b.innerHTML = detailsHtml(detailsSym); b.scrollTop = y;
+  }
+  if (document.body.classList.contains('details-open')) $('dbody').innerHTML = detailsHtml(state.symbol);
 }
 
 // ================= Views =================
@@ -736,7 +947,7 @@ function selectSymbol(sym, openChart = true) {
   if (noChart(sym)) { toast(`${short(sym)} has no chart in the free widget`); return; }
   state.symbol = sym; save();
   $('rows').querySelectorAll('.row').forEach(r => r.classList.toggle('on', r.dataset.sym === sym));
-  showSymbol(); renderHeader();
+  showSymbol(); renderHeader(); renderDetails();
   if (openChart && isPhone()) setView('chart');
 }
 
@@ -782,12 +993,13 @@ function closeSheet() {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   unshift();
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); $('ivMenu').classList.remove('open'); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
 function openRowMenu(sym, gi) {
   const l = activeList(), g = l.groups[gi];
   const opts = [];
   if (!noChart(sym)) opts.push(`<button class="opt" data-o="chart">Show on chart</button>`);
+  opts.push(`<button class="opt" data-o="details">Details</button>`);
   if (l.groups.length > 1) opts.push(`<button class="opt" data-o="move">Move to group<span class="c">${esc(g?.name || '')}</span></button>`);
   if (state.lists.length > 1) opts.push(`<button class="opt" data-o="copy">Copy to list</button>`);
   if (g && g.symbols.indexOf(sym) > 0) opts.push(`<button class="opt" data-o="top">Move to top of group</button>`);
@@ -796,6 +1008,7 @@ function openRowMenu(sym, gi) {
   $('shBody').onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
     if (o === 'chart') { closeSheet(); selectSymbol(sym); }
+    if (o === 'details') { if (isPhone()) toggleDetails(sym); else { closeSheet(); if (sym !== state.symbol) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); } }
     if (o === 'move') openMoveSheet(sym, gi);
     if (o === 'copy') openCopySheet(sym);
     if (o === 'top') { closeSheet(); moveSymbol(sym, gi, gi, 0); }
@@ -824,18 +1037,7 @@ function openCopySheet(sym) {
   };
 }
 
-// Interval: bottom sheet on phones, dropdown above the button on desktop.
-function openIntervals() {
-  const btns = INTERVALS.map(([lbl, v]) => `<button class="${v === state.interval ? 'on' : ''}" data-iv="${v}">${lbl}</button>`).join('');
-  if (isPhone()) {
-    openSheet('interval', 'Interval', `<div class="ivgrid">${btns}</div>`);
-    $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { closeSheet(); setChartInterval(b.dataset.iv); } };
-  } else {
-    const m = $('ivMenu'); m.innerHTML = btns; m.classList.toggle('open');
-  }
-}
-$('ivMenu').addEventListener('click', e => { const b = e.target.closest('[data-iv]'); if (b) { $('ivMenu').classList.remove('open'); setChartInterval(b.dataset.iv); } });
-document.addEventListener('click', e => { if (!e.target.closest('#ivMenu, #ivBtn')) $('ivMenu').classList.remove('open'); }, true);
+$('seg').addEventListener('click', e => { const b = e.target.closest('[data-iv]'); if (b) setChartInterval(b.dataset.iv); });
 
 // Search: TradingView symbol search through the relay (scanner fallback). Tap a result → chart; + → add to the active list.
 const RELAY_HTTP = RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '');
@@ -967,7 +1169,8 @@ document.addEventListener('click', e => {
     case 'sort': state.sort = state.sort === 'chg' ? null : 'chg'; save(); render(); break;
     case 'lists': openListManager(); break;
     case 'reconnect': refreshQuotes(); break;
-    case 'interval': openIntervals(); break;
+    case 'details': toggleDetails(); break;
+    case 'hist-range': state.histRange = HIST_RANGES[(HIST_RANGES.indexOf(histRange()) + 1) % HIST_RANGES.length]; save(); renderSentiment(); break;
     case 'toggle-chart': state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
     case 'sheet-close': closeSheet(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
@@ -1071,11 +1274,16 @@ window.addEventListener('resize', fitStandalone);
 window.addEventListener('resize', () => { if (chart.hiddenAtMount && $('chartWrap').offsetWidth > 0) { mountChart(); showSymbol(); } });
 
 // ================= Boot =================
+state.histRange = 'session';   // the sentiment chart always opens on the current session
+setInterval(sampleHistory, HIST_MS);
+window.addEventListener('resize', () => { clearTimeout(window._sentT); window._sentT = setTimeout(renderSentiment, 150); });
 $('ver').textContent = $('hver').textContent = 'v' + APP_VERSION;
 renderSession();
 setInterval(renderSession, 30000);
 render();
 applyChartHidden();
+applyDetails();
+window.addEventListener('resize', () => { if (document.body.classList.contains('details-open') !== (!!state.detailsOpen && !isPhone())) applyDetails(); });
 setView(isPhone() ? state.view : 'list');
 mountChart();
 wsConnect();
