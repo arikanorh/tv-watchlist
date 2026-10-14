@@ -1,15 +1,16 @@
 # tv-watchlist
 
-Personal TradingView-style watchlist: one static `index.html` (vanilla JS, no build, no backend) with live quotes, a TradingView chart widget, multiple watchlists and a details panel. Live at https://arikanorh.github.io/tv-watchlist/ (GitHub Pages, `main`). Owner: arikanorh (personal GitHub, not the work GHE).
+Personal TradingView-style watchlist: one static `index.html` (vanilla JS, no build, no backend) with live quotes, a TradingView chart widget and multiple watchlists. Goal: reach several lists quickly, see how each is doing (sentiment %), open a symbol's chart when needed. Live at https://arikanorh.github.io/tv-watchlist/ and https://tv-watchlist.pages.dev (both serve `main`). Owner: arikanorh (personal GitHub, not the work GHE).
 
-Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner payloads, widget postMessage API, field catalog).
+Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner payloads, widget postMessage API, BOATS overnight, field catalog).
 
 ## Files
 
 | Path | Role |
 |---|---|
-| `index.html` | The whole app: CSS, markup, JS (~1800 lines). Only deliverable. |
-| `relay/worker.js` | Cloudflare Worker that relays the TradingView quote websocket for non-localhost origins. |
+| `index.html` | The whole app: CSS, markup, JS (~1100 lines). Only deliverable. |
+| `manifest.webmanifest`, `icons/` | PWA (iOS home screen, standalone). `background_color` = nav color. |
+| `relay/worker.js` | Cloudflare Worker: relays the TradingView quote websocket for non-localhost origins and proxies `/search`. |
 | `relay/wrangler.toml`, `relay/README.md` | Worker config + deploy notes. |
 | `.github/workflows/deploy-relay.yml` | Deploys the worker on push to `main` when `relay/**` changes (secret `CLOUDFLARE_API_TOKEN`). |
 | `DATA-SOURCES.md` | Reverse-engineered TradingView endpoints and their quirks. |
@@ -17,50 +18,48 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 
 ## Runtime architecture (index.html)
 
-**State** — `state` object persisted in `localStorage` key `tvwl.state.v2`:
-`{ activeListId, interval, symbol, pinned[], chartHidden, detailsOpen, panelWidth, lists:[{id,name,groups:[{name,collapsed,symbols[]}]}] }`.
-`seed()` builds the default lists; `load()` migrates stored symbols through `SYMBOL_FIXES` / `REMOVED` and fills `pinned` with `DEFAULT_PINS`. Bumping `KEY` resets everyone's state (last bump: v1→v2).
+**State** — `state` in `localStorage` key `tvwl.state.v2`: `{ activeListId, interval, symbol, view, sort, chartHidden, migrated[], lists:[{id, name, summary, groups:[{name, collapsed, symbols[]}]}] }`. `summary` is `true` (average of the list's equities), a symbol string (TR → `BIST:XU100`) or `false`. `seed()` builds the default lists; `load()` runs `SYMBOL_FIXES` / `REMOVED`, one-time migrations recorded in `migrated`, and drops keys of the previous design (pinned, details, history). Bumping `KEY` would reset everyone's lists.
 
-**Rendering** — `render()` rebuilds tabs, pinned ticker tape (`#pins`, chips) and the list (`#list`) from state; `update(switchSymbol)` = save + render (+ `showSymbol()`). One delegated `click` handler on `document` dispatches on `data-action` (select, remove, interval, toggle-group, add/rename/delete-group, list, pin/unpin, manage-lists, dlg-*, toggle-details, toggle-chart, toggle-panel). List rows use HTML5 drag & drop (reorder within/between groups; no touch support). List management lives in a `<dialog id="listDlg">`.
+**Layout** — mobile first. Phone: one pane at a time (`body[data-view]` = `list` / `chart`) behind a two-tab nav (Liste / Grafik). What you read is at the top, what you tap at the bottom:
+- Header `.top` (session-tinted: pre amber, open green, post blue, overnight purple): list name + sentiment % on the list pane, symbol + last + chg% on the chart pane (tap → search); session label; last tick time + status dot (tap → reconnect).
+- List pane: table (Symbol / Last / Chg% / Ext; Ext hidden during the regular session via `body.regular`), collapsible groups, then the dock: one chip per list with its sentiment % (tap → switch) and `+` (search/add), `⇅` (sort by Chg%), `⋯` (list manager).
+- Chart pane: TradingView widget, then the chart bar: `Search` button and the interval button (bottom sheet on phones, dropdown on desktop).
+- ≥768px: header shows both list and symbol status; list pane (420px) | chart side by side; nav hidden; header button hides the chart (`state.chartHidden`).
 
-**Chart** — TradingView Advanced Chart free widget (`tv.js`, `mountChart()`), mounted once. Symbol and interval changes go through the undocumented iframe postMessage API (`send('set-symbol'|'set-interval', …)`), so the chart never reloads; messages queue until the iframe's first message (`chart.ready`). The widget's `quoteUpdate` stream tells us which symbol the user picked inside the widget (`onChartSymbol`): if it is in the active list it gets highlighted, otherwise the add box is prefilled (`resolveSymbol()` maps the Cboe feed name `BATS_DLY:X` to the listing exchange via the scanner). `hide_side_toolbar: true`; top toolbar kept for symbol search.
+**Interactions** — one delegated `click` handler on `document` dispatches on `data-act`. Rows: tap → `selectSymbol()` (chart; phones switch to the chart pane). Press and hold 420 ms → the row lifts: release in place → actions sheet (`openRowMenu`: show on chart, move to group, copy to list, move to top, remove with undo toast); drag → reorder within/between groups (pointer events on `#rows`, a non-passive `touchmove` stops scrolling once lifted). Desktop also has a hover `⋯` button and right-click. Sorted view (`state.sort = 'chg'`): non-equities stay on top as "Index", the rest is one "By change" group by Chg%; drag is off. Sheets (`openSheet`/`closeSheet`) are bottom sheets on phones and centered dialogs on desktop: row actions, move/copy, interval, search (`openSearch`, input at the bottom on phones), list manager (`openListManager`: rename, ↑/↓, Σ sentiment on/off, delete with a second tap, new list).
 
-**Quotes pipeline** — `quotes[sym] = {p,c,e,ep,es,ss}` (last, chg%, ext chg%, ext price, session label, session dot) rendered by `quoteHtml()`; `raw[sym]` keeps every merged field for the details panel. Sources, in order:
-1. Websocket `WS_DIRECT` (direct) when on localhost, else `RELAY_WS` (Cloudflare relay). TradingView only accepts the handshake from localhost/tradingview.com origins, hence the relay. `wsConnect()/wsSync()/onQuote()`; partial `qsd` updates are merged. Subscribed set = pinned ∪ active list.
-2. If the socket never opens (`wsEverOpen` false after a retry) → `quoteSource='poll'`: `pollNow()` hits the scanner REST every `POLL_MS` (10 s); symbols the scanner lacks (broker CFDs like `SKILLING:US100`) get hidden mini chart widgets (`syncFeeders()`, max 4) that stream `quoteUpdate` after a `quoteSubscribe` postMessage. `?quotes=poll` forces this mode for testing.
-`renderQuotes()` is throttled (250 ms), patches cells in place and flashes changed ones (`.flash.f-up/f-down/f-same`). `onQuote` also stamps the top-bar tick time and pulses it (max every 1.5 s). Status dot: green live, red reconnecting, amber polling.
+**Chart** — TradingView Advanced Chart free widget (`mountChart()`), toolbars/legend/volume off, `sessionId: '24h'`. Symbol and interval changes go through the undocumented iframe postMessage API (`send('set-symbol'|'set-interval')`), so the chart never reloads; messages queue until the iframe's first message (`chart.ready`). A widget mounted while its pane has no size stays blank, so `chart.hiddenAtMount` triggers a remount when the pane shows (`setView`, resize). Free widget cannot chart BIST or plain indices (`noChart()`): those rows are quote-only.
 
-**Sessions** — `isRegularSession()` (09:30–16:00 ET Mon–Fri) hides the Ext column; `sessionPhase()` drives the top-bar badge (pre/open/post/overnight/closed). Outside regular hours Last shows the extended price (`rtc`), Ext shows `rchp` with a colored dot (amber pre, blue post, purple overnight). Overnight (20:00–04:00 ET) the primary quote has no extended price, so `wsSync()` also subscribes each US stock's `BOATS:<ticker>` twin and `onQuote` takes the overnight price from it (change vs the regular close); the twins are dropped when the phase ends. The sentiment chart's default "session" range starts at 04:00 (day) or 20:00 (overnight) ET.
+**Quotes** — `raw[sym]` holds merged websocket fields; `quotes[sym] = {p, c, e, ep, ss}` (last, chg%, extended chg%, extended price, session dot). Sources:
+1. Websocket: direct on localhost, `RELAY_WS` elsewhere (TradingView accepts the handshake only from allow-listed origins). Subscribed set = every symbol of every list (`allSymbols()`), so all chips show live sentiment. Watchdog: 30 s without any `qsd` while the socket is open → reconnect (the session can go silent while heartbeats continue).
+2. Overnight (20:00–04:00 ET): `wsSync()` also subscribes each US stock's `BOATS:<ticker>` twin; `onQuote` takes the overnight price from it and computes the change against the regular close. Dropped when the phase ends (`renderSession`).
+3. If the socket never opens → `quoteSource = 'poll'`: scanner REST every 10 s, hidden mini widgets (`syncFeeders`, max 4) for symbols the scanner lacks. `?quotes=poll` forces it.
+`renderQuotes()` (throttled 250 ms) patches cells in place with flash, refreshes chips and header; in sorted view it re-orders at most every 3 s and never under a finger or an open sheet. Outside regular hours Last shows the extended price and Ext the extended change with a colored dot (amber pre, blue post, purple overnight). Prices: 2 decimals ≥ 1, T/B above a billion, 4 significant digits below 1 (`fmtPrice`). Earnings within 7 days show a tag next to the ticker.
 
-**Details panel** — `renderDetails()` builds a quote sheet for `state.symbol` from `raw`; same-symbol updates are patched per `[data-k]` cell with flash; range bars for day and 52 weeks; stock-only "Company" block. Toggle persisted in `state.detailsOpen`.
+**PWA / iOS** — `fitStandalone()` drops the nav's home-indicator padding when iOS stops the web view short of the screen (`body.ios-gap`); `unshift()` snaps the document back after keyboard use (otherwise taps land off target); `trackKeyboard()` keeps bottom sheets above the keyboard (`--kb`).
 
-**Layout** — CSS is mobile-first: the base rules describe a phone, `@media (min-width: 768px)` lays the same pieces out side by side. Phone: two views behind a bottom nav (`body[data-mview]` = `lists` / `chart`). The lists view is the list panel with phone chrome: `#phead` (name, day %, breadth meter) on top, the table, then `#strip` (one chip per watchlist, tinted) and `#bbar` (Edit · + Symbol · ⋯) at the bottom, thumb side. Edit mode (`body.edit`, `editMode`) turns rows into a management surface: tap a row → options sheet (`openRowOpts`: move/copy, pin, top, details, remove with undo toast), drag the ≡ handle (pointer events on `#list`), group tools visible, action bar becomes + Group · Rename · 🗑 · Done. Sheets render into `#overlay`; the list manager `<dialog>` opens as a bottom sheet. Pinned tape on lists + chart, tabs bar on chart only, details as a full-screen sheet. Desktop: top bar (tabs, ⋯ lists, status, tick time, chart toggle) → tape → breadth → body: list panel (draggable width, persisted as `--panel-w`) | resizer | details | chart. The chart always carries a bottom **chart bar** (`#mbar`: symbol + company → opens the search palette; price, change, bar countdown; interval picker `#intervals` → bottom sheet on phones, dropdown on desktop). `@media (hover: hover)` holds hover-only affordances; on touch screens the selected row shows its tools.
-
-**Dev conveniences** — on localhost the page polls its own `Last-Modified` every second and reloads itself (live reload); off localhost this is inert.
+**Versioning** — `APP_VERSION` shows in the nav (phones) and header (desktop); bump it on every push to `main`. Off localhost the page re-fetches itself on load and on resume and reloads when the live version differs. On localhost/LAN it live-reloads on file change.
 
 ## Vocabulary
 
-The owner calls a watchlist's aggregate move **sentiment**: *sentiment yüzdesi* = the list's day % (`listValue`, from `summarySymbols`: equities only, TR → XU100, Krip → USDT pairs only); *sentiment grafiği* = its history sparkline (`sparkline`, ranges 1h / 4h / session / 24h); *sentiment bar'ı* = the breadth bar (`breadth`, one tick per symbol via `ticksHtml`).
+The owner calls a watchlist's aggregate move **sentiment**: *sentiment yüzdesi* = the list's day % (`listValue`, from `summarySymbols`: equities only, TR → XU100, Krip → USDT pairs only; outside regular hours it uses the extended move). The sentiment chart and sentiment bar of earlier versions were dropped in the 1.0 redesign.
 
 ## Development workflow
 
-- Dev server: `.claude/launch.json` in `~/workspace/comeon` has `tv-watchlist` → `python3 -m http.server 8787 --directory ~/workspace/orhan/tv-watchlist`; open http://localhost:8787/. Any static server works.
-- Branching: work on `dev`, open a PR `dev → main`; `main` is what Pages serves. No `gh` CLI on this machine; PRs via the GitHub API with the token in macOS Keychain (`github.com`, user `arikanorh`). The repo-local git identity is `arikanorh@users.noreply.github.com` (work GHE identity is global, keep them separate).
+- Dev server: `.claude/launch.json` in `~/workspace/comeon` has `tv-watchlist` → `python3 -m http.server 8787 --directory ~/workspace/orhan/tv-watchlist`; open http://localhost:8787/ (LAN: http://192.168.1.89:8787/). Any static server works.
+- Work on `main` (push only when the owner says so). No `gh` CLI; PRs via the GitHub API with the token in macOS Keychain (`github.com`, user `arikanorh`). Repo-local git identity `arikanorh@users.noreply.github.com`.
 - Relay deploy is automatic from Actions; manual: `cd relay && CLOUDFLARE_API_TOKEN=… npx wrangler@4 deploy`. Add new page origins to `ALLOWED_ORIGINS` in `worker.js`.
-- Verify in the browser after UI changes (desktop + mobile preset); check `quoteSource`, `ws.readyState`, `Object.keys(quotes).length`, console errors.
+- Verify in the browser after UI changes, at phone width too (an iframe harness works when the pane can't be resized); check `quoteSource`, `ws.readyState`, `Object.keys(quotes).length`, console errors.
 
 ## Constraints and decisions
 
-- Single file, no framework, no backend, no build step. Keep it that way.
-- Mobile-first: small-screen usability wins.
+- Single file, no framework, no backend, no build step.
+- Mobile first; information at the top, interaction at the bottom.
 - Nothing may depend on the user's logged-in TradingView account. Only on an explicit "listeleri güncelle" request: read `GET /api/v1/symbols_list/custom/` from a TradingView tab the user opened, snapshot to `reference/`, update `seed()`.
-- The chart widget is official; the websocket, scanner and iframe postMessage API are reverse-engineered and may break without notice. Keep the polling fallback working.
-- Free widget cannot chart BIST symbols or plain indices like `NASDAQ:NDX` / `SP:SPX` (removed; the pinned CFDs `SKILLING:US100` / `SKILLING:SPX500` cover them).
+- The chart widget is official; the websocket, scanner, symbol search and iframe postMessage API are reverse-engineered and may break without notice. Keep the polling fallback working.
 - Replies to the user in Turkish with English technical terms; terse progress updates.
 
 ## Known gaps / ideas
 
-- Symbol search endpoint is origin-locked to tradingview.com (403 elsewhere); the scanner `name match` filter could power an autocomplete.
+- Groups can be collapsed and symbols moved between them, but groups themselves can't be created, renamed or deleted in the app (not requested in the 1.0 redesign).
 - `OANDA:XAUEUR`, `FX_IDC:XAUTRYG`, `INDEX:S5FI` have no scanner data (websocket covers them).
-- Touch drag & drop for reordering on phones.
-- Column picker for extra fields (volume, 1W, 52W, market cap) is a natural next step; the websocket already delivers them.

@@ -12,602 +12,327 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Watchlist</title>
 <style>
-  /* Mobile-first: the base rules describe a phone (three stacked views behind a bottom nav);
-     `@media (min-width: 768px)` lays the same pieces out side by side for tablets and desktops. */
+  /* Mobile first. Phone: one pane at a time (list or chart) behind a two-tab nav; what you read sits at the top
+     (header), what you tap sits at the bottom (dock, chart bar, nav, sheets). ≥768px: list | chart side by side. */
   :root {
-    --bg: #131722; --bg2: #1e222d; --bg3: #2a2e39; --border: #2a2e39;
+    --bg: #131722; --bg2: #1e222d; --bg3: #2a2e39; --line: #2a2e39;
     --text: #d1d4dc; --muted: #787b86; --accent: #2962ff; --accent-bg: #1c2a52;
-    --up: #089981; --down: #f23645; --warn: #f7a600;
-    --nav-h: 50px; --safe-b: env(safe-area-inset-bottom, 0px);
+    --up: #089981; --down: #f23645; --pre: #f7a600; --post: #4f8cff; --night: #b06cff;
+    --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+    --nav-h: 52px;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent; padding-top: var(--safe-t); }
+  @media (display-mode: standalone) { body { position: fixed; inset: 0; height: auto; } }
+  /* iOS home-screen apps can stop the web view short of the screen bottom; the native strip below is painted with the
+     manifest background_color (= nav color) and any root canvas that shows matches it too. */
+  @media (max-width: 767.98px) { html { background: var(--bg2); } body { background: var(--bg); } }
+  button, input { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; cursor: pointer; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; overscroll-behavior: none;
-    -webkit-tap-highlight-color: transparent; padding-top: env(safe-area-inset-top, 0px); }
-  @media (display-mode: standalone) { body { position: fixed; inset: 0; height: auto; } }
-  /* iOS home-screen apps can stop the page short of the screen bottom (see fitStandalone()); the nav then needs no
-     home-indicator padding, and any root canvas that shows is painted in the nav's color. */
-  body.ios-gap .mnav { padding-bottom: 0; }
-  @media (max-width: 767.98px) { html { background: var(--bg2); } body { background: var(--bg); } }
-  button, input, select { font: inherit; color: inherit; }
-  button { background: none; border: 0; cursor: pointer; padding: 0; }
-  input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; }
-  .num { font-variant-numeric: tabular-nums; }
+  svg { display: block; }
   .up { color: var(--up); } .down { color: var(--down); }
 
-  /* ---------- Top bar: watchlist tabs + feed status (chart view on phones, always on desktop) ---------- */
-  .bar { display: none; align-items: center; gap: 6px; padding: 4px 8px; min-width: 0;
-    border-bottom: 1px solid var(--border); background: var(--bg2); }
-  body[data-mview="chart"] .bar { display: flex; }
-  .bar [data-action="manage-lists"], .bar #chartToggle { display: none; }
-  body.sess-open .bar { background: rgba(8, 153, 129, .16); }
-  body.sess-pre .bar { background: rgba(247, 166, 0, .16); }
-  body.sess-post .bar { background: rgba(79, 140, 255, .16); }
-  body.sess-night .bar { background: rgba(176, 108, 255, .16); }
-  .tabs { display: flex; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 8px; white-space: nowrap;
-    color: var(--muted); font-weight: 500; }
-  .tab.on { background: var(--bg3); color: #fff; }
-  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 400; font-variant-numeric: tabular-nums; }
-  .badge:empty { display: none; }
-  .badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-  .badge.up i { background: var(--up); } .badge.down i { background: var(--down); }
-  .icon { width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
-    color: var(--muted); font-size: 15px; flex-shrink: 0; }
-  .spacer { flex: 1; }
-  .status { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; flex-shrink: 0; }
-  .status.live { background: var(--up); } .status.off { background: var(--down); } .status.poll { background: var(--warn); }
-  .upd { white-space: nowrap; font-size: 13px; font-weight: 500; color: var(--muted); padding: 6px 10px; border-radius: 8px; font-variant-numeric: tabular-nums; }
-  .upd.err { color: var(--down); }
-  .upd.pulse { animation: pulse .6s ease-out; }
-  @keyframes pulse { 0% { color: var(--text); background: var(--accent-bg); } 100% { color: var(--muted); background: transparent; } }
-  #chartToggle svg { display: block; }
-  #chartToggle .i-show, #chartToggle.off .i-hide { display: none; }
-  #chartToggle.off .i-show { display: block; }
+  /* ---------- Header: list status (list pane) / symbol status (chart pane), session tint, feed status ---------- */
+  .top { flex-shrink: 0; display: flex; align-items: center; gap: 12px; height: 54px; padding: 0 14px; min-width: 0;
+    background: var(--bg2); border-bottom: 1px solid var(--line); }
+  body.sess-open .top { background: #18302e; }  body.sess-pre .top { background: #2e2a24; }
+  body.sess-post .top { background: #1d2740; } body.sess-night .top { background: #272140; }
+  .hl, .hs { display: flex; align-items: baseline; gap: 10px; min-width: 0; font-variant-numeric: tabular-nums; }
+  .hl b, .hs b { font-size: 20px; font-weight: 700; white-space: nowrap; }
+  .hl .v { font-size: 17px; font-weight: 600; }
+  .hs { text-align: left; }
+  .hs .px { font-size: 17px; font-weight: 600; white-space: nowrap; }
+  .hs .chg { font-size: 14px; white-space: nowrap; }
+  .hs .d { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .sp { flex: 1; }
+  .sess { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .sess i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  body.sess-open .sess i { background: var(--up); } body.sess-pre .sess i { background: var(--pre); }
+  body.sess-post .sess i { background: var(--post); } body.sess-night .sess i { background: var(--night); }
+  .tick { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 2px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tick .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .tick .dot.live { background: var(--up); } .tick .dot.off { background: var(--down); } .tick .dot.poll { background: var(--pre); }
+  .tick.pulse span { animation: pulse .6s ease-out; }
+  @keyframes pulse { 0% { color: var(--text); } 100% { color: var(--muted); } }
+  .hbtn { display: none; width: 34px; height: 34px; border-radius: 8px; align-items: center; justify-content: center; color: var(--muted); }
+  .hbtn svg { width: 18px; height: 18px; }
+  .hver { display: none; font-size: 11px; color: var(--muted); }
+  /* phones: the header follows the pane on screen */
+  .hs { display: none; }
+  body[data-view="chart"] .hl { display: none; }
+  body[data-view="chart"] .hs { display: flex; }
+  @media (max-width: 380px) { .sess span { display: none; } }
 
-  /* ---------- Pinned tape (lists + chart views on phones, always on desktop) ---------- */
-  .taperow { display: none; align-items: center; background: var(--bg2); border-bottom: 1px solid var(--border); }
-  body[data-mview="lists"] .taperow, body[data-mview="chart"] .taperow { display: flex; }
-  .tape { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 4px 8px; overflow-x: auto; scrollbar-width: none; font-variant-numeric: tabular-nums; }
-  .tape::-webkit-scrollbar { display: none; }
-  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 8px; white-space: nowrap;
-    color: var(--text); flex-shrink: 0; line-height: 1.1; }
-  .chip.on { box-shadow: inset 0 0 0 1px var(--accent); }
-  .chip .sym { font-weight: 600; font-size: 12px; }
-  .chip .sym small { font-weight: 400; font-size: 9px; color: var(--muted); margin-left: 3px; }
-  .chip .q { display: flex; align-items: baseline; gap: 4px; }
-  .chip .px { display: none; font-size: 12px; }
-  .chip .chg { font-size: 11px; }
-  .chip .ext, .chip .px:empty, .chip .chg:empty { display: none; }
-  .chip .x { display: none; color: var(--muted); font-size: 13px; }
-  .chip.nochart, .row.nochart { cursor: default; }
-  .chip.nochart .sym, .row.nochart .sym { color: var(--muted); font-weight: 500; }
-  .chip.s-up-1 { background: rgba(8, 153, 129, .12); } .chip.s-up-2 { background: rgba(8, 153, 129, .24); }
-  .chip.s-up-3 { background: rgba(8, 153, 129, .40); } .chip.s-up-4 { background: rgba(8, 153, 129, .60); }
-  .chip.s-down-1 { background: rgba(242, 54, 69, .12); } .chip.s-down-2 { background: rgba(242, 54, 69, .24); }
-  .chip.s-down-3 { background: rgba(242, 54, 69, .40); } .chip.s-down-4 { background: rgba(242, 54, 69, .60); }
-  .chip[class*="s-up-"] .px, .chip[class*="s-up-"] .chg, .chip[class*="s-down-"] .px, .chip[class*="s-down-"] .chg { color: var(--text); }
+  /* ---------- Panes ---------- */
+  .main { flex: 1; min-height: 0; display: flex; }
+  .pane { display: none; flex-direction: column; min-width: 0; min-height: 0; flex: 1; }
+  body[data-view="list"] .listpane, body[data-view="chart"] .chartpane { display: flex; }
 
-  /* ---------- Breadth summary + sparkline (desktop only) ---------- */
-  .breadth { display: none; align-items: center; gap: 12px; padding: 5px 10px; font-size: 12px; color: var(--muted);
-    font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--border); background: var(--bg2); }
-  .breadth:empty { display: none; }
-  .breadth .meter { flex: 1; min-width: 0; height: 6px; display: grid; border-radius: 3px; overflow: hidden; background: var(--bg3); }
-  .breadth .meter .t-d4 { background: rgba(242, 54, 69, 1); }   .breadth .meter .t-d3 { background: rgba(242, 54, 69, .72); }
-  .breadth .meter .t-d2 { background: rgba(242, 54, 69, .48); } .breadth .meter .t-d1 { background: rgba(242, 54, 69, .28); }
-  .breadth .meter .t-0 { background: var(--bg3); }
-  .breadth .meter .t-u1 { background: rgba(8, 153, 129, .28); } .breadth .meter .t-u2 { background: rgba(8, 153, 129, .48); }
-  .breadth .meter .t-u3 { background: rgba(8, 153, 129, .72); } .breadth .meter .t-u4 { background: rgba(8, 153, 129, 1); }
-  .breadth .stat { white-space: nowrap; flex-shrink: 0; }
-  .breadth .stat b { font-weight: 600; color: var(--text); }
-  .breadth .srange { font-size: 10px; color: var(--muted); flex-shrink: 0; cursor: pointer; }
-  .spark { display: block; width: 200px; height: 36px; cursor: pointer; flex-shrink: 0; }
-  .spark .lbl { font-size: 7px; fill: var(--muted); }
-  .spark .zero { stroke: var(--muted); stroke-opacity: .5; stroke-dasharray: 2 2; }
-  .spark .line { fill: none; stroke-width: 1.5; }
-  .spark .area { opacity: .18; }
-  .spark .up { stroke: var(--up); } .spark .down { stroke: var(--down); }
-  .spark .area.up { fill: var(--up); } .spark .area.down { fill: var(--down); }
-  .spark .dot { fill: var(--text); stroke: var(--bg); stroke-width: 1; }
-  .stip { position: fixed; z-index: 20; pointer-events: none; background: var(--bg3); color: var(--text); border: 1px solid var(--border);
-    border-radius: 6px; padding: 4px 8px; font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
-  .stip b { font-weight: 600; }
-  .tpop { position: fixed; z-index: 20; pointer-events: none; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
-    padding: 6px 8px 4px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
-  .tpop .t { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
-
-  /* ---------- Views: one of lists / list / chart on screen, picked by the bottom nav ---------- */
-  .body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-  .panel, .details, .chart, .resizer { display: none; }
-  body[data-mview="lists"] .panel { display: flex; }
-  body[data-mview="chart"] .chart { display: flex; }
-  /* Symbol details: full-screen sheet above the current view, closed with its × */
-  body.details-open .details { display: flex; flex-direction: column; position: fixed; left: 0; right: 0; top: 0; z-index: 50;
-    bottom: calc(var(--nav-h) + max(0px, calc(var(--safe-b) - 12px))); }
-  .mnav { position: relative; flex-shrink: 0; display: grid; grid-template-columns: repeat(2, 1fr);
-    background: var(--bg2); border-top: 1px solid var(--border);
-    /* clear the home indicator, but not the full inset: the buttons sit low, like native tab bars */
-    padding-bottom: max(0px, calc(var(--safe-b) - 12px)); }
-  .mnav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: var(--nav-h);
-    color: var(--muted); font-size: 10px; }
-  .mnav button svg { width: 20px; height: 20px; }
-  .mnav button.on { color: var(--text); }
-  .mnav button.on svg { color: var(--accent); }
-  .mnav .ver { position: absolute; right: 6px; bottom: 3px; font-size: 9px; color: var(--muted); opacity: .7; pointer-events: none; }
-
-  /* ---------- Lists view (phones): what you read sits at the top, what you tap at the bottom ---------- */
-  .phead { flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; padding: 6px 12px 6px; }
-  .phead .pinfo { min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 0 8px; align-items: baseline; }   /* left: the list */
-  .phead .hist { min-width: 0; display: flex; justify-content: center; }                                               /* right: its day */
-  .phead .spark { width: 100%; height: 40px; }   /* sentiment history; tap to cycle 1h / 4h / open / 24h */
-  .phead .hist { position: relative; }
-  .phead .srange { position: absolute; right: 0; top: -2px; font-size: 10px; color: var(--muted); pointer-events: none; }
-  .phead b { font-size: 20px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .phead .big { font-size: 18px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
-  /* Breadth ticks: one segment per ticker, sorted worst → best, tinted by its sentiment tier (head + list chips) */
-  .ticks { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
-  .ticks i { border-radius: 1px; background: var(--bg3); }
-  .ticks .t-d4 { background: rgba(242, 54, 69, 1); }   .ticks .t-d3 { background: rgba(242, 54, 69, .72); }
-  .ticks .t-d2 { background: rgba(242, 54, 69, .48); } .ticks .t-d1 { background: rgba(242, 54, 69, .28); }
-  .ticks .t-u1 { background: rgba(8, 153, 129, .28); } .ticks .t-u2 { background: rgba(8, 153, 129, .48); }
-  .ticks .t-u3 { background: rgba(8, 153, 129, .72); } .ticks .t-u4 { background: rgba(8, 153, 129, 1); }
-  .phead .meter { grid-column: 1 / -1; height: 5px; margin-top: 6px; }
-  .lchip .mm { width: 100%; height: 3px; margin-top: 4px; display: grid; gap: 0; border-radius: 2px; overflow: hidden; }
-  .lchip .mm .d { background: var(--down); } .lchip .mm .f { background: rgba(255, 255, 255, .18); } .lchip .mm .u { background: var(--up); }
-  .phead .hint { grid-column: 1 / -1; margin-top: 6px; font-size: 12px; color: var(--accent); }
-  .strip { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg2); }
-  .strip .chips { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-  .strip .chips::-webkit-scrollbar { display: none; }
-  .lchip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 72px; padding: 6px 12px 7px; border-radius: 12px;
-    background: var(--bg3); color: var(--muted); border: 1px solid transparent; }
-  .lchip b { font-size: 14px; font-weight: 600; color: var(--text); }
-  .lchip small { font-size: 11px; font-variant-numeric: tabular-nums; }
-  .lchip.on { border-color: var(--accent); background: var(--accent-bg); }
-  .lchip[class*="s-up-"] { background: rgba(8, 153, 129, .22); } .lchip[class*="s-down-"] { background: rgba(242, 54, 69, .22); }
-  .lchip.on[class*="s-"] { border-color: var(--text); }
-  .lchip.add { align-items: center; justify-content: center; min-width: 44px; font-size: 20px; background: none; border: 1px dashed var(--bg3); }
-  /* Actions ride at the right end of the strip (sticky, so they stay put while the chips scroll) */
-  .strip .acts { flex: none; display: flex; gap: 6px; padding-left: 8px; border-left: 1px solid var(--border); }
-  .strip .acts .pill { height: 40px; padding: 0 12px; font-size: 14px; }
-  .strip .acts .pill.sq { width: 40px; }
-  .bbar { flex-shrink: 0; display: none; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg2); }
-  body.edit .bbar { display: flex; }
-  /* The strip stays hidden; tapping the active "Liste" nav tab again toggles it (body.strip-open) */
-  .strip { display: none; }
-  body.strip-open:not(.edit) .strip { display: flex; }
-  .pill { flex: 1; height: 40px; padding: 0 14px; border-radius: 10px; background: var(--bg3); color: var(--text); font-size: 15px; font-weight: 600;
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
-  .pill.primary { background: var(--accent); color: #fff; }
-  .pill.danger { color: var(--down); }
-  .pill.sq { flex: none; width: 44px; padding: 0; font-size: 20px; }
-  .pill.on { background: var(--accent-bg); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-  .toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + 108px); transform: translateX(-50%); z-index: 60; display: flex; gap: 14px; align-items: center;
-    padding: 10px 16px; border-radius: 10px; background: var(--bg3); color: var(--text); font-size: 14px; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
-  .toast button { color: var(--accent); font-weight: 600; }
-  /* Sheets (row options, move to group) */
-  .overlay[hidden] { display: none; }
-  .overlay .backdrop { position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, .5); }
-  .overlay .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 56; max-height: 80%; display: flex; flex-direction: column; background: var(--bg2);
-    border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.5); padding-bottom: max(8px, var(--safe-b)); }
-  .overlay .sheet::before { content: ''; flex-shrink: 0; width: 36px; height: 4px; border-radius: 2px; background: var(--bg3); margin: 10px auto 4px; }
-  .overlay h3 { margin: 4px 16px 8px; font-size: 16px; }
-  .overlay .sbody { min-height: 0; overflow-y: auto; }
-  .overlay .opt { display: flex; align-items: center; gap: 10px; width: 100%; height: 48px; padding: 0 16px; border-top: 1px solid var(--border); font-size: 16px; text-align: left; color: var(--text); }
-  .overlay .opt.on { color: var(--accent); }
-  .overlay .opt.danger { color: var(--down); }
-  .overlay .opt .c { margin-left: auto; font-size: 12px; color: var(--muted); }
-  /* List manager dialog opens as a bottom sheet on phones */
-  #listDlg { position: fixed; margin: 0; left: 0; right: 0; top: auto; bottom: 0; width: 100%; max-width: none; max-height: 85%; border: 0; border-radius: 16px 16px 0 0;
-    padding-bottom: max(8px, var(--safe-b)); }
-  #listDlg .dlg-row { height: 50px; }
-  #listDlg .dlg-row input { font-size: 16px; }
-  #listDlg .dlg-row .icon { width: 36px; height: 36px; }
-
-  /* ---------- List view: the active watchlist ---------- */
-  .panel { flex: 1; flex-direction: column; min-height: 0; min-width: 0; background: var(--bg); }
-  .list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .cols, .row { display: grid; grid-template-columns: 1fr 84px 64px 70px; gap: 6px; align-items: center; padding: 0 12px; }
-  .cols { height: 32px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  /* List table */
+  .cols, .row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 72px 76px; gap: 8px; align-items: center; padding: 0 14px; }
+  body.regular .cols, body.regular .row { grid-template-columns: minmax(0, 1fr) 96px 72px; }
+  body.regular .cols .x, body.regular .row .ext { display: none; }
+  .cols { flex-shrink: 0; height: 30px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
   .cols span:not(:first-child) { text-align: right; }
-  .cols .sortable { cursor: pointer; }
-  body.sorted .cols .sortable { color: var(--accent); }
-  body.sorted .cols .sortable::after { content: ' ▾'; }
-  .row { height: 44px; cursor: pointer; font-size: 15px; font-variant-numeric: tabular-nums; position: relative;
-    border-left: 2px solid transparent; }
-  .row.on { background: var(--accent-bg); border-left-color: var(--accent); }
-  .row .sym { display: flex; align-items: center; gap: 4px; font-weight: 600; min-width: 0; }
-  .row .sym .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row .q { display: contents; }
-  .row .px, .row .chg, .row .ext { text-align: right; }
-  .row .ext { font-size: 13px; display: flex; align-items: center; justify-content: flex-end; }
-  .row .ext .v { min-width: 50px; text-align: right; }
-  .row .px:empty::before, .row .chg:empty::before, .row .ext:empty::before { content: '–'; color: var(--muted); }
-  .panel.no-ext .cols, .panel.no-ext .row { grid-template-columns: 1fr 84px 64px; }
-  .panel.no-ext .cols span:last-child, .panel.no-ext .ext { display: none; }
-  /* Chg% text on one scale: full red (≥5 % down) → neutral text (< 0.5 %) → full green (≥5 % up); solid colors, no opacity. */
-  .row .chg.up, .row .chg.down { color: var(--text); }
-  /* c-* tiers come from the Chg% value itself; s-* (row sentiment) may follow the extended move outside regular hours */
-  .row.c-down-1 .chg { color: #d9adb6; } .row.c-down-2 .chg { color: #e28591; } .row.c-down-3 .chg { color: #ea5e6b; font-weight: 600; } .row.c-down-4 .chg { color: #f23645; font-weight: 700; }
-  .row.c-up-1 .chg { color: #9fc5c5; }   .row.c-up-2 .chg { color: #6db7af; }   .row.c-up-3 .chg { color: #3aa898; font-weight: 600; }   .row.c-up-4 .chg { color: #089981; font-weight: 700; }
-  /* Big moves tint the whole row: ≥5 % light, ≥10 % stronger */
-  .row.s-down-4 { background: rgba(242, 54, 69, .10); } .row.s-up-4 { background: rgba(8, 153, 129, .10); }
-  .row.x-down { background: rgba(242, 54, 69, .24); }   .row.x-up { background: rgba(8, 153, 129, .24); }
-  .row.s-down-4.on, .row.x-down.on { background: rgba(242, 54, 69, .34); } .row.s-up-4.on, .row.x-up.on { background: rgba(8, 153, 129, .34); }
-  .ss { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
-  .ss.pre { background: var(--warn); } .ss.post { background: #4f8cff; } .ss.night { background: #b06cff; }
-  /* Row tools: star / info / remove. Hidden until hover on desktop; on the selected row on touch screens. */
-  .row .icon { width: 24px; height: 24px; font-size: 13px; opacity: 0; background: transparent; }
-  @media (hover: none) { .row.on .icon.star { opacity: 1; } }
-  /* Swipe-to-reveal (phones): the row slides left over two actions */
-  .rowwrap { position: relative; overflow: hidden; }
-  .row { position: relative; z-index: 1; background: var(--bg); touch-action: pan-y; transition: transform .18s ease-out; }
-  .rowwrap.open .row { transform: translateX(-140px); }
-  .racts { position: absolute; top: 0; bottom: 0; right: 0; display: flex; visibility: hidden; }
-  .rowwrap.open .racts, .rowwrap.swiping .racts { visibility: visible; }
-  .racts button { width: 70px; color: #fff; font-size: 13px; font-weight: 600; background: var(--bg3); }
-  .racts .rm { background: var(--down); }
-  /* info / remove sit at the right end of the symbol cell on phones (same grid row, so the row stays one line); desktop pins them to the row's right edge */
-  .row .sym { grid-row: 1; grid-column: 1; }
-  .row .icon.info, .row .icon.rm { grid-row: 1; grid-column: 1; justify-self: end; align-self: center; background: var(--bg3); }
-  @media (hover: none) and (max-width: 767.98px) { .row .icon.info { display: none; } body:not(.edit) .row .icon.rm { display: none; } }
-  .row .icon.info { margin-right: 30px; }
-  .row .icon.info { font: italic 600 11px Georgia, serif; }
-  .row .icon.star.on { opacity: 1; color: var(--warn); background: transparent; }
-  .earn { flex-shrink: 0; font-size: 9px; font-weight: 600; line-height: 1; padding: 2px 4px; border-radius: 3px;
-    color: var(--warn); border: 1px solid rgba(247, 166, 0, .55); letter-spacing: .02em; }
-  .earn.soon { background: var(--warn); color: var(--bg); border-color: var(--warn); }
-  .row.dragging { opacity: .4; }
+  .rows { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .row { position: relative; height: 48px; border-bottom: 1px solid rgba(42, 46, 57, .55); cursor: pointer; font-variant-numeric: tabular-nums;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; background: var(--bg); transition: transform .12s, box-shadow .12s; }
+  .row.on { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }
+  .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .row .sym b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.nochart .sym b { color: var(--muted); font-weight: 500; }
+  .row .px, .row .chg, .row .ext { text-align: right; white-space: nowrap; }
+  .row .ext { display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 13px; }
+  .ss { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .ss.pre { background: var(--pre); } .ss.post { background: var(--post); } .ss.night { background: var(--night); }
+  .earn { flex-shrink: 0; font-style: normal; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 5px; border-radius: 4px;
+    color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
+  .earn.soon { background: var(--pre); color: var(--bg); }
+  .row .more { display: none; }
+  .row.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); transform: scale(1.015); z-index: 3; }
+  .row.dragging { opacity: .55; }
   .row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
-  .gtab.drop-into { box-shadow: inset 0 0 0 1px var(--accent); }
-  .group { border-top: 1px solid var(--border); }
-  .gtab { position: relative; display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 12px;
-    background: var(--bg3); cursor: pointer; user-select: none; font-size: 11px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text); }
-  .gtab .chev { color: var(--muted); font-size: 9px; transition: transform .15s; }
-  .group.collapsed .chev { transform: rotate(-90deg); }
-  .gname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .gtools { display: flex; gap: 2px; opacity: .6; }
-  .gtools .icon { width: 24px; height: 24px; font-size: 12px; }
-  .gcount { padding: 8px 12px; font-size: 12px; color: var(--muted); }
-  .empty { padding: 20px 12px; color: var(--muted); text-align: center; }
-  .flash { animation: cell .9s ease-out; border-radius: 3px; }
+  .row.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+  .gh { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px; background: var(--bg3);
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .gh .chev { color: var(--muted); font-size: 9px; transition: transform .15s; }
+  .gh.collapsed .chev { transform: rotate(-90deg); }
+  .gh .gc { margin-left: auto; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+  .gh.static { cursor: default; }
+  .gh.drop-into { box-shadow: inset 0 0 0 1px var(--accent); }
+  .flash { animation: flash .9s ease-out; border-radius: 3px; }
   .f-up { --fl: rgba(8, 153, 129, .45); } .f-down { --fl: rgba(242, 54, 69, .45); } .f-same { --fl: rgba(41, 98, 255, .35); }
-  @keyframes cell { 0% { background: var(--fl); } 100% { background: transparent; } }
-  /* End-of-day summary card */
-  /* Selected symbol strip under the list (+ add when it is not in this list) */
-  .selbar { display: none; grid-template-columns: auto 1fr auto; gap: 0 10px; align-items: center; padding: 8px 12px;
-    border-top: 1px solid var(--border); background: var(--bg2); }
-  .selbar:empty { display: none; }
-  .selbar .ssym { font-weight: 700; font-size: 16px; }
-  .selbar .ssym small { font-size: 10px; font-weight: 400; color: var(--muted); margin-left: 4px; }
-  .selbar .sdesc { min-width: 0; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .selbar .q { display: flex; align-items: baseline; gap: 8px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
-  .selbar .q .px { font-size: 17px; font-weight: 600; }
-  .selbar .q .chg { font-size: 13px; font-weight: 500; }
-  .selbar .q .ext { display: none; }
-  .selbar .sadd { grid-column: 1 / -1; justify-self: stretch; margin-top: 6px; background: var(--accent); color: #fff; border-radius: 8px;
-    padding: 8px 10px; font-size: 13px; font-weight: 500; }
-  .add { display: none; }   /* legacy add box; the palette and the chart sheet add symbols now */
+  @keyframes flash { 0% { background: var(--fl); } 100% { background: transparent; } }
+  .empty { padding: 32px 20px; color: var(--muted); text-align: center; }
 
-  /* ---------- Chart view: widget + chart bar (symbol · price · countdown · interval) ---------- */
-  .chart { flex-direction: column; flex: 1; min-width: 0; min-height: 0; position: relative; }
+  /* Dock: every list with its sentiment %, then add / sort / lists */
+  .dock { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg2); border-top: 1px solid var(--line); }
+  .chips { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 66px; padding: 6px 12px; border-radius: 12px;
+    background: var(--bg3); border: 1px solid transparent; text-align: left; }
+  .chip b { font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .chip small { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .chip small.up { color: var(--up); } .chip small.down { color: var(--down); }
+  .chip.on { border-color: var(--accent); background: var(--accent-bg); }
+  .acts { flex: none; display: flex; gap: 6px; padding-left: 8px; border-left: 1px solid var(--line); }
+  .ib { width: 44px; height: 44px; border-radius: 12px; background: var(--bg3); display: flex; align-items: center; justify-content: center; color: var(--text); flex-shrink: 0; }
+  .ib svg { width: 20px; height: 20px; }
+  .ib.primary { background: var(--accent); color: #fff; }
+  .ib.on { background: var(--accent-bg); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+  /* Chart pane */
+  .chartpane { position: relative; }
   #tv_chart { position: relative; flex: 1; min-height: 0; }
-  .mbar { position: relative; z-index: 41; display: flex; align-items: stretch; flex-shrink: 0; height: 48px;
-    border-top: 1px solid var(--border); background: var(--bg2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .mbar .msym { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; padding: 0 12px 0 14px;
-    font-size: 19px; font-weight: 700; color: var(--text); text-align: left; }
-  .mbar .msym small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 500; color: var(--muted); }
-  .mbar .mbt { display: flex; align-items: baseline; gap: 10px; align-self: center; padding-right: 12px; }
-  .mbar .px { font-size: 19px; font-weight: 600; }
-  .mbar .chg { font-size: 15px; }
-  .mbar .cd { font-size: 15px; color: var(--muted); }
-  .mbar .cd b { color: var(--text); font-weight: 600; }
-  .mbar .cd b.soon { color: var(--warn); }
-  .ivsel { position: static; display: flex; flex-shrink: 0; }
-  .ivbtn { display: inline-flex; align-items: center; height: 100%; padding: 0 14px; font-size: 15px; font-weight: 600;
-    font-variant-numeric: tabular-nums; color: var(--text); background: var(--bg3); border-left: 1px solid var(--border); }
-  /* Interval picker: a bottom sheet above the chart bar */
-  .ivmenu { position: absolute; left: 0; right: 0; bottom: 100%; z-index: 40; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-    padding: 14px 16px 16px; background: var(--bg2); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
-    box-shadow: 0 -10px 30px rgba(0,0,0,.5); }
-  .ivmenu[hidden] { display: none; }
-  .ivmenu::before { content: ''; grid-column: 1 / -1; justify-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--bg3); margin-bottom: 2px; }
-  .ivmenu button { padding: 14px 0; border-radius: 8px; font-size: 16px; font-weight: 600; color: var(--muted); background: var(--bg); }
-  .ivmenu button.on { color: #fff; background: var(--accent); }
-  .ivbackdrop { position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, .45); }
-  .ivbackdrop[hidden] { display: none; }
+  .cbar { position: relative; flex-shrink: 0; display: flex; gap: 8px; padding: 8px 10px; background: var(--bg2); border-top: 1px solid var(--line); }
+  .sbtn { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 12px; background: var(--bg3); color: var(--muted); }
+  .sbtn svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .sbtn b { color: var(--text); font-weight: 600; }
+  .ivbtn { flex: none; min-width: 64px; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg3); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ivmenu { display: none; }
+
+  /* Bottom nav (phones) */
+  .nav { position: relative; flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; background: var(--bg2); border-top: 1px solid var(--line);
+    padding-bottom: max(0px, calc(var(--safe-b) - 12px)); }
+  body.ios-gap .nav { padding-bottom: 0; }
+  .nav button { height: var(--nav-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--muted); }
+  .nav button svg { width: 21px; height: 21px; }
+  .nav button.on { color: var(--text); } .nav button.on svg { color: var(--accent); }
+  .nav .ver { position: absolute; right: 8px; bottom: 4px; font-size: 9px; color: var(--muted); opacity: .7; pointer-events: none; }
+
+  /* Sheets: bottom sheet on phones, centered dialog on desktop */
+  .scrim { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .5); }
+  .sheet { position: fixed; left: 0; right: 0; bottom: var(--kb, 0px); z-index: 51; max-height: calc(88% - var(--kb, 0px)); display: flex; flex-direction: column;
+    background: var(--bg2); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, .5); padding-bottom: max(8px, var(--safe-b)); }
+  body.kb .sheet { padding-bottom: 8px; }
+  .sheet::before { content: ''; flex-shrink: 0; width: 36px; height: 4px; border-radius: 2px; background: var(--bg3); margin: 10px auto 4px; }
+  .sh-title { flex-shrink: 0; padding: 4px 16px 10px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .sh-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+  .sh-foot { flex-shrink: 0; padding: 8px 12px 0; }
+  .sh-foot button { width: 100%; height: 46px; border-radius: 12px; background: var(--bg3); font-weight: 600; }
+  .opt { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 0 16px; border-top: 1px solid var(--line); text-align: left; font-size: 16px; flex-shrink: 0; }
+  .opt .c { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .opt.on { color: var(--accent); } .opt.danger { color: var(--down); }
+  .ivgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 4px 16px 8px; }
+  .ivgrid button { height: 48px; border-radius: 10px; background: var(--bg); font-size: 16px; font-weight: 600; color: var(--muted); }
+  .ivgrid button.on { background: var(--accent); color: #fff; }
+  /* search */
+  .sres { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .sr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 9px 12px 9px 16px; border-top: 1px solid var(--line); cursor: pointer; }
+  .sr .s { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .sr .s b { font-weight: 600; }
+  .sr .s small { font-size: 11px; color: var(--muted); }
+  .sr .d { grid-column: 1; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sr .add { grid-column: 2; grid-row: 1 / span 2; width: 40px; height: 40px; border-radius: 10px; background: var(--bg3); display: flex; align-items: center; justify-content: center; }
+  .sr .add svg { width: 18px; height: 18px; }
+  .sr .add.in { background: none; color: var(--up); }
+  .shint { padding: 18px 16px; color: var(--muted); font-size: 14px; }
+  .sform { flex-shrink: 0; padding: 10px 12px 2px; }
+  .field { width: 100%; height: 44px; padding: 0 12px; font-size: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; outline: none; }
+  .field:focus { border-color: var(--accent); }
+  /* list manager */
+  .lm { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); flex-shrink: 0; }
+  .lm .field { flex: 1; min-width: 0; height: 40px; }
+  .lm .ib { width: 40px; height: 40px; border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--muted); }
+  .lm .ib.sig.on { color: var(--accent); background: var(--accent-bg); }
+  .lm .ib.del.armed { width: auto; padding: 0 10px; background: var(--down); color: #fff; }
+  .lm .ib:disabled { opacity: .35; }
+  .lmnew { display: flex; gap: 8px; padding: 10px 12px 2px; border-top: 1px solid var(--line); flex-shrink: 0; }
+  .lmnew button { flex: none; padding: 0 16px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 80px + var(--safe-b)); z-index: 60; display: flex; align-items: center; gap: 14px;
+    max-width: calc(100vw - 24px); padding: 11px 16px; border-radius: 10px; background: var(--bg3); font-size: 14px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+  .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toast button { color: var(--accent); font-weight: 600; flex-shrink: 0; }
   #feeders { position: fixed; left: -2000px; top: 0; width: 320px; pointer-events: none; }
   #feeders > div { width: 320px; height: 220px; }
 
-  /* ---------- Details ---------- */
-  .details { position: relative; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); font-variant-numeric: tabular-nums; }
-  /* Phones: the close control is a full-width bar at the bottom (thumb side); desktop keeps the × top-right */
-  .details #dbody { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .dclose { order: 2; flex-shrink: 0; width: auto; height: 44px; margin: 8px 12px; border-radius: 10px; background: var(--bg3); color: var(--text); font-size: 0; }
-  .dclose::after { content: 'Close'; font-size: 15px; font-weight: 600; }
-  .d-head { padding: 12px 14px 10px; padding-right: 48px; border-bottom: 1px solid var(--border); }
-  .d-sym { display: flex; align-items: baseline; gap: 8px; }
-  .d-sym b { font-size: 20px; }
-  .d-sym small { color: var(--muted); font-size: 12px; }
-  .d-desc { color: var(--muted); font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .d-price { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; }
-  .d-price .big { font-size: 28px; font-weight: 500; letter-spacing: -.01em; }
-  .d-price .big small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 4px; }
-  .d-price span { font-size: 14px; }
-  .d-sep { margin: 0 6px; color: var(--border); }
-  .d-ext { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 4px; }
-  .d-sec { padding: 10px 14px 12px; border-bottom: 1px solid var(--border); }
-  .d-sec h4 { margin: 0 0 6px; font-size: 11px; font-weight: 500; color: var(--muted); }
-  .d-kv { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 14px; }
-  .d-kv span:first-child { color: var(--muted); }
-  .d-bar { position: relative; height: 4px; background: var(--bg3); border-radius: 2px; margin: 8px 0 4px; }
-  .d-bar i { transition: left .3s; position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--text); transform: translateX(-50%); }
-  .d-bar-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
-  .d-empty { padding: 24px 14px; color: var(--muted); font-size: 13px; }
-  .d-stale { color: var(--muted); font-size: 11px; margin-top: 6px; }
-
-  /* ---------- Dialogs: list manager, command palette ---------- */
-  dialog { background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 0;
-    width: min(400px, calc(100vw - 24px)); }
-  dialog::backdrop { background: rgba(0, 0, 0, .55); }
-  .dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); font-weight: 600; }
-  .dlg-row { display: flex; align-items: center; gap: 6px; padding: 6px 12px; }
-  .dlg-row input, .dlg-add input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
-  .dlg-row .count { color: var(--muted); font-size: 11px; width: 48px; text-align: right; }
-  .dlg-row .sum { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted); cursor: pointer; }
-  .dlg-row .sum input { accent-color: var(--accent); margin: 0; }
-  .dlg-row .move { font-size: 11px; width: 26px; }
-  .dlg-add { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border); }
-  .dlg-add button { background: var(--accent); color: #fff; border-radius: 8px; padding: 0 14px; }
-  .cmd { width: min(480px, calc(100vw - 24px)); margin-top: 8vh; }
-  .cmd-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .cmd-mode { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; width: 54px; }
-  .cmd-head input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; font-size: 18px; font-weight: 500; }
-  .cmd-hint { font-size: 12px; color: var(--muted); white-space: nowrap; }
-  .cmd-list { max-height: 50vh; overflow-y: auto; }
-  .cmd-foot { padding: 8px 12px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); }
-  .ac { position: absolute; left: 6px; right: 6px; bottom: 100%; max-height: 260px; overflow-y: auto; background: var(--bg2);
-    border: 1px solid var(--border); border-radius: 8px; z-index: 5; }
-  .ac-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 12px; cursor: pointer; font-size: 14px; }
-  .ac-item.on { background: var(--accent-bg); }
-  .ac-item .s { font-weight: 600; }
-  .ac-item .ex { color: var(--muted); font-size: 11px; text-align: right; }
-  .ac-item .ex .icon { display: inline-flex; width: 26px; height: 26px; margin-left: 4px; background: var(--bg3); }
-  .ac-item .d { grid-column: 1 / -1; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ac-empty { padding: 8px 12px; color: var(--muted); font-size: 12px; }
-
-  /* ---------- Edit mode (phones): the same rows become a management surface ---------- */
-  .row .hnd { display: none; }
-  .grp { display: none; }   /* "+ group" link; phones add groups from the action bar */
-  @media (max-width: 767.98px) {
-    body.edit .cols { display: none; }
-    body.edit .row { grid-template-columns: 1fr auto 40px; }
-    body.edit .row .q, body.edit .row .icon.star, body.edit .row .icon.info { display: none; }
-    body.edit .row .icon.rm { grid-column: 2; opacity: 1; width: 28px; height: 28px; border-radius: 14px; background: rgba(242, 54, 69, .18); color: var(--down); font-size: 18px; }
-    body.edit .row .hnd { grid-column: 3; display: flex; width: 40px; height: 44px; margin-right: -12px; align-items: center; justify-content: center; color: var(--muted); cursor: grab; touch-action: none; }
-    body.edit .row .hnd svg { width: 18px; height: 18px; }
-    body.edit .gtools { opacity: 1; }
-    body.edit .gtools .icon { width: 30px; height: 30px; font-size: 14px; }
-    body.edit .row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
-    .row.dragging { opacity: .35; }
-  }
-
-  /* ---------- Hover affordances (pointer devices only) ---------- */
-  @media (hover: hover) {
-    .tab:hover, .icon:hover, .upd:hover, .chip:hover { background: var(--bg3); color: var(--text); }
-    .chip.nochart:hover, .row.nochart:hover { background: transparent; }
-    .chip .x { display: inline; width: 0; overflow: hidden; transition: width .15s; }
-    .chip:hover .x { width: 10px; }
-    .row:hover { background: var(--bg2); }
-    .row:hover .icon { opacity: 1; }
-    .row .icon:hover { background: var(--bg3); }
-    .gtab:hover { filter: brightness(1.2); }
-    .gtools { opacity: 0; }
-    .gtab:hover .gtools { opacity: 1; }
-    .ivmenu button:hover { color: var(--text); background: var(--bg3); }
-    .ac-item:hover { background: var(--accent-bg); }
-    .dlg-row .icon:hover { color: var(--down); }
-  }
-
-  /* ---------- Tablet / desktop: everything side by side ---------- */
+  /* ---------- Desktop / tablet ---------- */
   @media (min-width: 768px) {
-    html, body { font-size: 13px; }
-    .bar, body[data-mview] .bar { display: flex; padding: 6px 10px; }
-    .bar [data-action="manage-lists"], .bar #chartToggle { display: inline-flex; }
-    .tabs { flex: 0 1 auto; }
-    .tab { padding: 5px 12px; border-radius: 6px; }
-    .icon { width: 28px; height: 28px; border-radius: 6px; }
-    .upd { font-size: 14px; padding: 4px 10px; }
-    .taperow, body[data-mview] .taperow { display: flex; }
-    .tape { padding: 3px 8px; }
-    .chip { padding: 2px 7px; gap: 6px; border-radius: 6px; }
-    .chip .sym { font-size: 13px; }
-    .chip .q { flex-direction: column; align-items: flex-end; gap: 0; }
-    .chip .px { display: block; }
-    .chip .chg { font-size: 10px; }
-    .breadth { display: flex; }
-    .body { flex-direction: row; }
-    .mnav { display: none; }
-    body[data-mview] .panel { display: flex; width: var(--panel-w, 300px); flex: none; }
-    .resizer { display: block; width: 5px; flex-shrink: 0; cursor: col-resize; background: var(--border); }
-    .resizer:hover, .resizer.active { background: var(--accent); }
-    body.resizing { cursor: col-resize; user-select: none; }
-    body.resizing .chart { pointer-events: none; }
-    body.details-open .details { display: block; position: static; width: 280px; flex: none; border-right: 1px solid var(--border); }
-    .details #dbody { overflow: visible; }
-    .dclose { position: absolute; right: 8px; top: 8px; z-index: 1; width: 28px; height: 28px; margin: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 15px; }
-    .dclose::after { content: none; }
-    body[data-mview] .chart { display: flex; }
-    body.chart-hidden .chart, body.chart-hidden .resizer { display: none !important; }
-    body.chart-hidden .panel { width: auto !important; flex: 1; }
-    .cols, .row { grid-template-columns: 1fr 76px 60px 70px; padding: 0 10px; }
-    .cols { height: 28px; font-size: 12px; }
-    .row { height: 30px; font-size: 13px; }
-    .row .ext { font-size: 12px; }
-    .row .icon { width: 16px; height: 16px; font-size: 12px; }
-    .row .icon.info, .row .icon.rm { position: absolute; top: 50%; transform: translateY(-50%); margin: 0; }
-    .racts { display: none; }
-    .row { transition: none; }
-    .row .icon.info { right: 22px; }
-    .row .icon.rm { right: 2px; }
-    .panel.no-ext .cols, .panel.no-ext .row { grid-template-columns: 1fr 76px 60px; }
-    .gtab { height: 18px; font-size: 10px; padding: 0 10px; }
-    .gtools .icon { width: 16px; height: 16px; font-size: 11px; }
-    .gcount { padding: 8px 10px; }
-    .selbar { display: grid; }
-    .selbar .ssym { font-size: 15px; }
-    .selbar .sadd { padding: 4px 10px; font-size: 12px; margin-top: 4px; }
-    .mbar { height: 40px; }
-    .mbar .msym { font-size: 15px; }
-    .mbar .msym small { font-size: 11px; }
-    .mbar .px { font-size: 15px; } .mbar .chg, .mbar .cd { font-size: 13px; }
-    .ivsel { position: relative; }
-    .ivbtn { padding: 0 12px; font-size: 13px; }
-    .ivmenu { left: auto; right: 4px; bottom: calc(100% + 4px); gap: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.5); }
-    .ivmenu::before { display: none; }
-    .ivmenu button { padding: 8px 0; min-width: 44px; font-size: 13px; border-radius: 6px; }
-    .ivbackdrop { display: none !important; }
-    .phead, .strip, .bbar, .overlay, .toast { display: none !important; }
-    .grp { display: block; }
-    #listDlg { position: static; margin: auto; width: min(360px, calc(100vw - 32px)); max-height: none; border: 1px solid var(--border); border-radius: 10px; padding-bottom: 0; }
-    #listDlg .dlg-row { height: auto; }
-    #listDlg .dlg-row input { font-size: inherit; }
-    #listDlg .dlg-row .icon { width: 28px; height: 28px; }
-    .d-sym b { font-size: 18px; }
-    .d-price .big { font-size: 26px; }
-    .d-kv { font-size: 13px; padding: 3px 0; }
-    .d-head { padding-right: 40px; }
-    dialog { border-radius: 10px; width: min(360px, calc(100vw - 32px)); }
-    .cmd { width: min(460px, calc(100vw - 32px)); margin-top: 12vh; }
-    .ac-item { padding: 8px 12px; font-size: 13px; }
-    .ac-item .ex .icon { width: 22px; height: 22px; }
+    html, body { font-size: 14px; }
+    .top { height: 50px; gap: 16px; }
+    .hl, .hs, body[data-view] .hl, body[data-view] .hs { display: flex; }
+    .hs { padding-left: 16px; border-left: 1px solid var(--line); cursor: pointer; }
+    .hbtn, .hver { display: flex; }
+    .nav { display: none; }
+    body[data-view] .pane { display: flex; }
+    .listpane { flex: none; width: 420px; border-right: 1px solid var(--line); }
+    body.chart-hidden .chartpane { display: none; }
+    body.chart-hidden .listpane { flex: 1; width: auto; border-right: 0; }
+    .row { height: 36px; font-size: 14px; }
+    .row .more { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border-radius: 6px; background: var(--bg3);
+      color: var(--muted); display: flex; align-items: center; justify-content: center; opacity: 0; }
+    .row .more svg { width: 16px; height: 16px; }
+    .row:hover .more { opacity: 1; }
+    .row:hover { background: var(--bg2); }
+    .row.on:hover { background: var(--accent-bg); }
+    .chip { padding: 5px 10px; min-width: 60px; }
+    .ib { width: 38px; height: 38px; border-radius: 10px; }
+    .sbtn, .ivbtn { height: 38px; border-radius: 10px; }
+    .ivmenu.open { display: grid; position: absolute; right: 10px; bottom: calc(100% + 6px); z-index: 20; grid-template-columns: repeat(4, 56px); gap: 4px; padding: 6px;
+      background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+    .ivmenu button { height: 34px; border-radius: 6px; background: var(--bg); color: var(--muted); font-weight: 600; }
+    .ivmenu button:hover { color: var(--text); background: var(--bg3); }
+    .ivmenu button.on { background: var(--accent); color: #fff; }
+    .sheet { left: 50%; right: auto; top: 10vh; bottom: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); max-height: 78vh;
+      border-radius: 14px; border: 1px solid var(--line); padding-bottom: 8px; }
+    .sheet::before { display: none; }
+    .sh-title { padding-top: 14px; }
+    .sh-foot { display: none; }
+    .sform { order: -1; padding: 0 12px 10px; }
+    .opt { min-height: 42px; font-size: 14px; }
+    .opt:hover, .sr:hover { background: var(--bg3); }
+    .toast { bottom: 24px; }
   }
 </style>
 </head>
-<body>
-<div class="bar">
-  <div class="tabs" id="tabs"></div>
-  <button class="icon" data-action="manage-lists" title="Manage lists">⋯</button>
-  <span class="spacer"></span>
-  <span class="status off" id="status"></span>
-  <button class="upd" id="upd" data-action="refresh" title="Last tick. Click to reconnect.">–</button>
-  <button class="icon" id="chartToggle" data-action="toggle-chart" title="Hide chart">
-    <svg class="i-hide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
-    <svg class="i-show" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-  </button>
-</div>
-<div class="taperow">
-  <div class="tape" id="pins"></div>
-</div>
-<div class="ivbackdrop" id="ivbackdrop" hidden data-action="iv-close"></div>
-<div class="breadth" id="summary"></div>
-<div id="feeders" aria-hidden="true"></div>
-<div class="stip" id="stip" hidden></div>
-<div class="tpop" id="tpop" hidden></div>
-<div class="body">
-  <div class="panel" id="panel">
-    <div class="phead" id="phead"></div>
-    <div class="cols"><span>Symbol</span><span>Last</span><span class="sortable" data-action="sort-chg" title="Sort by change (indices stay on top); click again to restore your order">Chg%</span><span title="● pre-market · ● post-market · ● overnight">Ext</span></div>
-    <div class="list" id="list"></div>
-    <div class="selbar" id="selbar"></div>
-    <div class="strip" id="strip"></div>
-    <div class="bbar" id="bbar"></div>
-    <form class="add" id="addForm">
-      <div class="ac" id="ac" hidden></div>
-      <input id="symInput" placeholder="Search symbol or type NASDAQ:NBIS" autocomplete="off" spellcheck="false" aria-autocomplete="list">
-      <button type="submit" title="Add symbol">+</button>
-    </form>
-  </div>
-  <div class="resizer" id="resizer"></div>
-  <aside class="details" id="details" aria-label="Symbol details">
-    <button class="icon dclose" data-action="toggle-details" title="Close details">×</button>
-    <div id="dbody"></div>
-  </aside>
-  <div class="chart" id="chartWrap">
+<body data-view="list">
+<header class="top">
+  <div class="hl"><b id="hlName"></b><span class="v" id="hlPct"></span></div>
+  <button class="hs" data-act="search" title="Search symbol"><b id="hsSym"></b><span class="px" id="hsPx"></span><span class="chg" id="hsChg"></span><span class="d" id="hsDesc"></span></button>
+  <span class="sp"></span>
+  <span class="sess"><i></i><span id="sessLabel"></span></span>
+  <button class="tick" id="tick" data-act="reconnect" title="Last update. Tap to reconnect."><i class="dot off" id="dot"></i><span id="tickTime">–</span></button>
+  <button class="hbtn" data-act="toggle-chart" id="chartToggle" title="Hide chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg></button>
+  <span class="hver" id="hver"></span>
+</header>
+
+<main class="main">
+  <section class="pane listpane" aria-label="Watchlist">
+    <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span class="x" title="Pre-market · post-market · overnight">Ext</span></div>
+    <div class="rows" id="rows"></div>
+    <div class="dock">
+      <div class="chips" id="chips"></div>
+      <div class="acts">
+        <button class="ib primary" data-act="search" aria-label="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="ib" data-act="sort" id="sortBtn" aria-label="Sort by change"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg></button>
+        <button class="ib" data-act="lists" aria-label="Manage lists"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+      </div>
+    </div>
+  </section>
+  <section class="pane chartpane" id="chartWrap" aria-label="Chart">
     <div id="tv_chart"></div>
-    <div class="mbar" id="mbar"><button class="msym" id="mbarSym" data-action="open-search" title="Search symbol"></button><span class="mbt" id="mbarText"></span><div class="ivsel" id="intervals"><button class="ivbtn" data-action="iv-toggle" title="Chart interval"></button><div class="ivmenu" hidden></div></div></div>
-  </div>
-</div>
+    <div class="cbar">
+      <button class="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><b id="cbSym"></b><span>Search</span></button>
+      <button class="ivbtn" data-act="interval" id="ivBtn" title="Chart interval"></button>
+      <div class="ivmenu" id="ivMenu"></div>
+    </div>
+  </section>
+</main>
 
-<div class="overlay" id="overlay" hidden></div>
-<nav class="mnav" id="mnav" aria-label="Views"><span class="ver" id="appVer"></span>
-  <button data-action="mview" data-view="lists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Liste</button>
-  <button data-action="mview" data-view="chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 5-8 4 5"/></svg>Grafik</button>
+<nav class="nav" aria-label="Views">
+  <button data-act="view" data-view="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Liste</button>
+  <button data-act="view" data-view="chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 5-8 4 5"/></svg>Grafik</button>
+  <span class="ver" id="ver"></span>
 </nav>
-<dialog id="listDlg">
-  <div class="dlg-head"><span>Watchlists</span><button class="icon" data-action="close-dlg" title="Close">×</button></div>
-  <div id="dlgRows"></div>
-  <form class="dlg-add" id="pinForm" title="Pinned symbols shown above every list, comma separated">
-    <input id="pinInput" placeholder="Pinned: SKILLING:US100, BINANCE:BTCUSDT" autocomplete="off" spellcheck="false">
-    <button type="submit">Pin</button>
-  </form>
-  <form class="dlg-add" id="newListForm">
-    <input id="newListName" placeholder="New list name" autocomplete="off">
-    <button type="submit">Add</button>
-  </form>
-</dialog>
 
-<dialog id="cmd" class="cmd">
-  <div class="cmd-head"><span class="cmd-mode" id="cmdMode">Symbol</span><input id="cmdInput" autocomplete="off" spellcheck="false" placeholder="Search symbol"><span class="cmd-hint" id="cmdHint"></span></div>
-  <div id="cmdList" class="cmd-list"></div>
-</dialog>
+<div class="scrim" id="scrim" hidden data-act="sheet-close"></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
+  <div class="sh-title" id="shTitle"></div>
+  <div class="sh-body" id="shBody"></div>
+  <div class="sh-foot"><button data-act="sheet-close">Close</button></div>
+</div>
+<div id="feeders" aria-hidden="true"></div>
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '0.13';  // bump the minor on every push to main
+const APP_VERSION = '1.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
-const INTERVALS = [['1m','1'],['5m','5'],['15m','15'],['30m','30'],['1h','60'],['4h','240'],['1D','D'],['1W','W']];
-// Label for any widget interval value ("120" → 2h, "D" → 1D, "3M" → 3M).
-const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : (/^\d/.test(v) ? v : '1' + v));
+const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
+const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
 const uid = () => Math.random().toString(36).slice(2, 9);
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const isPhone = () => window.innerWidth < 768;
+const short = sym => sym.includes(':') ? sym.split(':')[1] : sym;
 
+// ================= State =================
 function seed() {
   const g = (name, symbols) => ({ name, collapsed: false, symbols });
   return {
-    activeListId: 'abd', interval: '60', symbol: 'NASDAQ:NBIS', pinned: DEFAULT_PINS.slice(),
+    activeListId: 'abd', interval: '60', symbol: 'NASDAQ:NBIS', view: 'list',
     lists: [
       { id: 'abd', name: 'ABD', summary: true, groups: [
         g('Index', ['SKILLING:US100', 'SKILLING:SPX500']),
-        g('Spot', ['NASDAQ:NBIS','NASDAQ:CRWV','NYSE:BE','NASDAQ:CEG','NYSE:MOD','NASDAQ:AVGO','NASDAQ:ASTS','NASDAQ:UPST','NYSE:AMPX','NYSE:KRMN']),
-        g('Moon sh', ['NASDAQ:ONDS','NASDAQ:RCAT','NASDAQ:GRRR','NYSE:TE','NASDAQ:ASPI','NASDAQ:EOSE','NYSE:ORCL','NYSE:NKE']),
-      ]},
+        g('Spot', ['NASDAQ:NBIS', 'NASDAQ:CRWV', 'NYSE:BE', 'NASDAQ:CEG', 'NYSE:MOD', 'NASDAQ:AVGO', 'NASDAQ:ASTS', 'NASDAQ:UPST', 'NYSE:AMPX', 'NYSE:KRMN']),
+        g('Moon sh', ['NASDAQ:ONDS', 'NASDAQ:RCAT', 'NASDAQ:GRRR', 'NYSE:TE', 'NASDAQ:ASPI', 'NASDAQ:EOSE', 'NYSE:ORCL', 'NYSE:NKE']),
+      ] },
       { id: 'inci', name: 'İnci', summary: true, groups: [
-        g('All', ['NASDAQ:RKLB','NYSE:PL','NASDAQ:APP','CBOE:EUV','NASDAQ:COHU','NYSE:RBRK','NASDAQ:SOFI','NASDAQ:QS','NYSE:NOW','NASDAQ:AVAV','NASDAQ:EOSE','NYSE:RDDT','NASDAQ:CBRS']),
-      ]},
+        g('All', ['NASDAQ:RKLB', 'NYSE:PL', 'NASDAQ:APP', 'CBOE:EUV', 'NASDAQ:COHU', 'NYSE:RBRK', 'NASDAQ:SOFI', 'NASDAQ:QS', 'NYSE:NOW', 'NASDAQ:AVAV', 'NASDAQ:EOSE', 'NYSE:RDDT', 'NASDAQ:CBRS']),
+      ] },
       { id: 'krip', name: 'Krip', summary: true, groups: [
-        g('Main', ['BINANCE:BTCUSDT','BINANCE:ETHUSDT']),
-        g('Section 3', ['BINANCE:XRPUSDT','BINANCE:SOLUSDT','BINANCEUS:HYPEUSDT','COINBASE:AVAXUSDT']),
-        g('Section 2', ['CRYPTOCAP:BTC.D','CRYPTOCAP:TOTAL2','CRYPTOCAP:OTHERS']),
-        g('Section 1', ['TVC:DXY','BINANCE:ETHBTC','BINANCE:XRPETH']),
-      ]},
+        g('Main', ['BINANCE:BTCUSDT', 'BINANCE:ETHUSDT']),
+        g('Section 3', ['BINANCE:XRPUSDT', 'BINANCE:SOLUSDT', 'BINANCEUS:HYPEUSDT', 'COINBASE:AVAXUSDT']),
+        g('Section 2', ['CRYPTOCAP:BTC.D', 'CRYPTOCAP:TOTAL2', 'CRYPTOCAP:OTHERS']),
+        g('Section 1', ['TVC:DXY', 'BINANCE:ETHBTC', 'BINANCE:XRPETH']),
+      ] },
       { id: 'tr', name: 'TR', summary: 'BIST:XU100', groups: [
-        g('FX', ['TVC:DXY','FX:EURUSD','FX:USDTRY','FX:EURTRY']),
-        g('BIST', ['BIST:XU100','BIST:XU030D1!','BIST:XBANK','BIST:DMLKT','BIST:ENPRA']),
-        g('Altın & Gümüş', ['OANDA:XAUUSD','TVC:SILVER','TVC:GOLDSILVER','OANDA:XAUEUR']),
-        g('Other', ['FX_IDC:XAUTRYG','BIST:ALTIN','BIST:GMSTR']),
-      ]},
-      { id: 'ozet', name: 'Özet', groups: [
-        g('All', ['TVC:VIX','FX:UKOIL','TVC:US10Y','OANDA:XAUUSD','TVC:SILVER','BINANCE:BTCUSDT','BINANCE:ETHUSDT','TVC:DXY','NASDAQ:QQQ','AMEX:SPY','AMEX:RSP','AMEX:IWM','DJ:DJI','TVC:NI225','KRX:KOSPI','FX:USDJPY','INDEX:S5FI','AMEX:XLF']),
-      ]},
+        g('FX', ['TVC:DXY', 'FX:EURUSD', 'FX:USDTRY', 'FX:EURTRY']),
+        g('BIST', ['BIST:XU100', 'BIST:XU030D1!', 'BIST:XBANK', 'BIST:DMLKT', 'BIST:ENPRA']),
+        g('Altın & Gümüş', ['OANDA:XAUUSD', 'TVC:SILVER', 'TVC:GOLDSILVER', 'OANDA:XAUEUR']),
+        g('Other', ['FX_IDC:XAUTRYG', 'BIST:ALTIN', 'BIST:GMSTR']),
+      ] },
+      { id: 'ozet', name: 'Özet', summary: false, groups: [
+        g('All', ['TVC:VIX', 'FX:UKOIL', 'TVC:US10Y', 'OANDA:XAUUSD', 'TVC:SILVER', 'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT', 'TVC:DXY', 'NASDAQ:QQQ', 'AMEX:SPY', 'AMEX:RSP', 'AMEX:IWM', 'DJ:DJI', 'TVC:NI225', 'KRX:KOSPI', 'FX:USDJPY', 'INDEX:S5FI', 'AMEX:XLF']),
+      ] },
       { id: 'zorning', name: 'Z-Örning', summary: true, groups: [
-        g('Main', ['NASDAQ:LULU','NASDAQ:MRVL','NASDAQ:META','NASDAQ:NVDA']),
-        g('Section 1', ['NASDAQ:RXRX','NASDAQ:SPCX','NYSE:LEU','NASDAQ:MU','NASDAQ:GOOGL','NASDAQ:AMZN','NASDAQ:MSFT','NASDAQ:PLTR','NYSE:DXYZ','NASDAQ:ALAB','NASDAQ:AMD','NYSE:NET','NYSE:ANET','NASDAQ:SEZL','NYSE:VST','NASDAQ:SHAZ','NYSE:QXO','NASDAQ:ALMU','AMEX:NASA','NASDAQ:CRDO','NASDAQ:IREN','NASDAQ:KTOS']),
-      ]},
+        g('Main', ['NASDAQ:LULU', 'NASDAQ:MRVL', 'NASDAQ:META', 'NASDAQ:NVDA']),
+        g('Section 1', ['NASDAQ:RXRX', 'NASDAQ:SPCX', 'NYSE:LEU', 'NASDAQ:MU', 'NASDAQ:GOOGL', 'NASDAQ:AMZN', 'NASDAQ:MSFT', 'NASDAQ:PLTR', 'NYSE:DXYZ', 'NASDAQ:ALAB', 'NASDAQ:AMD', 'NYSE:NET', 'NYSE:ANET', 'NASDAQ:SEZL', 'NYSE:VST', 'NASDAQ:SHAZ', 'NYSE:QXO', 'NASDAQ:ALMU', 'AMEX:NASA', 'NASDAQ:CRDO', 'NASDAQ:IREN', 'NASDAQ:KTOS']),
+      ] },
     ],
   };
 }
 const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'SKILLING:US100', 'CAPITALCOM:SPX500': 'SKILLING:SPX500', 'TVC:DJI': 'DJ:DJI', 'TVC:UKOIL': 'FX:UKOIL',
   'OANDA:XAGUSD': 'TVC:SILVER', 'AMEX:LEU': 'NYSE:LEU', 'NASDAQ:EUV': 'CBOE:EUV', 'NASDAQ:DXYZ': 'NYSE:DXYZ',
   'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS' };
-const REMOVED = new Set(['NASDAQ:NDX', 'SP:SPX']);  // no chart in the free widget; pinned CFDs cover them
-// Free widget has no chart for plain indices and BIST; these stay quote-only.
+const REMOVED = new Set(['NASDAQ:NDX', 'SP:SPX']);   // no chart in the free widget
+// The free widget has no chart for plain indices and BIST; these stay quote-only.
 const noChart = sym => /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|BIST:)/.test(sym);
-const DEFAULT_PINS = ['SKILLING:US100', 'SKILLING:SPX500', 'TVC:VIX', 'FX:UKOIL', 'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT'];
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
@@ -615,154 +340,61 @@ function load() {
       const fix = x => SYMBOL_FIXES[x] || x;
       s.symbol = fix(s.symbol);
       s.lists.forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.map(fix).filter(x => !REMOVED.has(x)); }));
-      s.pinned = Array.isArray(s.pinned) ? [...new Set(s.pinned.map(fix))] : DEFAULT_PINS.slice();
-      s.lists.forEach(l => { if (l.summary === undefined) l.summary = l.id === 'tr' ? 'BIST:XU100' : ['abd', 'inci', 'zorning'].includes(l.id); });
+      s.lists.forEach(l => { if (l.summary === undefined) l.summary = l.id === 'tr' ? 'BIST:XU100' : ['abd', 'inci', 'zorning', 'krip'].includes(l.id); });
       // One-time edits to stored lists (each runs once per device, so later manual changes stick).
       s.migrated = Array.isArray(s.migrated) ? s.migrated : [];
-      if (!s.migrated.includes('abd-index-trim')) {   // ABD Index keeps only US100 and SPX500
+      if (!s.migrated.includes('abd-index-trim')) {
         const drop = new Set(['CME_MINI:NQ1!', 'CME_MINI:ES1!', 'CBOT_MINI:YM1!', 'OKX:US100USDT.P', 'OKX:US500USDT.P']);
         s.lists.filter(l => l.id === 'abd').forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.filter(x => !drop.has(x)); }));
         s.migrated.push('abd-index-trim');
       }
-      if (!s.lists.some(l => l.id === 'krip')) {
-        const k = seed().lists.find(l => l.id === 'krip'), i = s.lists.findIndex(l => l.id === 'inci');
-        s.lists.splice(i < 0 ? s.lists.length : i + 1, 0, k);
-      }
+      // Leftovers from the previous design (pinned tape, details panel, history chart, edit mode).
+      for (const k of ['pinned', 'detailsOpen', 'hudHidden', 'histRange', 'panelWidth', 'mview']) delete s[k];
+      if (!['list', 'chart'].includes(s.view)) s.view = 'list';
       return s;
     }
-  } catch (e) {}
+  } catch (_) {}
   return seed();
 }
-function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
-
 let state = load();
-const $ = id => document.getElementById(id);
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {} }
+for (const k of ['tvwl.hist.v1', 'tvwl.eod.v1']) { try { localStorage.removeItem(k); } catch (_) {} }
 const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
 const flatSymbols = list => list.groups.flatMap(g => g.symbols);
-const allSymbols = () => [...new Set([...(state.pinned || []), ...state.lists.flatMap(flatSymbols)])];
+const allSymbols = () => [...new Set(state.lists.flatMap(flatSymbols))];
 
-// Widget iframe accepts {name:'set-symbol',data:{symbol}} / {name:'set-interval',data:{interval}} via postMessage.
-const chart = { ready: false, pending: {} };
-function send(name, data) {
-  const f = $('chartWrap').querySelector('iframe');
-  if (!chart.ready || !f) { chart.pending[name] = data; return; }
-  f.contentWindow.postMessage({ name, data }, '*');
+// ================= Formatting =================
+const NF2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Prices: 2 decimals from 1 up; market-cap style T/B above a billion; four significant digits below 1 (0.0005436, 0.03020).
+function fmtPrice(p) {
+  if (p == null || isNaN(p)) return '';
+  const a = Math.abs(p);
+  if (a >= 1e12) return (p / 1e12).toFixed(2) + 'T';
+  if (a >= 1e9) return (p / 1e9).toFixed(2) + 'B';
+  if (a >= 1 || a === 0) return NF2.format(p);
+  return p.toFixed(Math.min(10, 3 - Math.floor(Math.log10(a))));
 }
-window.addEventListener('message', e => {
-  const f = $('chartWrap').querySelector('iframe');
-  if (!f || f.contentWindow !== e.source) return onFeederMessage(e);
-  if (!chart.ready) {
-    chart.ready = true;
-    for (const k in chart.pending) send(k, chart.pending[k]);
-    chart.pending = {};
-  }
-  // The widget streams quoteUpdate for the symbol currently on the chart (JSON string, provider TradingView).
-  if (typeof e.data === 'string' && e.data.startsWith('{')) {
-    try {
-      const m = JSON.parse(e.data);
-      if (m.name === 'quoteUpdate') onChartSymbol(m.data);
-      if (m.name === 'symbolInfo' && m.type === 'on') onSymbolInfo(m.data);
-    } catch (_) {}
-  }
-});
+const pct = v => v == null ? '' : (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+const dir = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
 
-// Chart → interval sync: the widget has no change event, so ask it for symbolInfo every 2 s and mirror its interval.
-const SYMBOL_INFO = JSON.stringify({ provider: 'TradingView', type: 'get', name: 'symbolInfo', id: 7, client_id: 'tvwl', data: {} });
-setInterval(() => { const f = $('chartWrap').querySelector('iframe'); if (f && chart.ready && !document.hidden) f.contentWindow.postMessage(SYMBOL_INFO, '*'); }, 2000);
-function onSymbolInfo(d) {
-  if (!d || !d.interval || d.interval === state.interval) return;
-  state.interval = d.interval; save();
-  renderIntervals();
-}
-
-// Chart → list sync: when the symbol is changed inside the widget, highlight it if listed, otherwise prefill the add box.
-const resolved = {};
-let lastChartName = null, autofilled = false;
-async function onChartSymbol(d) {
-  if (!d || d.original_name === lastChartName) return;
-  lastChartName = d.original_name;
-  const sym = await resolveSymbol(d.original_name, d.short_name);
-  if (lastChartName !== d.original_name) return;
-  chart.symbol = sym;
-  if (flatSymbols(activeList()).includes(sym) && state.symbol !== sym) { state.symbol = sym; save(); render(); }
-}
-async function resolveSymbol(name, short) {
-  if (resolved[name]) return resolved[name];
-  const [ex] = name.split(':');
-  let sym = name;
-  if (ex === 'BATS_DLY' || ex === 'BATS' || ex === 'CBOE') {
-    // Delayed Cboe feed: find the listing exchange. Prefer a symbol already in any list.
-    const known = state.lists.flatMap(flatSymbols).find(x => x.split(':')[1] === short);
-    if (known) sym = known;
-    else {
-      const cands = ['NASDAQ', 'NYSE', 'AMEX', 'CBOE'].map(x => x + ':' + short);
-      try {
-        const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST',
-          body: JSON.stringify({ symbols: { tickers: cands }, columns: ['close'] }) });
-        const found = new Set((await r.json()).data.map(x => x.s));
-        sym = cands.find(c => found.has(c)) || sym;
-      } catch (_) {}
-    }
-  }
-  return resolved[name] = sym;
-}
-
-function mountChart() {
-  const old = $('tv_chart'); const fresh = document.createElement('div'); fresh.id = 'tv_chart'; old.replaceWith(fresh);
-  chart.hiddenAtMount = getComputedStyle($('chartWrap')).display === 'none';   // phones start on the list view
-  new TradingView.widget({
-    autosize: true, container_id: 'tv_chart',
-    symbol: state.symbol || flatSymbols(activeList())[0] || 'BINANCE:BTCUSDT', interval: state.interval,
-    timezone: 'Etc/UTC', theme: 'dark', style: '1', locale: 'en',
-    allow_symbol_change: true, details: false, hotlist: false, calendar: false,
-    hide_side_toolbar: true, hide_top_toolbar: true, hide_legend: true, hide_volume: true,
-    backgroundColor: '#131722', gridColor: 'rgba(42, 46, 57, 0.4)',
-    overrides: { 'mainSeriesProperties.sessionId': '24h' },  // Session → 24 hours (regular | extended | premarket | postmarket | 24h)
-    disabled_features: ['header_indicators', 'header_compare', 'show_object_tree', 'legend_context_menu', 'control_bar'],
-    support_host: 'https://www.tradingview.com',
-    // Note: the free embed forces mainSeriesProperties.showCountdown=false at load, so neither `overrides`
-    // nor `use_localstorage_for_settings` can keep the widget's own countdown across reloads.
-  });
-}
-function showSymbol() { send('set-symbol', { symbol: state.symbol }); }
-
-// Quotes: TradingView scanner (unofficial, CORS-enabled). Polled for the active list only.
-const quotes = {};
-let quoteTimer = null;
-const fmt = p => p >= 1e9 ? (p >= 1e12 ? (p / 1e12).toFixed(2) + 'T' : (p / 1e9).toFixed(2) + 'B') : new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(p);  // market-cap style symbols (CRYPTOCAP:TOTAL2)
-function quoteHtml(sym) {
-  const q = quotes[sym];
-  if (!q) return '<span class="px"></span><span class="chg"></span><span class="ext"></span>';
-  const pct = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
-  const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
-  const dot = q.ss ? `<i class="ss ${q.ss}"></i>` : '';
-  const ext = q.e == null ? dot : dot + `<span class="v">${pct(q.e)}</span>`;
-  // Outside the regular session, Last shows the extended-session price when there is one.
-  const last = !regular && q.ep != null ? q.ep : q.p;
-  return `<span class="px ${cls(q.c)}" title="${last !== q.p ? q.es : ''}">${fmt(last)}</span><span class="chg ${cls(q.c)}">${pct(q.c)}</span>` +
-    `<span class="ext ${cls(q.e)}" title="${q.es || ''}">${ext}</span>`;
-}
-// Regular US session: Mon–Fri 09:30–16:00 America/New_York. Ext column is hidden then.
-function isRegularSession() {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false,
-    weekday: 'short', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
-  const get = t => parts.find(x => x.type === t).value;
-  const mins = (+get('hour') % 24) * 60 + +get('minute');
-  return !['Sat', 'Sun'].includes(get('weekday')) && mins >= 9 * 60 + 30 && mins < 16 * 60;
-}
-// US session phase for the top bar: pre 04:00–09:30, open 09:30–16:00, post 16:00–20:00, overnight 20:00–04:00 (Mon–Fri), closed on weekends.
+// ================= Sessions (New York) =================
+const nyParts = () => {
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
+  const g = t => p.find(x => x.type === t).value;
+  return { wd: g('weekday'), m: (+g('hour') % 24) * 60 + +g('minute') };
+};
+// Regular session Mon–Fri 09:30–16:00: the Ext column is hidden then.
+function isRegularSession() { const { wd, m } = nyParts(); return !['Sat', 'Sun'].includes(wd) && m >= 570 && m < 960; }
+// pre 04:00–09:30, open 09:30–16:00, post 16:00–20:00, overnight 20:00–04:00 (Sun 20:00 → Fri 20:00), closed otherwise.
 function sessionPhase() {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false,
-    weekday: 'short', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
-  const get = t => parts.find(x => x.type === t).value;
-  const wd = get('weekday'), m = (+get('hour') % 24) * 60 + +get('minute');
-  if (wd === 'Sat' || (wd === 'Sun' && m < 20 * 60) || (wd === 'Fri' && m >= 20 * 60)) return ['closed', 'Closed'];
-  if (m < 4 * 60 || m >= 20 * 60) return ['night', 'Overnight'];
-  if (m < 9 * 60 + 30) return ['pre', 'Pre-market'];
-  if (m < 16 * 60) return ['open', 'Market open'];
+  const { wd, m } = nyParts();
+  if (wd === 'Sat' || (wd === 'Sun' && m < 1200) || (wd === 'Fri' && m >= 1200)) return ['closed', 'Closed'];
+  if (m < 240 || m >= 1200) return ['night', 'Overnight'];
+  if (m < 570) return ['pre', 'Pre-market'];
+  if (m < 960) return ['open', 'Market open'];
   return ['post', 'Post-market'];
 }
-let lastPhase = null;
+let regular = isRegularSession(), lastPhase = null;
 function renderSession() {
   const [cls, label] = sessionPhase();
   if (lastPhase && lastPhase !== cls && (lastPhase === 'night' || cls === 'night')) {
@@ -772,223 +404,29 @@ function renderSession() {
   }
   lastPhase = cls;
   document.body.className = document.body.className.replace(/\bsess-\w+\b/g, '').replace(/\s+/g, ' ').trim() + ' sess-' + cls;
-}
-setInterval(renderSession, 30000);
-let regular = false;
-// Market sentiment tint: |chg%| 0.5–1 light, 1–2 medium, 2–5 strong, 5+ strongest; below 0.5 none.
-const SENTIMENT_TIERS = [0.5, 1, 2, 5];
-function sentimentClass(c) {
-  if (c == null) return '';
-  const a = Math.abs(c);
-  const tier = SENTIMENT_TIERS.filter(t => a >= t).length;
-  return tier ? `s-${c > 0 ? 'up' : 'down'}-${tier}` : '';
-}
-const effChange = q => q ? (!regular && q.e != null ? q.e : q.c) : null;
-const NON_EQUITY = new Set(['index', 'cfd', 'futures', 'economic']);
-// Symbols that count toward a list's sentiment: everything except indices and index CFDs.
-// Symbols that make up a list's day %, breadth and history. Crypto (Krip) counts only USDT pairs, so dominance,
-// market-cap totals, DXY and cross pairs (ETHBTC, XRPETH) stay out of the average.
-const SUMMARY_MATCH = { krip: /USDT$/ };
-const summarySymbols = list => flatSymbols(list).filter(sy => SUMMARY_MATCH[list.id] ? SUMMARY_MATCH[list.id].test(sy) : !NON_EQUITY.has(raw[sy]?.type));
-// Tier of a change: -4..-1 (down, strongest first), 0 (flat, |x| < 0.5), 1..4 (up). Same thresholds as the row tint.
-const tierOf = x => { const t = SENTIMENT_TIERS.filter(th => Math.abs(x) >= th).length; return x < 0 ? -t : t; };
-function breadth(symbols) {
-  const v = symbols.map(sy => effChange(quotes[sy])).filter(x => x != null);
-  if (!v.length) return null;
-  const up = v.filter(x => x >= 0.5).length, down = v.filter(x => x <= -0.5).length, flat = v.length - up - down;
-  const tiers = {}; for (const x of v) { const t = tierOf(x); tiers[t] = (tiers[t] || 0) + 1; }
-  return { up, down, flat, n: v.length, avg: v.reduce((a, b) => a + b, 0) / v.length, tiers };
-}
-const pct = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
-const ORDER = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
-const TIER_LABEL = { '-4': '≤ −5%', '-3': '−5…−2%', '-2': '−2…−1%', '-1': '−1…−0.5%', 0: '±0.5%', 1: '+0.5…1%', 2: '+1…2%', 3: '+2…5%', 4: '≥ +5%' };
-const dirCls = v => v >= 0.5 ? 'up' : v <= -0.5 ? 'down' : '';
-// Sentiment history: one sample per 15 s per list (avg change, indices excluded), kept 8 h in localStorage.
-// One sample / 15 s for the last 2 h, thinned to 1 / min beyond that, kept for 24 h (≈ 480 + 1320 samples per list).
-const HIST_KEY = 'tvwl.hist.v1', HIST_MS = 15000, HIST_FINE_MS = 2 * 3600000, HIST_COARSE_MS = 60000, HIST_MAX_MS = 24 * 3600000;
-const HIST_RANGES = [['1h', 'last hour'], ['4h', 'last 4 h'], ['session', 'this session (day 04–20 ET or overnight 20–04 ET)'], ['24h', 'last 24 h']];
-const histRange = () => HIST_RANGES.some(r => r[0] === state.histRange) ? state.histRange : 'session';
-const histSince = () => { const r = histRange(); return r === 'session' ? sessionOpenTs() : Date.now() - { '1h': 1, '4h': 4, '24h': 24 }[r] * 3600000; };
-const histLabel = () => HIST_RANGES.find(r => r[0] === histRange())[1];
-function pruneHistory(arr, now) {
-  const out = []; let lastCoarse = 0;
-  for (const x of arr) {
-    if (now - x[0] > HIST_MAX_MS) continue;
-    if (now - x[0] > HIST_FINE_MS) { if (x[0] - lastCoarse < HIST_COARSE_MS - 1000) continue; lastCoarse = x[0]; }
-    out.push(x);
-  }
-  return out;
-}
-let hist = {}; try { hist = JSON.parse(localStorage.getItem(HIST_KEY)) || {}; } catch (_) {}
-function sampleHistory() {
-  const now = Date.now(); let changed = false;
-  for (const l of state.lists) {
-    const b = l.summary ? breadth(summarySymbols(l)) : null;
-    if (!b) continue;
-    const arr = hist[l.id] = hist[l.id] || [];
-    if (arr.length && now - arr[arr.length - 1][0] < HIST_MS - 1000) continue;
-    arr.push([now, +b.avg.toFixed(3), b.up, b.down]);
-    hist[l.id] = pruneHistory(arr, now);
-    changed = true;
-  }
-  if (changed) { try { localStorage.setItem(HIST_KEY, JSON.stringify(hist)); } catch (_) {} }
-}
-setInterval(sampleHistory, HIST_MS);
-// Start of the session we are in, New York time: the day session runs 04:00 → 20:00 (pre → regular → post), the
-// overnight session 20:00 → 04:00. The sentiment chart's "day" range starts here.
-function sessionOpenTs() {
-  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date());
-  const g = t => +p.find(x => x.type === t).value;
-  const nowNy = (g('hour') % 24) * 60 + g('minute');
-  const open = nowNy >= 4 * 60 && nowNy < 20 * 60 ? 4 * 60 : 20 * 60;
-  return Date.now() - ((nowNy - open + 24 * 60) % (24 * 60)) * 60000;
-}
-let sparkPts = [], sparkLim = 1;
-const SH = 36, SL = 2, SR = 2, ST = 3, SB = 10;  // chart box height, label gutters (width is per call; 200 on desktop)
-function sparkline(listId, SW = 200) {
-  const since = histSince();
-  const pts = (hist[listId] || []).filter(x => x[0] >= since);
-  const iw = SW - SL - SR, ih = SH - ST - SB, ymid = ST + ih / 2;
-  if (pts.length < 2) return `<svg class="spark" viewBox="0 0 ${SW} ${SH}" data-action="hist-range"><line class="zero" x1="${SL}" x2="${SL + iw}" y1="${ymid}" y2="${ymid}"/><text class="lbl" x="${SL + iw / 2}" y="${ymid - 4}" text-anchor="middle">collecting… ${pts.length}/2</text></svg>`;
-  const vals = pts.map(x => x[1]);
-  const lim = Math.max(0.25, ...vals.map(Math.abs));
-  const x = i => (SL + i / (pts.length - 1) * iw).toFixed(1), y = v => (ymid - v / lim * (ih / 2 - 1)).toFixed(1);
-  const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i)} ${y(p[1])}`).join(' ');
-  const last = vals[vals.length - 1], cls = last >= 0 ? 'up' : 'down';
-  const hm = ts => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  sparkPts = pts; sparkLim = lim;
-  return `<svg class="spark" viewBox="0 0 ${SW} ${SH}" data-action="hist-range">
-    <line class="zero" x1="${SL}" x2="${SL + iw}" y1="${ymid}" y2="${ymid}"/>
-    <path class="area ${cls}" d="${path} L${x(pts.length - 1)} ${ymid} L${SL} ${ymid} Z"/><path class="line ${cls}" d="${path}"/>
-    <text class="lbl" x="${SL}" y="${SH - 1}">${hm(pts[0][0])}</text><text class="lbl" x="${SL + iw}" y="${SH - 1}" text-anchor="end">${hm(pts[pts.length - 1][0])}</text>
-    <circle class="dot" r="2.2" cx="-10" cy="-10"/></svg>`;
-}
-let sparkHoverI = -1;
-// Tooltip + marker anchored to the hovered sample's point (re-applied after every re-render).
-function showSparkTip() {
-  const tip = $('stip'), svg = document.querySelector('#summary svg.spark'), dot = svg && svg.querySelector('.dot');
-  if (sparkHoverI < 0 || !dot || sparkPts.length < 2) { tip.hidden = true; if (dot) dot.setAttribute('cx', -10); return; }
-  const i = Math.min(sparkHoverI, sparkPts.length - 1), [ts, v, up, down] = sparkPts[i];
-  const SW = svg.viewBox.baseVal.width, iw = SW - SL - SR, ih = SH - ST - SB, ymid = ST + ih / 2;
-  const cx = SL + i / (sparkPts.length - 1) * iw, cy = ymid - v / sparkLim * (ih / 2 - 1);
-  dot.setAttribute('cx', cx.toFixed(1)); dot.setAttribute('cy', cy.toFixed(1));
-  const r = svg.getBoundingClientRect(), k = r.width / SW;
-  tip.innerHTML = `${new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · <b class="${v >= 0 ? 'up' : 'down'}">${pct(v)}</b> · ${up}↑ ${down}↓`;
-  tip.hidden = false;
-  const px = r.left + cx * k, py = r.top + cy * k;
-  tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 8, px + 8) + 'px';
-  tip.style.top = (py - tip.offsetHeight / 2) + 'px';
-}
-$('summary').addEventListener('mousemove', e => {
-  const svg = e.target.closest('svg.spark');
-  if (!svg || sparkPts.length < 2) { sparkHoverI = -1; showSparkTip(); return; }
-  const r = svg.getBoundingClientRect(), SW = svg.viewBox.baseVal.width;
-  const fx = ((e.clientX - r.left) / r.width * SW - SL) / (SW - SL - SR);
-  sparkHoverI = Math.max(0, Math.min(sparkPts.length - 1, Math.round(fx * (sparkPts.length - 1))));
-  showSparkTip();
-});
-$('summary').addEventListener('mouseleave', () => { sparkHoverI = -1; showSparkTip(); });
-// Hovering a list tab shows that list's sentiment chart (same range as the strip) without switching to it.
-$('tabs').addEventListener('mouseover', e => {
-  const tab = e.target.closest('.tab'); const pop = $('tpop');
-  if (!tab) return;
-  const l = state.lists.find(x => x.id === tab.dataset.id);
-  if (!l || !l.summary || l.summary !== true) { pop.hidden = true; return; }
-  const keepPts = sparkPts, keepLim = sparkLim;           // sparkline() writes hover state; restore the strip's
-  const b = breadth(summarySymbols(l));
-  pop.innerHTML = `<div class="t"><span>${esc(l.name)} · ${histLabel()}</span><span>${b ? `${b.up}↑ ${b.flat}– ${b.down}↓ · ${pct(b.avg)}` : ''}</span></div>` + sparkline(l.id).replace(' data-action="hist-range"', '');
-  sparkPts = keepPts; sparkLim = keepLim;
-  pop.hidden = false;
-  const r = tab.getBoundingClientRect();
-  pop.style.left = Math.min(window.innerWidth - pop.offsetWidth - 8, r.left) + 'px';
-  pop.style.top = (r.bottom + 6) + 'px';
-});
-$('tabs').addEventListener('mouseleave', () => { $('tpop').hidden = true; });
-function applySummaries() {
-  if (document.body.dataset.mview === 'lists' && isPhone()) renderPanelChrome();
-  for (const l of state.lists) {
-    const el = document.querySelector(`.badge[data-list="${l.id}"]`); if (!el) continue;
-    // summary: true → breadth of the list's equities; a symbol string → that symbol's change (e.g. TR → BIST:XU100).
-    if (typeof l.summary === 'string') {
-      const v = effChange(quotes[l.summary]);
-      el.className = 'badge ' + (v == null ? '' : dirCls(v));
-      el.innerHTML = v == null ? '' : `<i></i>${pct(v)}`;
-      el.title = `${l.name}: ${l.summary} ${v == null ? '' : pct(v)}`;
-      continue;
-    }
-    const b = l.summary ? breadth(summarySymbols(l)) : null;
-    el.className = 'badge ' + (b ? dirCls(b.avg) : '');
-    el.innerHTML = b ? `<i></i>${pct(b.avg)}` : '';
-    el.title = b ? `${l.name}: ${b.up}↑ ${b.flat}– ${b.down}↓ · average ${pct(b.avg)} (indices excluded)` : '';
-  }
-  const b = activeList().summary === true ? breadth(summarySymbols(activeList())) : null;
-  const el = $('summary');
-  if (!b) { el.innerHTML = ''; return; }
-  el.innerHTML = sparkline(activeList().id) + `<span class="srange" data-action="hist-range" title="Click to switch range">${histRange() === 'session' ? (overnightNow() ? 'night' : 'day') : histRange()}</span>` +
-    `<span class="stat"><span class="up">${b.up}↑</span> ${b.flat}– <span class="down">${b.down}↓</span> · <b class="${dirCls(b.avg)}">${pct(b.avg)}</b></span>` +
-    `<span class="meter" style="grid-template-columns:${ORDER.map(t => (b.tiers[t] || 0) + 'fr').join(' ')}">${ORDER.map(t => `<span class="t-${t < 0 ? 'd' + -t : t > 0 ? 'u' + t : 0}" title="${TIER_LABEL[t]}: ${b.tiers[t] || 0}"></span>`).join('')}</span>`;
-  showSparkTip();
-}
-// Earnings within 7 days: bordered day-count tag next to the symbol (filled when ≤ 1 day). Hover shows the date.
-function applyEarnings() {
-  const now = Date.now();
-  document.querySelectorAll('#list .row').forEach(row => {
-    const t = raw[row.dataset.symbol]?.earnings_release_next_date;
-    const days = t ? Math.round((t * 1000 - now) / 864e5) : null;
-    const show = days != null && days >= 0 && days <= 7;
-    let tag = row.querySelector('.earn');
-    if (!show) { if (tag) tag.remove(); return; }
-    if (!tag) { tag = document.createElement('i'); tag.className = 'earn'; const sym = row.querySelector('.sym'); sym.insertBefore(tag, sym.querySelector('.icon')); }
-    tag.textContent = days === 0 ? 'today' : days + 'd';
-    tag.classList.toggle('soon', days <= 1);
-    tag.title = 'Earnings ' + fmtDays(t);
-  });
-}
-function applySentiment() {
-  applySummaries();
-  applyEarnings();
-  document.querySelectorAll('#pins .chip, #list .row').forEach(el => {
-    const q = quotes[el.dataset.symbol];
-    // Outside the regular session the extended-session move (pre/post-market) is what matters.
-    const v = q ? (!regular && q.e != null ? q.e : q.c) : null, cls = sentimentClass(v);
-    // ±10 % and beyond also tints the whole row (x-up / x-down).
-    const ccls = sentimentClass(q ? q.c : null).replace(/^s-/, 'c-');   // colors the Chg% number by its own value
-    el.className = el.className.replace(/\b([sc]-(up|down)-\d|x-(up|down))\b/g, '').replace(/\s+/g, ' ').trim() + (cls ? ' ' + cls : '') + (ccls ? ' ' + ccls : '')
-      + (v != null && Math.abs(v) >= 10 ? (v > 0 ? ' x-up' : ' x-down') : '');
-  });
-}
-function renderQuotes() {
-  if (Object.keys(quotes).length) sampleHistory();
-  applySentiment();
+  $('sessLabel').textContent = label;
   regular = isRegularSession();
-  $('panel').classList.toggle('no-ext', regular);
-  if (state.detailsOpen) renderDetails();
-  document.querySelectorAll('.q[data-q]').forEach(el => {
-    const html = quoteHtml(el.dataset.q);
-    if (html === el.innerHTML) return;
-    const oldPx = el.querySelector('.px')?.textContent, oldChg = el.querySelector('.chg')?.textContent, oldExt = el.querySelector('.ext')?.textContent;
-    el.innerHTML = html;
-    const px = el.querySelector('.px');
-    const flash = (node, cls) => { if (node && !node.classList.contains('flash')) { node.classList.add('flash', cls); node.addEventListener('animationend', () => node.classList.remove('flash', cls), { once: true }); } };
-    if (oldPx != null && px.textContent !== oldPx) {
-      const d = parseFloat(px.textContent.replace(/,/g, '')) - parseFloat(oldPx.replace(/,/g, ''));
-      flash(px, d > 0 ? 'f-up' : d < 0 ? 'f-down' : 'f-same');
-    }
-    if (oldChg != null && el.querySelector('.chg').textContent !== oldChg) flash(el.querySelector('.chg'), 'f-same');
-    if (oldExt != null && el.querySelector('.ext').textContent !== oldExt) flash(el.querySelector('.ext'), 'f-same');
-  });
+  document.body.classList.toggle('regular', regular);
 }
-// Quote stream: TradingView quote websocket (unofficial). One connection, all symbols of the active list,
-// partial updates merged into `quotes`. Fields: lp/ch/chp = regular session, rtc/rch/rchp = extended session.
-const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode',
-  'open_price', 'high_price', 'low_price', 'prev_close_price', 'bid', 'ask', 'volume', 'average_volume',
-  'price_52_week_high', 'price_52_week_low', 'all_time_high', 'price_percent_change_1_week', 'price_percent_change_52_week',
-  'market_cap_basic', 'earnings_release_next_date', 'price_target_average',
-  'description', 'exchange', 'type', 'currency_code', 'session-regular', 'timezone'];
-const raw = {};
-let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, lastPulse = 0, wsEverOpen = false;
-// TradingView accepts the socket only from localhost / tradingview.com origins; elsewhere go through the relay
-// (relay/worker.js on Cloudflare). Empty RELAY_WS → scanner polling fallback.
+
+// ================= Sentiment % =================
+// A list's sentiment % is the average move of its summary symbols: equities only (indices, CFDs, futures excluded),
+// Krip only USDT pairs; TR uses BIST:XU100 itself (summary is a symbol string). summary false → no sentiment.
+const NON_EQUITY = new Set(['index', 'cfd', 'futures', 'economic']);
+const SUMMARY_MATCH = { krip: /USDT$/ };
+const effChange = q => q ? (!regular && q.e != null ? q.e : q.c) : null;   // outside regular hours the extended move counts
+const summarySymbols = list => flatSymbols(list).filter(sy => SUMMARY_MATCH[list.id] ? SUMMARY_MATCH[list.id].test(sy) : !NON_EQUITY.has(raw[sy]?.type));
+function listValue(l) {
+  if (!l.summary) return null;
+  if (typeof l.summary === 'string') return effChange(quotes[l.summary]);
+  const v = summarySymbols(l).map(sy => effChange(quotes[sy])).filter(x => x != null);
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+
+// ================= Quotes: websocket (relay off localhost), scanner polling fallback =================
+const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date'];
+const raw = {}, quotes = {};
+let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, wsEverOpen = false, lastPulse = 0, lastData = 0;
 const WS_DIRECT = 'wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart';
 const RELAY_WS = 'wss://tv-watchlist-relay.tv-watchlist.workers.dev/';
 const IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -1006,6 +444,7 @@ function wsConnect() {
     wsSend({ m: 'set_auth_token', p: ['unauthorized_user_token'] });
     wsSend({ m: 'quote_create_session', p: ['qs'] });
     wsSend({ m: 'quote_set_fields', p: ['qs', ...QUOTE_FIELDS] });
+    lastData = Date.now();
     wsSync();
     setStatus('live');
   };
@@ -1013,24 +452,22 @@ function wsConnect() {
     for (const part of String(e.data).split(/~m~\d+~m~/).filter(Boolean)) {
       if (part.startsWith('~h~')) { ws.send('~m~' + part.length + '~m~' + part); continue; }
       let m; try { m = JSON.parse(part); } catch (_) { continue; }
-      if (m.m === 'qsd' && m.p[1]?.s === 'ok') {
-        const n = m.p[1].n;
-        if (n.startsWith('BOATS:')) { raw[n] = Object.assign(raw[n] || {}, m.p[1].v); allSymbols().filter(x => boatsOf(x) === n).forEach(x => onQuote(x, {})); }
-        else onQuote(n, m.p[1].v);
-      }
+      if (m.m !== 'qsd' || m.p[1]?.s !== 'ok') continue;
+      lastData = Date.now();
+      const n = m.p[1].n;
+      if (n.startsWith('BOATS:')) { raw[n] = Object.assign(raw[n] || {}, m.p[1].v); allSymbols().filter(x => boatsOf(x) === n).forEach(x => onQuote(x, {})); }
+      else onQuote(n, m.p[1].v);
     }
   };
   ws.onclose = () => {
     setStatus('off');
-    // TradingView only accepts the socket from allow-listed origins (localhost, tradingview.com). Elsewhere: poll.
+    // TradingView accepts the socket only from allow-listed origins; if it never opened, fall back to polling.
     if (!wsEverOpen && wsRetry >= 1) { quoteSource = 'poll'; return startPolling(); }
     wsTimer = setTimeout(wsConnect, Math.min(30000, 1000 * 2 ** wsRetry++));
   };
 }
-// Subscribe exactly the active list's symbols.
-// Overnight (20:00–04:00 ET): US stocks trade on Blue Ocean ATS, which TradingView carries as a separate BOATS:<ticker>
-// symbol. Its price never reaches the primary listing's quote, so we subscribe the BOATS twins only during the overnight
-// phase and drop them again when it ends.
+// Overnight (20:00–04:00 ET) US stocks trade on Blue Ocean ATS, carried as a separate BOATS:<ticker> symbol whose price
+// never reaches the primary listing. Subscribe those twins only during the overnight phase.
 const US_EX = new Set(['NASDAQ', 'NYSE', 'AMEX', 'NYSEARCA', 'ARCA', 'BATS']);
 const boatsOf = sym => { const [ex, t] = sym.split(':'); return t && US_EX.has(ex) && !NON_EQUITY.has(raw[sym]?.type) ? 'BOATS:' + t : null; };
 const overnightNow = () => sessionPhase()[0] === 'night';
@@ -1048,734 +485,34 @@ let renderTimer = null;
 function onQuote(sym, v) {
   const r = raw[sym] = Object.assign(raw[sym] || {}, v);
   if (r.lp == null) return;
-  // Session marker: pre-market (amber), post-market (blue), overnight/BOATS (purple); none during the regular session.
+  // Extended session: pre-market (amber), post-market (blue), overnight via BOATS (purple).
   const bo = overnightNow() && boatsOf(sym) ? raw[boatsOf(sym)] : null;
   const night = bo?.lp != null;
   const ss = night ? 'night' : r.current_session === 'pre_market' ? 'pre' : r.current_session === 'post_market' ? 'post'
     : r.current_session !== 'market' && r.rtc != null ? 'night' : '';
-  const ext = { pre: 'Pre-market', post: 'Post-market', night: 'Overnight' }[ss] || '';
   const ep = night ? bo.lp : r.rtc ?? null, e = night ? (bo.lp - r.lp) / r.lp * 100 : r.rchp ?? null;
-  quotes[sym] = { p: r.lp, c: r.chp ?? 0, e, ep, es: ext, ss };
+  quotes[sym] = { p: r.lp, c: r.chp ?? 0, e, ep, ss };
+  $('tickTime').textContent = new Date().toLocaleTimeString('en-GB');
   const now = Date.now();
-  const upd = $('upd');
-  upd.textContent = '↻ ' + new Date().toLocaleTimeString('en-GB');
-  if (now - lastPulse > 1500) { lastPulse = now; upd.classList.remove('pulse'); void upd.offsetWidth; upd.classList.add('pulse'); }
+  if (now - lastPulse > 1500) { lastPulse = now; const t = $('tick'); t.classList.remove('pulse'); void t.offsetWidth; t.classList.add('pulse'); }
   if (!renderTimer) renderTimer = setTimeout(() => { renderTimer = null; renderQuotes(); }, 250);
 }
-function setStatus(st) { $('status').className = 'status ' + st; $('status').title = { live: 'Live stream connected', off: 'Reconnecting…', poll: 'Polling every 10s (live socket not allowed on this host); CFDs stream via widget' }[st]; }
+// Watchdog: the socket can stay open (heartbeats keep coming) while quote data silently stops. Crypto in the lists
+// ticks around the clock, so 30 s without any quote means the session is stuck: reconnect.
+setInterval(() => {
+  if (quoteSource === 'ws' && ws && ws.readyState === 1 && !document.hidden && Date.now() - lastData > 30000) { wsRetry = 0; wsConnect(); }
+}, 10000);
+function setStatus(st) {
+  $('dot').className = 'dot ' + st;
+  $('tick').title = { live: 'Live. Tap to reconnect.', off: 'Reconnecting… Tap to retry.', poll: 'Polling every 10 s (live socket not allowed here). Tap to refresh.' }[st];
+}
 function refreshQuotes() { if (quoteSource === 'poll') return pollNow(); wsRetry = 0; wsConnect(); }
-document.addEventListener('visibilitychange', () => { if (!document.hidden && (!ws || ws.readyState !== 1)) refreshQuotes(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && quoteSource === 'ws' && (!ws || ws.readyState !== 1)) refreshQuotes(); });
 
-function renderIntervals() {
-  const ivs = INTERVALS.some(x => x[1] === state.interval) ? INTERVALS : [...INTERVALS, [intervalLabel(state.interval), state.interval]];
-  $('intervals').querySelector('.ivbtn').textContent = intervalLabel(state.interval);
-  $('intervals').querySelector('.ivmenu').innerHTML = ivs.map(([label, v]) => `<button class="${v === state.interval ? 'on' : ''}" data-action="iv-pick" data-value="${v}">${label}</button>`).join('');
-}
-function render() {
-  const list = activeList();
-  state.activeListId = list.id;
-
-  $('tabs').innerHTML = state.lists.map(l =>
-    `<button class="tab${l.id === list.id ? ' on' : ''}" data-action="list" data-id="${l.id}">${esc(l.name)}<span class="badge" data-list="${l.id}"></span></button>`).join('');
-
-  renderIntervals();
-
-  const pins = state.pinned || [];
-  const shortOf = s => s.includes(':') ? s.split(':')[1] : s;
-  const dup = new Set(pins.map(shortOf).filter((x, i, a) => a.indexOf(x) !== i));
-  $('pins').innerHTML = pins.map(s => `
-    <button class="chip${s === state.symbol ? ' on' : ''}${noChart(s) ? ' nochart' : ''}" ${noChart(s) ? '' : 'data-action="select"'} data-symbol="${esc(s)}" title="${esc(s)}${noChart(s) ? ' · no chart in the free widget' : ''}">
-      <span class="sym">${esc(shortOf(s))}${dup.has(shortOf(s)) ? `<small>${esc(s.split(':')[0])}</small>` : ''}</span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
-      <span class="x" data-action="unpin" data-symbol="${esc(s)}" title="Unpin">×</span>
-    </button>`).join('');
-  const single = list.groups.length === 1;
-  const rowInner = (s, gi) => {
-    const sym = s.includes(':') ? s.split(':')[1] : s;
-    return `<div class="row${s === state.symbol ? ' on' : ''}${noChart(s) ? ' nochart' : ''}" draggable="true" ${noChart(s) ? '' : 'data-action="select"'} data-group="${gi}" data-symbol="${esc(s)}" title="${esc(s)}${noChart(s) ? ' · no chart in the free widget' : ''}">
-        <span class="sym"><span class="name">${esc(sym)}</span><button class="icon star${(state.pinned || []).includes(s) ? ' on' : ''}" data-action="${(state.pinned || []).includes(s) ? 'unpin' : 'pin'}" data-symbol="${esc(s)}" title="${(state.pinned || []).includes(s) ? 'Unpin from top' : 'Pin to top'}">${(state.pinned || []).includes(s) ? '★' : '☆'}</button></span><span class="q" data-q="${esc(s)}">${quoteHtml(s)}</span>
-        <button class="icon info" data-action="details" data-symbol="${esc(s)}" title="Details">i</button>
-        <button class="icon rm" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}" title="Remove">×</button>
-        <span class="hnd" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9h14M5 15h14"/></svg></span>
-      </div>`; };
-  // Phones: swipe a row left to reveal Details / Remove behind it (desktop shows the row's hover icons instead).
-  const rowHtml = (s, gi) => `<div class="rowwrap"><div class="racts"><button data-action="details" data-symbol="${esc(s)}">Details</button><button class="rm" data-action="remove" data-group="${gi}" data-symbol="${esc(s)}">Remove</button></div>${rowInner(s, gi)}</div>`;
-  // Sorted view (state.sort = 'chg'): indices / CFDs keep their place, every other symbol is one group ordered by change.
-  // Rows keep their real group index so remove / pin still work; reordering is off until the sort is reset.
-  document.body.classList.toggle('sorted', state.sort === 'chg');
-  if (state.sort === 'chg') {
-    const giOf = sym => list.groups.findIndex(g => g.symbols.includes(sym));
-    const all = flatSymbols(list), fixed = all.filter(sy => NON_EQUITY.has(raw[sy]?.type) || noChart(sy));
-    const rest = all.filter(sy => !fixed.includes(sy)).sort((a, c) => (effChange(quotes[c]) ?? -Infinity) - (effChange(quotes[a]) ?? -Infinity));
-    const gtab = (name, n) => `<div class="group"><div class="gtab"><span class="gname">${name}</span><span class="gcount" style="padding:0">${n}</span></div><div class="grows">`;
-    $('list').innerHTML = (fixed.length ? gtab('Index', fixed.length) + fixed.map(sy => rowHtml(sy, giOf(sy))).join('') + '</div></div>' : '')
-      + gtab('By change', rest.length) + rest.map(sy => rowHtml(sy, giOf(sy))).join('') + '</div></div>';
-  } else
-  // Groups: a vertical tab on the left of the group's rows (click = collapse); single-group lists have no tab.
-  $('list').innerHTML = list.groups.length ? list.groups.map((g, gi) => single
-    ? g.symbols.map(s => rowHtml(s, gi)).join('')
-    : `<div class="group${g.collapsed ? ' collapsed' : ''}">
-      <div class="gtab" data-action="toggle-group" data-group="${gi}" title="${esc(g.name)} · click to ${g.collapsed ? 'expand' : 'collapse'}">
-        <span class="chev">▾</span><span class="gname">${esc(g.name)}</span>
-        <span class="gtools"><button class="icon" data-action="rename-group" data-group="${gi}" title="Rename group">✎</button><button class="icon" data-action="delete-group" data-group="${gi}" title="Delete group">×</button></span>
-      </div>
-      <div class="grows">${g.collapsed ? `<div class="gcount">${g.symbols.length} symbols</div>` : g.symbols.map(s => rowHtml(s, gi)).join('')}</div>
-    </div>`).join('') + `<div class="grp" data-action="add-group" style="cursor:pointer">+ group</div>`
-  : `<div class="empty">No groups yet</div><div class="grp" data-action="add-group">+ group</div>`;
-  renderSelbar();
-  renderMLists();
-  applySentiment();
-}
-// A list's headline number: the tab badge logic (breadth average, or a proxy symbol such as XU100 for TR).
-const listValue = l => typeof l.summary === 'string' ? effChange(quotes[l.summary]) : (breadth(summarySymbols(l))?.avg ?? null);
-let editMode = false;
-const ticksHtml = syms => syms.map(sy => effChange(quotes[sy])).filter(x => x != null).sort((a, c) => a - c)
-  .map(x => { const t = tierOf(x); return `<i class="t-${t < 0 ? 'd' + -t : t > 0 ? 'u' + t : 0}"></i>`; }).join('');
-// Phone chrome around the list: head (name, day, breadth) on top; list strip + action bar at the bottom.
-function renderPanelChrome() {
-  const l = activeList(), syms = summarySymbols(l), b = breadth(syms), v = listValue(l);
-  const hw = Math.max(120, Math.round((($('phead').clientWidth || 360) - 24 - 12) / 2));   // right column = half the head
-  $('phead').innerHTML = `<div class="pinfo"><b>${esc(l.name)}</b><span class="big ${v == null ? '' : dirCls(v)}">${v == null ? '' : pct(v)}</span>
-      ${b ? `<span class="meter ticks">${ticksHtml(syms)}</span>` : ''}</div>
-    <span class="hist">${(hist[l.id] || []).length ? sparkline(l.id, Math.round(hw * SH / 40)) + `<span class="srange">${histRange() === 'session' ? (overnightNow() ? 'night' : 'day') : histRange()}</span>` : ''}</span>
-    ${editMode ? `<span class="hint">Tap a row for options · drag ≡ to reorder · tap a group name to rename</span>` : ''}`;
-  const strip = $('strip'), x = strip.querySelector('.chips')?.scrollLeft || 0;
-  strip.innerHTML = '<div class="chips">' + state.lists.map(li => { const lv = listValue(li); return `<button class="lchip${li.id === state.activeListId ? ' on' : ''} ${sentimentClass(lv)}" data-action="list" data-id="${esc(li.id)}">
-      <b>${esc(li.name)}</b><small class="${lv == null ? '' : dirCls(lv)}">${lv == null ? flatSymbols(li).length + ' sym' : pct(lv)}</small>${(bb => bb ? `<span class="mm" style="grid-template-columns:${bb.down}fr ${bb.flat}fr ${bb.up}fr"><i class="d"></i><i class="f"></i><i class="u"></i></span>` : '')(breadth(summarySymbols(li)))}</button>`; }).join('')
-    + `<button class="lchip add" data-action="manage-lists" title="Manage lists">⋯</button></div>`
-    + `<span class="acts"><button class="pill primary sq" data-action="open-search" title="Add symbol">+</button><button class="pill sq${state.sort === 'chg' ? ' on' : ''}" data-action="sort-chg" title="${state.sort === 'chg' ? 'Restore your order' : 'Sort by change'}">⇅</button><button class="pill sq" data-action="edit-toggle" title="Edit list">✎</button></span>`;
-  strip.querySelector('.chips').scrollLeft = x;
-  $('bbar').innerHTML = `<button class="pill" data-action="add-group">+ Group</button><button class="pill" data-action="rename-list">Rename</button><button class="pill danger sq" data-action="delete-list" title="Delete list">🗑</button><button class="pill primary" data-action="edit-toggle">Done</button>`;
-}
-function renderMLists() { renderPanelChrome(); }
-function renderSelbar() {
-  const sym = state.symbol, el = $('selbar');
-  if (!sym) { el.innerHTML = ''; return; }
-  const inList = flatSymbols(activeList()).includes(sym);
-  const short = sym.includes(':') ? sym.split(':')[1] : sym;
-  const desc = raw[sym]?.description || '';
-  el.innerHTML = `<span class="ssym" title="${esc(sym)}">${esc(short)}<small>${esc(sym.split(':')[0] || '')}</small></span>` +
-    `<span class="sdesc" title="${esc(desc)}">${esc(desc === short ? '' : desc)}</span>` +
-    `<span class="q" data-q="${esc(sym)}">${quoteHtml(sym)}</span>` +
-    (inList ? '' : `<button class="sadd" data-action="add-selected" title="Add ${esc(sym)} to ${esc(activeList().name)}">+ Add to ${esc(activeList().name)}</button>`);
-}
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-function update(switchSymbol) { save(); render(); if (switchSymbol) showSymbol(); if (state.detailsOpen) renderDetails(); }
-
-// Drag & drop: reorder symbols within a group or move them between groups (drop on a row or a group header).
-let drag = null;
-const listEl = $('list');
-listEl.addEventListener('dragstart', e => {
-  const row = e.target.closest('.row'); if (!row || state.sort) { e.preventDefault(); return; }
-  drag = { gi: +row.dataset.group, sym: row.dataset.symbol };
-  row.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', drag.sym);
-});
-listEl.addEventListener('dragend', () => { drag = null; clearDrop(); });
-const clearDrop = () => listEl.querySelectorAll('.drop-before, .drop-into, .dragging').forEach(el => el.classList.remove('drop-before', 'drop-into', 'dragging'));
-listEl.addEventListener('dragover', e => {
-  if (!drag) return;
-  const row = e.target.closest('.row'), grp = e.target.closest('.gtab');
-  if (!row && !grp) return;
-  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-  clearDrop();
-  (row || grp).classList.add(row ? 'drop-before' : 'drop-into');
-});
-listEl.addEventListener('drop', e => {
-  if (!drag) return;
-  const row = e.target.closest('.row'), grp = e.target.closest('.gtab');
-  if (!row && !grp) return;
-  e.preventDefault();
-  if (row && row.dataset.symbol === drag.sym) { drag = null; clearDrop(); return; }
-  const list = activeList();
-  const from = list.groups[drag.gi];
-  from.symbols.splice(from.symbols.indexOf(drag.sym), 1);
-  if (row) {
-    const to = list.groups[+row.dataset.group];
-    const idx = to.symbols.indexOf(row.dataset.symbol);
-    to.symbols.splice(idx < 0 ? to.symbols.length : idx, 0, drag.sym);
-  } else {
-    list.groups[+grp.dataset.group].symbols.push(drag.sym);
-  }
-  drag = null; update(false); renderQuotes();
-});
-
-document.addEventListener('click', e => {
-  const el = e.target.closest('[data-action]');
-  if (!el) return;
-  const list = activeList();
-  const gi = +el.dataset.group;
-  switch (el.dataset.action) {
-    case 'select':
-      if (editMode && isPhone()) { openRowOpts(el.dataset.symbol, +el.dataset.group); break; }
-      state.symbol = el.dataset.symbol; update(true);
-      if (isPhone() && !state.chartHidden) setMobileView('chart'); break;
-    case 'remove': {
-      e.stopPropagation();
-      const g = list.groups[gi], sym = el.dataset.symbol, at = g.symbols.indexOf(sym);
-      g.symbols = g.symbols.filter(s => s !== sym);
-      update(false); wsSync();
-      if (isPhone()) toast(`${sym.split(':').pop()} removed`, 'Undo', () => { g.symbols.splice(Math.min(at, g.symbols.length), 0, sym); update(false); wsSync(); });
-      break;
-    }
-    case 'sort-chg':
-      state.sort = state.sort === 'chg' ? null : 'chg'; update(false); renderQuotes(); break;
-    case 'edit-toggle':
-      if (!editMode && state.sort) { state.sort = null; }   // editing works on your own order
-      editMode = !editMode; document.body.classList.toggle('edit', editMode); document.body.classList.remove('strip-open'); renderPanelChrome(); break;
-    case 'rename-list': {
-      const name = prompt('List name', list.name); if (!name || !name.trim()) return;
-      list.name = name.trim(); update(false); break;
-    }
-    case 'delete-list': {
-      if (state.lists.length === 1) return alert('Cannot delete the last list');
-      if (!confirm(`Delete list "${list.name}"?`)) return;
-      state.lists = state.lists.filter(x => x.id !== list.id); state.activeListId = state.lists[0].id;
-      editMode = false; document.body.classList.remove('edit'); update(false); wsSync(); break;
-    }
-    case 'open-search':
-      openCmd('symbol', ''); break;
-    case 'sheet-close':
-      closeOverlay(); break;
-    case 'toggle-group':
-      list.groups[gi].collapsed = !list.groups[gi].collapsed; update(false); break;
-    case 'add-group': {
-      const name = prompt('Group name'); if (!name) return;
-      list.groups.push({ name: name.trim(), collapsed: false, symbols: [] }); update(false); break;
-    }
-    case 'rename-group': {
-      e.stopPropagation();
-      const name = prompt('Group name', list.groups[gi].name); if (!name) return;
-      list.groups[gi].name = name.trim(); update(false); break;
-    }
-    case 'delete-group': {
-      e.stopPropagation();
-      if (!confirm(`Delete group "${list.groups[gi].name}"?`)) return;
-      list.groups.splice(gi, 1); update(false); wsSync(); break;
-    }
-    case 'list':
-      if (el.closest('#strip')) document.body.classList.remove('strip-open');   // before update() re-renders the strip and detaches el
-      state.activeListId = el.dataset.id; update(false); wsSync(); break;
-    case 'pin':
-      e.stopPropagation();
-      if (!(state.pinned || []).includes(el.dataset.symbol)) state.pinned = [...(state.pinned || []), el.dataset.symbol];
-      update(false); wsSync(); break;
-    case 'unpin':
-      e.stopPropagation();
-      if (el.closest('.chip') && !confirm(`Remove ${el.dataset.symbol} from the top bar?`)) return;
-      state.pinned = state.pinned.filter(x => x !== el.dataset.symbol); update(false); wsSync(); break;
-    case 'manage-lists':
-      renderListDlg(); $('listDlg').showModal(); break;
-    case 'close-dlg':
-      $('listDlg').close(); break;
-    case 'dlg-delete': {
-      const l = state.lists.find(x => x.id === el.dataset.id);
-      if (state.lists.length === 1) return alert('Cannot delete the last list');
-      if (!confirm(`Delete list "${l.name}"?`)) return;
-      state.lists = state.lists.filter(x => x.id !== l.id);
-      if (state.activeListId === l.id) state.activeListId = state.lists[0].id;
-      update(false); wsSync(); renderListDlg(); break;
-    }
-    case 'dlg-move': {
-      const i = state.lists.findIndex(x => x.id === el.dataset.id), j = i + (+el.dataset.dir);
-      if (j < 0 || j >= state.lists.length) return;
-      [state.lists[i], state.lists[j]] = [state.lists[j], state.lists[i]];
-      update(false); renderListDlg(); break;
-    }
-    case 'details':
-      e.stopPropagation();
-      state.symbol = el.dataset.symbol; state.detailsOpen = true; save(); render();
-      if (!noChart(state.symbol)) showSymbol();
-      applyDetails(); break;
-    case 'add-selected':
-      addSymbol(state.symbol); break;
-    case 'hist-range':
-      state.histRange = HIST_RANGES[(HIST_RANGES.findIndex(r => r[0] === histRange()) + 1) % HIST_RANGES.length][0]; save(); applySummaries(); break;
-    case 'iv-toggle': {
-      e.stopPropagation();
-      const m = $('intervals').querySelector('.ivmenu'), open = m.hidden;
-      closeSheets(); if (open) { m.hidden = false; $('ivbackdrop').hidden = false; } break;
-    }
-    case 'iv-close':
-      closeSheets(); break;
-    case 'iv-pick':
-      e.stopPropagation();
-      state.interval = el.dataset.value; update(false); send('set-interval', { interval: state.interval });
-      closeSheets(); break;
-    case 'toggle-details':
-      state.detailsOpen = !state.detailsOpen; save(); applyDetails(); break;
-    case 'toggle-chart':
-      state.chartHidden = !state.chartHidden; save(); applyChartHidden(); renderHud(); break;
-    case 'mview':
-      if (el.dataset.view === 'lists' && document.body.dataset.mview === 'lists') { document.body.classList.toggle('strip-open'); break; }
-      document.body.classList.remove('strip-open'); setMobileView(el.dataset.view); break;
-  }
-});
-const isPhone = () => window.innerWidth < 768;
-
-// ---- Phone sheets: row options, move to group / copy to list; undo toast ----
-function sheet(html) { $('overlay').hidden = false; $('overlay').innerHTML = `<div class="backdrop" data-action="sheet-close"></div><div class="sheet">${html}</div>`; }
-function closeOverlay() { $('overlay').hidden = true; $('overlay').innerHTML = ''; }
-function openRowOpts(sym, gi) {
-  const l = activeList(), g = l.groups[gi], short = sym.split(':').pop(), pinned = (state.pinned || []).includes(sym);
-  sheet(`<h3>${esc(short)} <small style="color:var(--muted);font-weight:400">${esc(sym.split(':')[0])}</small></h3><div class="sbody">
-    <button class="opt" data-o="move">Move to group / copy to list<span class="c">${esc(g.name)}</span></button>
-    <button class="opt" data-o="pin">${pinned ? 'Unpin from top' : 'Pin to top'}</button>
-    <button class="opt" data-o="top">Move to top of group</button>
-    <button class="opt" data-o="details">Details</button>
-    <button class="opt danger" data-o="rm">Remove from list</button></div>`);
-  $('overlay').querySelectorAll('[data-o]').forEach(b => b.addEventListener('click', () => {
-    const o = b.dataset.o; closeOverlay();
-    if (o === 'move') openMoveSheet(sym, gi);
-    if (o === 'pin') { state.pinned = pinned ? state.pinned.filter(x => x !== sym) : [...(state.pinned || []), sym]; update(false); wsSync(); }
-    if (o === 'top') { g.symbols = [sym, ...g.symbols.filter(x => x !== sym)]; update(false); }
-    if (o === 'details') { state.symbol = sym; state.detailsOpen = true; save(); render(); applyDetails(); }
-    if (o === 'rm') { const at = g.symbols.indexOf(sym); g.symbols = g.symbols.filter(x => x !== sym); update(false); wsSync();
-      toast(`${short} removed`, 'Undo', () => { g.symbols.splice(Math.min(at, g.symbols.length), 0, sym); update(false); wsSync(); }); }
-  }));
-}
-function openMoveSheet(sym, from) {
-  const l = activeList();
-  sheet(`<h3>${esc(sym.split(':').pop())} → </h3><div class="sbody">
-    ${l.groups.map((g, gi) => `<button class="opt${gi === from ? ' on' : ''}" data-g="${gi}">${esc(g.name)}<span class="c">${g.symbols.length}</span></button>`).join('')}
-    ${state.lists.filter(x => x !== l).map(x => `<button class="opt" data-l="${esc(x.id)}">Copy to ${esc(x.name)}<span class="c">${flatSymbols(x).length}</span></button>`).join('')}</div>`);
-  $('overlay').querySelectorAll('[data-g]').forEach(b => b.addEventListener('click', () => {
-    const gi = +b.dataset.g; closeOverlay();
-    if (gi === from) return;
-    l.groups[from].symbols = l.groups[from].symbols.filter(x => x !== sym); l.groups[gi].symbols.push(sym); update(false);
-  }));
-  $('overlay').querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => {
-    const x = state.lists.find(y => y.id === b.dataset.l), g = x.groups[x.groups.length - 1]; closeOverlay();
-    if (!g) return;
-    if (!flatSymbols(x).includes(sym)) g.symbols.push(sym);
-    update(false); wsSync(); toast(`${sym.split(':').pop()} → ${x.name}`);
-  }));
-}
-let toastTimer = null;
-function toast(text, action, fn) {
-  document.querySelector('.toast')?.remove();
-  const t = document.createElement('div'); t.className = 'toast';
-  t.innerHTML = `<span>${esc(text)}</span>${action ? `<button>${esc(action)}</button>` : ''}`;
-  if (action) t.querySelector('button').addEventListener('click', () => { t.remove(); fn(); });
-  document.body.appendChild(t); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 4000);
-}
-
-// ---- Phone swipe: drag a row left to reveal its actions; any tap elsewhere closes it ----
-let swipe = null, swipedRecently = false;
-const closeSwipes = except => listEl.querySelectorAll('.rowwrap.open').forEach(w => { if (w !== except) w.classList.remove('open'); });
-listEl.addEventListener('pointerdown', e => {
-  if (e.pointerType === 'mouse' || editMode || !isPhone()) return;
-  const row = e.target.closest('.row'); if (!row) return;
-  swipe = { row, wrap: row.parentElement, x: e.clientX, y: e.clientY, dx: 0, active: false, wasOpen: row.parentElement.classList.contains('open') };
-});
-listEl.addEventListener('pointermove', e => {
-  if (!swipe) return;
-  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
-  if (!swipe.active) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; } if (Math.abs(dx) < 12) return;
-    swipe.active = true; swipe.wrap.classList.add('swiping'); swipe.row.style.transition = 'none'; closeSwipes(swipe.wrap); }
-  const base = swipe.wasOpen ? -140 : 0;
-  swipe.dx = Math.max(-140, Math.min(0, base + dx));
-  swipe.row.style.transform = `translateX(${swipe.dx}px)`;
-});
-const endSwipe = () => {
-  if (!swipe) return;
-  const { row, wrap, dx, active } = swipe; swipe = null;
-  if (!active) return;
-  row.style.transition = ''; row.style.transform = ''; wrap.classList.remove('swiping');
-  wrap.classList.toggle('open', dx < -70);
-  swipedRecently = true; setTimeout(() => { swipedRecently = false; }, 300);
-};
-listEl.addEventListener('pointerup', endSwipe);
-listEl.addEventListener('pointercancel', endSwipe);
-document.addEventListener('click', e => {
-  if (swipedRecently) { e.stopPropagation(); e.preventDefault(); return; }   // the swipe is not a tap
-  const w = e.target.closest('.rowwrap');
-  if (w && w.classList.contains('open') && !e.target.closest('.racts')) { w.classList.remove('open'); e.stopPropagation(); e.preventDefault(); return; }
-  closeSwipes(w && e.target.closest('.racts') ? w : null);
-}, true);
-
-// ---- Phone drag: hold the ≡ handle (pointer events, so touch works), drop between rows or onto a group tab ----
-let pdrag = null;
-listEl.addEventListener('pointerdown', e => {
-  const h = e.target.closest('.hnd'); if (!h || !editMode || state.sort) return;
-  const row = h.closest('.row'); e.preventDefault();
-  pdrag = { row, sym: row.dataset.symbol, gi: +row.dataset.group, pos: null };
-  row.classList.add('dragging'); h.setPointerCapture(e.pointerId);
-});
-listEl.addEventListener('pointermove', e => {
-  if (!pdrag) return;
-  clearDrop(); pdrag.row.classList.add('dragging');
-  const items = [...listEl.querySelectorAll('.row:not(.dragging), .gtab')];
-  let target = null, before = true;
-  for (const it of items) { const r = it.getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { target = it; before = true; break; } target = it; before = false; }
-  if (!target) return;
-  if (target.classList.contains('gtab')) { target.classList.add('drop-into'); pdrag.pos = { gi: +target.dataset.group, sym: null }; return; }
-  target.classList.add('drop-before'); pdrag.pos = { gi: +target.dataset.group, sym: target.dataset.symbol, after: !before };
-  const cr = listEl.getBoundingClientRect();
-  if (e.clientY < cr.top + 40) listEl.scrollTop -= 8; else if (e.clientY > cr.bottom - 40) listEl.scrollTop += 8;
-});
-listEl.addEventListener('pointerup', () => {
-  if (!pdrag) return;
-  const { sym, gi, pos } = pdrag; pdrag = null; clearDrop();
-  if (!pos || (pos.sym === sym)) return;
-  const list = activeList(), from = list.groups[gi];
-  from.symbols.splice(from.symbols.indexOf(sym), 1);
-  const to = list.groups[pos.gi];
-  if (pos.sym == null) to.symbols.push(sym);
-  else { const i = to.symbols.indexOf(pos.sym); to.symbols.splice(i < 0 ? to.symbols.length : i + (pos.after ? 1 : 0), 0, sym); }
-  update(false); renderQuotes();
-});
-listEl.addEventListener('pointercancel', () => { if (pdrag) { pdrag = null; clearDrop(); } });
-
-
-function closeSheets() { $('intervals').querySelector('.ivmenu').hidden = true; $('ivbackdrop').hidden = true; unshift(); }
-// iOS: focusing an input inside the fixed body scrolls the document to reveal it; after the keyboard closes the
-// layout stays shifted and taps land one or two rows above their targets. Snap the document back to the top.
-// iOS home-screen app: the web view can stop short of the screen bottom (by about the status bar's height). The strip
-// below it is native, painted with the manifest's background_color (set to the nav color), and it already sits over the
-// home indicator, so the nav's own bottom padding is wasted there. Detect that case and drop the padding (body.ios-gap).
-// Nothing is moved or stretched, so taps keep landing where they should; it measures every time and turns itself off
-// once iOS gives the page the full screen.
-function fitStandalone() {
-  if (!matchMedia('(display-mode: standalone)').matches && !navigator.standalone) return;
-  const portrait = matchMedia('(orientation: portrait)').matches;
-  const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-  const gap = Math.round(full - window.innerHeight);
-  document.body.classList.toggle('ios-gap', gap > 0 && gap <= 100);   // > 100 would be the keyboard, not the bug
-}
-fitStandalone();
-window.addEventListener('resize', fitStandalone);
-window.addEventListener('orientationchange', () => setTimeout(fitStandalone, 300));
-function unshift() { if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0); }
-document.addEventListener('focusout', () => setTimeout(unshift, 60));
-$('appVer').textContent = 'v' + APP_VERSION;
-window.visualViewport?.addEventListener('resize', () => setTimeout(unshift, 60));
-document.addEventListener('click', e => { if (!e.target.closest('#intervals')) closeSheets(); }, true);
-// Symbol search for the add box: TradingView's search via the relay (full coverage), scanner as fallback.
-const RELAY_HTTP = RELAY_WS ? RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '') : '';
-const PREFERRED_EX = ['NASDAQ', 'NYSE', 'AMEX', 'CBOE', 'BIST', 'BINANCE', 'OANDA', 'FX', 'TVC', 'SKILLING', 'CAPITALCOM', 'CME_MINI', 'OKX', 'FX_IDC', 'COINBASE', 'CRYPTOCAP', 'SP', 'DJ'];
-const stripEm = x => String(x || '').replace(/<\/?em>/g, '');
-async function searchSymbols(text) {
-  if (RELAY_HTTP) {
-    try {
-      const r = await fetch(`${RELAY_HTTP}/search?text=${encodeURIComponent(text)}`);
-      if (r.ok) {
-        const j = await r.json();
-        const items = (j.symbols || []).map(it => ({
-          sym: `${it.prefix || it.source_id || it.exchange}:${stripEm(it.symbol)}`,
-          desc: stripEm(it.description), ex: it.exchange, type: it.type,
-        }));
-        if (items.length) return items.slice(0, 10);
-      }
-    } catch (_) {}
-  }
-  // Fallback: scanner (no broker CFDs), primary listings on familiar exchanges, biggest first.
-  try {
-    const body = { filter: [{ left: 'is_primary', operation: 'equal', right: true }, { left: 'exchange', operation: 'in_range', right: PREFERRED_EX }],
-      filter2: { operator: 'or', operands: [{ expression: { left: 'name', operation: 'match', right: text } }, { expression: { left: 'description', operation: 'match', right: text } }] },
-      columns: ['name', 'exchange', 'description', 'type'], sort: { sortBy: 'market_cap_basic', sortOrder: 'desc', nullsFirst: false }, range: [0, 10] };
-    const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify(body) });
-    return ((await r.json()).data || []).map(row => ({ sym: row.s, desc: row.d[2], ex: row.d[1], type: row.d[3] }));
-  } catch (_) { return []; }
-}
-let acItems = [], acIndex = -1, acTimer = null, acSeq = 0;
-function renderAc() {
-  const box = $('ac');
-  if (!acItems.length) { box.hidden = true; box.innerHTML = ''; return; }
-  box.innerHTML = acItems.map((it, i) => `<div class="ac-item${i === acIndex ? ' on' : ''}" data-i="${i}" title="${esc(it.sym)}">
-    <span class="s">${esc(it.sym)}</span><span class="ex">${esc(it.type || '')}</span><span class="d">${esc(it.desc || '')}</span></div>`).join('');
-  box.hidden = false;
-  box.querySelector('.ac-item.on')?.scrollIntoView({ block: 'nearest' });
-}
-function closeAc() { acItems = []; acIndex = -1; renderAc(); }
-function addSymbol(sym) {
-  const list = activeList();
-  sym = sym.trim().toUpperCase();
-  if (!sym) return;
-  if (!list.groups.length) list.groups.push({ name: 'Main', collapsed: false, symbols: [] });
-  const g = list.groups[list.groups.length - 1];
-  if (!flatSymbols(list).includes(sym)) g.symbols.push(sym);
-  $('symInput').value = ''; closeAc();
-  state.symbol = sym; update(true); wsSync();
-}
-$('symInput').addEventListener('input', e => {
-  autofilled = false;
-  const text = e.target.value.trim();
-  clearTimeout(acTimer);
-  if (!text) return closeAc();
-  acTimer = setTimeout(async () => {
-    const seq = ++acSeq;
-    const items = await searchSymbols(text);
-    if (seq !== acSeq) return;  // a newer query is in flight
-    acItems = items; acIndex = items.length ? 0 : -1; renderAc();
-  }, 250);
-});
-$('symInput').addEventListener('keydown', e => {
-  if (!acItems.length) { if (e.key === 'Escape') closeAc(); return; }
-  if (e.key === 'ArrowDown') { acIndex = (acIndex + 1) % acItems.length; renderAc(); e.preventDefault(); }
-  else if (e.key === 'ArrowUp') { acIndex = (acIndex - 1 + acItems.length) % acItems.length; renderAc(); e.preventDefault(); }
-  else if (e.key === 'Escape') { closeAc(); }
-});
-$('ac').addEventListener('mousedown', e => { const it = e.target.closest('.ac-item'); if (it) { e.preventDefault(); addSymbol(acItems[+it.dataset.i].sym); } });
-$('symInput').addEventListener('blur', () => setTimeout(closeAc, 150));
-$('addForm').addEventListener('submit', e => {
-  e.preventDefault();
-  // Enter picks the highlighted suggestion; a raw EXCHANGE:SYMBOL still works without one.
-  addSymbol(acIndex >= 0 && acItems[acIndex] ? acItems[acIndex].sym : $('symInput').value);
-});
-
-function applyDetails() {
-  document.body.classList.toggle('details-open', !!state.detailsOpen);
-  if (state.detailsOpen) renderDetails();
-}
-
-// Mobile: which of the three views is on screen (desktop shows all side by side and ignores this).
-function setMobileView(v) {
-  state.mview = v; save();
-  document.body.dataset.mview = v;
-  document.querySelectorAll('.mnav button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
-  if (v === 'chart') {
-    // A widget mounted while its container was display:none stays blank; mount it fresh the first time it is shown.
-    if (chart.hiddenAtMount) { chart.ready = false; chart.pending = {}; mountChart(); showSymbol(); }
-    else window.dispatchEvent(new Event('resize'));
-  }
-}
-function applyChartHidden() {
-  document.body.classList.toggle('chart-hidden', !!state.chartHidden);
-  $('chartToggle').classList.toggle('off', !!state.chartHidden);
-  $('chartToggle').title = state.chartHidden ? 'Show chart' : 'Hide chart';
-}
-applyChartHidden();
-
-// List management dialog: rename inline, reorder, delete, add.
-function renderListDlg() {
-  $('dlgRows').innerHTML = state.lists.map((l, i) => `
-    <div class="dlg-row">
-      <input value="${esc(l.name)}" data-rename="${l.id}" aria-label="List name">
-      <label class="sum" title="Show sentiment summary (tab badge + breadth bar)"><input type="checkbox" data-summary="${l.id}" ${l.summary ? 'checked' : ''}>Σ</label>
-      <span class="count">${flatSymbols(l).length} sym</span>
-      <button class="icon move" data-action="dlg-move" data-id="${l.id}" data-dir="-1" title="Move up" ${i === 0 ? 'disabled' : ''}>▲</button>
-      <button class="icon move" data-action="dlg-move" data-id="${l.id}" data-dir="1" title="Move down" ${i === state.lists.length - 1 ? 'disabled' : ''}>▼</button>
-      <button class="icon" data-action="dlg-delete" data-id="${l.id}" title="Delete list">🗑</button>
-    </div>`).join('');
-}
-$('dlgRows').addEventListener('change', e => {
-  if (e.target.dataset.summary) {
-    const l = state.lists.find(x => x.id === e.target.dataset.summary);
-    if (typeof l.summary === 'string') l.summarySymbol = l.summary;   // remember the symbol mode across toggles
-    l.summary = e.target.checked ? (l.summarySymbol || true) : false;
-    update(false); return;
-  }
-  const id = e.target.dataset.rename; if (!id) return;
-  const name = e.target.value.trim();
-  if (!name) { e.target.value = state.lists.find(l => l.id === id).name; return; }
-  state.lists.find(l => l.id === id).name = name; update(false);
-});
-$('pinForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const syms = $('pinInput').value.split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
-  if (!syms.length) return;
-  state.pinned = [...new Set([...(state.pinned || []), ...syms])];
-  $('pinInput').value = '';
-  update(false); wsSync();
-});
-$('newListForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const name = $('newListName').value.trim(); if (!name) return;
-  const l = { id: uid(), name, groups: [{ name: 'Main', collapsed: false, symbols: [] }] };
-  state.lists.push(l); state.activeListId = l.id;
-  $('newListName').value = '';
-  update(false); wsSync(); renderListDlg();
-});
-$('listDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
-
-// Command palette (TradingView-style): type a letter anywhere → symbol search; type a digit → interval entry.
-const cmd = { mode: 'symbol', items: [], index: -1, seq: 0, timer: null };
-function parseInterval(text) {
-  const m = /^(\d{1,4})\s*([mhdwMHDW]?)$/.exec(text.trim()); if (!m) return null;
-  const n = +m[1], u = (m[2] || 'm').toLowerCase();
-  if (!n) return null;
-  if (u === 'm') return String(n);
-  if (u === 'h') return String(n * 60);
-  if (u === 'd') return n === 1 ? 'D' : n + 'D';
-  if (u === 'w') return n === 1 ? 'W' : n + 'W';
-  return null;
-}
-const COMMANDS = [
-  ['sort', 'Sort by change (indices stay on top) / restore your order', () => { state.sort = state.sort === 'chg' ? null : 'chg'; update(false); renderQuotes(); }],
-  ['go SYM', 'Open a symbol on the chart', a => { if (a) { state.symbol = a.toUpperCase(); update(!noChart(state.symbol)); } }],
-  ['add SYM', 'Add a symbol to the active list', a => a && addSymbol(a)],
-  ['remove SYM', 'Remove a symbol from the active list', a => { const sy = a.toUpperCase(); activeList().groups.forEach(g => { g.symbols = g.symbols.filter(x => x !== sy); }); update(false); wsSync(); }],
-  ['pin SYM', 'Pin a symbol to the top bar', a => { const sy = a.toUpperCase(); if (sy && !state.pinned.includes(sy)) { state.pinned.push(sy); update(false); wsSync(); } }],
-  ['unpin SYM', 'Unpin a symbol', a => { state.pinned = state.pinned.filter(x => x !== a.toUpperCase()); update(false); wsSync(); }],
-  ['list NAME', 'Switch to a watchlist', a => { const l = state.lists.find(x => x.name.toLowerCase().startsWith(a.toLowerCase())); if (l) { state.activeListId = l.id; update(false); wsSync(); } }],
-  ['interval 2h', 'Set the chart interval', a => { const v = parseInterval(a); if (v) { state.interval = v; save(); renderIntervals(); send('set-interval', { interval: v }); } }],
-  ['range 1h|4h|day|24h', 'Sentiment chart range', a => { const k = a.trim().toLowerCase(); state.histRange = k === 'day' || k === 'open' ? 'session' : (HIST_RANGES.some(r => r[0] === k) ? k : 'session'); save(); applySummaries(); }],
-  ['details', 'Toggle the details panel', () => { state.detailsOpen = !state.detailsOpen; save(); applyDetails(); }],
-  ['chart', 'Show / hide the chart', () => { state.chartHidden = !state.chartHidden; save(); applyChartHidden(); renderHud(); }],
-  ['lists', 'Manage watchlists', () => { renderListDlg(); $('listDlg').showModal(); }],
-  ['reconnect', 'Reconnect the quote stream', () => refreshQuotes()],
-];
-function openCmd(mode, seed) {
-  cmd.mode = mode; cmd.items = []; cmd.index = -1;
-  $('cmdMode').textContent = mode === 'symbol' ? 'Symbol' : mode === 'interval' ? 'Interval' : 'Command';
-  $('cmdInput').placeholder = mode === 'symbol' ? 'Search symbol' : mode === 'interval' ? 'e.g. 15, 2h, 1d, 1w' : 'pin NBIS · list İnci · details';
-  $('cmdInput').value = seed; $('cmdHint').textContent = '';
-  $('cmdList').innerHTML = mode === 'symbol' ? '' : `<div class="cmd-foot">Number = minutes · h = hours · d = days · w = weeks · Enter applies</div>`;
-  const d = $('cmd'); if (!d.open) d.showModal();
-  const i = $('cmdInput'); i.focus(); i.setSelectionRange(i.value.length, i.value.length);
-  onCmdInput();
-}
-function renderCmd() {
-  const box = $('cmdList');
-  if (cmd.mode === 'command') {
-    box.innerHTML = cmd.items.map((c, i) => `<div class="ac-item${i === cmd.index ? ' on' : ''}" data-i="${i}"><span class="s">/${esc(c[0])}</span><span class="ex"></span><span class="d">${esc(c[1])}</span></div>`).join('')
-      + `<div class="cmd-foot">Enter = run · Esc = close</div>`;
-    box.querySelector('.ac-item.on')?.scrollIntoView({ block: 'nearest' });
-    return;
-  }
-  if (cmd.mode !== 'symbol') return;
-  box.innerHTML = cmd.items.length ? cmd.items.map((it, i) => `<div class="ac-item${i === cmd.index ? ' on' : ''}" data-i="${i}">
-      <span class="s">${esc(it.sym)}</span><span class="ex">${esc(it.type || '')} <button class="icon" data-add="${i}" title="Add to list">＋</button></span><span class="d">${esc(it.desc || '')}</span></div>`).join('')
-    + `<div class="cmd-foot">Enter / tap = open on chart · ＋ or Shift+Enter = add to list · Esc = close</div>`
-    : ($('cmdInput').value.trim() ? '<div class="ac-empty">No matches</div>' : '');
-  box.querySelector('.ac-item.on')?.scrollIntoView({ block: 'nearest' });
-}
-function onCmdInput() {
-  const text = $('cmdInput').value.trim();
-  // A leading "/" switches the palette to command mode wherever it was opened from (phones have no "/" shortcut).
-  if (cmd.mode === 'symbol' && text.startsWith('/')) { cmd.mode = 'command'; $('cmdMode').textContent = 'Command'; }
-  else if (cmd.mode === 'command' && !text.startsWith('/')) { cmd.mode = 'symbol'; $('cmdMode').textContent = 'Symbol'; }
-  if (cmd.mode === 'command') {
-    const word = text.replace(/^\//, '').split(/\s+/)[0].toLowerCase();
-    cmd.items = COMMANDS.filter(c => !word || c[0].split(' ')[0].startsWith(word));
-    cmd.index = cmd.items.length ? 0 : -1; renderCmd(); return;
-  }
-  if (cmd.mode === 'interval') {
-    const v = parseInterval(text);
-    $('cmdHint').textContent = v ? '→ ' + intervalLabel(v) : (text ? 'invalid' : '');
-    return;
-  }
-  clearTimeout(cmd.timer);
-  if (!text) { cmd.items = []; renderCmd(); return; }
-  cmd.timer = setTimeout(async () => {
-    const seq = ++cmd.seq;
-    const items = await searchSymbols(text);
-    if (seq !== cmd.seq) return;
-    cmd.items = items; cmd.index = items.length ? 0 : -1; renderCmd();
-  }, 200);
-}
-function pickCmd(addToList) {
-  if (cmd.mode === 'command') {
-    const c = cmd.items[cmd.index]; if (!c) return;
-    const arg = $('cmdInput').value.trim().replace(/^\//, '').split(/\s+/).slice(1).join(' ');
-    $('cmd').close(); c[2](arg); return;
-  }
-  if (cmd.mode === 'interval') {
-    const v = parseInterval($('cmdInput').value); if (!v) return;
-    state.interval = v; save(); renderIntervals(); send('set-interval', { interval: v });
-    $('cmd').close(); return;
-  }
-  const it = cmd.items[cmd.index]; if (!it) return;
-  if (addToList) addSymbol(it.sym);
-  else { state.symbol = it.sym; update(!noChart(it.sym)); if (state.detailsOpen) renderDetails(); }
-  $('cmd').close();
-}
-$('cmdInput').addEventListener('input', onCmdInput);
-$('cmdInput').addEventListener('keydown', e => {
-  if (e.key === 'ArrowDown' && cmd.items.length) { cmd.index = (cmd.index + 1) % cmd.items.length; renderCmd(); e.preventDefault(); }
-  else if (e.key === 'ArrowUp' && cmd.items.length) { cmd.index = (cmd.index - 1 + cmd.items.length) % cmd.items.length; renderCmd(); e.preventDefault(); }
-  else if (e.key === 'Enter') { pickCmd(e.shiftKey); e.preventDefault(); }
-});
-$('cmdList').addEventListener('mousedown', e => { const it = e.target.closest('.ac-item'); if (it) { e.preventDefault(); cmd.index = +it.dataset.i; pickCmd(e.shiftKey || !!e.target.closest('[data-add]')); } });
-$('cmd').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
-
-// Chart HUD: countdown to the current bar's close (aligned to the symbol's session, like TradingView) + live price.
-function tzNow(tz) {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date());
-  const g = t => parts.find(x => x.type === t).value;
-  return { wd: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(g('weekday')), sec: ((+g('hour') % 24) * 3600) + (+g('minute') * 60) + (+g('second')) };
-}
-function barCloseIn(sym, interval) {
-  const r = raw[sym] || {};
-  const tz = r.timezone || 'America/New_York';
-  const sess = r['session-regular'] || '';
-  const m = /^(\d{2})(\d{2})-(\d{2})(\d{2})/.exec(sess);
-  const allDay = !m || sess.startsWith('24x7') || (m[1] === '00' && m[2] === '00' && m[3] === '00' && m[4] === '00');
-  const open = allDay ? 0 : (+m[1] * 60 + +m[2]) * 60, close = allDay ? 86400 : (+m[3] * 60 + +m[4]) * 60;
-  const { wd, sec } = tzNow(tz);
-  if (/^\d+$/.test(interval)) {
-    const n = +interval * 60;
-    const base = sec >= open ? open : 0;                       // intraday bars align to session open (pre-market: midnight)
-    const start = base + Math.floor((sec - base) / n) * n;
-    return start + n - sec;
-  }
-  const days = interval === 'W' ? (allDay ? (7 - wd) % 7 || 7 : ((5 - wd) + 7) % 7) : 0;  // week closes Fri (session) or Sun 00:00 (24x7)
-  let left = close - sec + days * 86400;
-  if (left <= 0) left += 86400 * (allDay ? 1 : (wd === 5 ? 3 : wd === 6 ? 2 : 1));
-  return left;
-}
-const fmtCountdown = t => t >= 86400 ? `${Math.floor(t / 86400)}d ${Math.floor(t % 86400 / 3600)}h` : t >= 3600 ? `${Math.floor(t / 3600)}:${String(Math.floor(t % 3600 / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}` : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-// Chart bar: symbol + company, live price / change and the bar-close countdown (refreshed every second).
-function renderHud() {
-  if (!state.symbol) return;
-  const q = quotes[state.symbol];
-  const left = barCloseIn(state.symbol, state.interval);
-  const price = q ? (!regular && q.ep != null ? q.ep : q.p) : null;
-  const chg = q ? (!regular && q.e != null ? q.e : q.c) : null;
-  const sym = state.symbol, short = sym.includes(':') ? sym.split(':')[1] : sym;
-  const desc = raw[sym]?.description || '';
-  $('mbarSym').innerHTML = `${esc(short)}<small>${esc(desc.toUpperCase() === short ? '' : desc)}</small>`;
-  $('mbarText').innerHTML = `<span class="px ${signCls(chg)}">${price != null ? fmtN(price) : ''}</span><span class="chg ${signCls(chg)}">${price != null ? fmtPct(chg) : ''}</span>` +
-    `<span class="cd"><b class="${left <= 10 ? 'soon' : ''}">${fmtCountdown(Math.max(0, Math.round(left)))}</b></span>`;
-}
-setInterval(() => { if (!document.hidden) renderHud(); }, 1000);
-
-// Keyboard: ↑/↓ move through the active list's chartable tickers, ←/→ switch watchlists.
-document.addEventListener('keydown', e => {
-  if (e.altKey || e.ctrlKey || e.metaKey) return;
-  const t = e.target;
-  if (t.closest && (t.closest('input, textarea, select, dialog[open]'))) return;
-  if (/^[a-zA-Z]$/.test(e.key)) { openCmd('symbol', e.key.toUpperCase()); e.preventDefault(); return; }
-  if (/^[0-9]$/.test(e.key)) { openCmd('interval', e.key); e.preventDefault(); return; }
-  if (e.key === '/') { openCmd('command', '/'); e.preventDefault(); return; }
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-    const i = state.lists.findIndex(l => l.id === state.activeListId);
-    const j = (i + (e.key === 'ArrowRight' ? 1 : -1) + state.lists.length) % state.lists.length;
-    state.activeListId = state.lists[j].id; update(false); wsSync();
-    document.querySelector('.tab.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-    e.preventDefault();
-  } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-    const syms = flatSymbols(activeList()).filter(sy => !noChart(sy));
-    if (!syms.length) return;
-    const i = syms.indexOf(state.symbol);
-    const j = i < 0 ? 0 : (i + (e.key === 'ArrowDown' ? 1 : -1) + syms.length) % syms.length;
-    state.symbol = syms[j]; update(true);
-    document.querySelector('.row.on')?.scrollIntoView({ block: 'nearest' });
-    e.preventDefault();
-  }
-});
-
-// Panel width: drag the divider; persisted in state.
-const setPanelWidth = w => $('panel').style.setProperty('--panel-w', w + 'px');   // desktop only; phones ignore it
-if (state.panelWidth) setPanelWidth(state.panelWidth);
-$('resizer').addEventListener('pointerdown', e => {
-  const r = e.currentTarget, startX = e.clientX, startW = $('panel').offsetWidth;
-  r.setPointerCapture(e.pointerId); r.classList.add('active'); document.body.classList.add('resizing');
-  const move = ev => { state.panelWidth = Math.min(600, Math.max(200, startW + ev.clientX - startX)); setPanelWidth(state.panelWidth); };
-  const up = () => { r.classList.remove('active'); document.body.classList.remove('resizing');
-    r.removeEventListener('pointermove', move); r.removeEventListener('pointerup', up); save(); };
-  r.addEventListener('pointermove', move); r.addEventListener('pointerup', up);
-});
-
-
-// Fallback quote source for hosts the websocket rejects: scanner REST polling (any origin, no streaming)
-// plus hidden chart widgets whose quoteUpdate stream covers symbols the scanner lacks (broker CFDs).
+// Polling fallback: scanner REST every 10 s; symbols the scanner lacks (broker CFDs) stream from hidden mini widgets.
 const POLL_MS = 10000, FEEDER_MAX = 4;
 const SCAN_COLS = ['close', 'change', 'premarket_close', 'premarket_change', 'premarket_time', 'postmarket_close', 'postmarket_change', 'postmarket_time',
-  'open', 'high', 'low', 'volume', 'average_volume_10d_calc', 'market_cap_basic', 'price_52_week_high', 'price_52_week_low',
-  'Perf.W', 'Perf.Y', 'earnings_release_next_date', 'price_target_average', 'description', 'exchange', 'type', 'currency'];
+  'earnings_release_next_date', 'description', 'exchange', 'type'];
 let pollTimer = null;
 const feeders = {};
 function startPolling() {
@@ -1790,7 +527,7 @@ async function pollNow() {
   let data;
   try {
     const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify({ symbols: { tickers }, columns: SCAN_COLS }) });
-    data = (await r.json()).data;
+    data = (await r.json()).data || [];
   } catch (e) { console.warn('scanner', e); return; }
   const [phase] = sessionPhase();
   const found = new Set();
@@ -1801,33 +538,27 @@ async function pollNow() {
     const ext = pre ? ['premarket_close', 'premarket_change'] : ['postmarket_close', 'postmarket_change'];
     const hasExt = d[ext[0]] != null;
     onQuote(row.s, {
-      lp: d.close, ch: d.change == null ? null : d.close - d.close / (1 + d.change / 100), chp: d.change,
-      rtc: hasExt ? d[ext[0]] : null, rchp: hasExt ? d[ext[1]] : null,
+      lp: d.close, chp: d.change, rtc: hasExt ? d[ext[0]] : null, rchp: hasExt ? d[ext[1]] : null,
       current_session: !hasExt ? 'market' : phase === 'pre' ? 'pre_market' : phase === 'post' ? 'post_market' : phase === 'open' ? 'market' : 'out_of_session',
-      open_price: d.open, high_price: d.high, low_price: d.low, volume: d.volume, average_volume: d.average_volume_10d_calc,
-      market_cap_basic: d.market_cap_basic, price_52_week_high: d.price_52_week_high, price_52_week_low: d.price_52_week_low,
-      price_percent_change_1_week: d['Perf.W'], price_percent_change_52_week: d['Perf.Y'],
-      earnings_release_next_date: d.earnings_release_next_date, price_target_average: d.price_target_average,
-      description: d.description, exchange: d.exchange, type: d.type, currency_code: d.currency, update_mode: 'polled',
+      earnings_release_next_date: d.earnings_release_next_date, description: d.description, exchange: d.exchange, type: d.type, update_mode: 'polled',
     });
   }
   syncFeeders(tickers.filter(t => !found.has(t)));
 }
-// Hidden widgets: one per scanner-missing symbol, asked to stream quotes via the TradingView iframe protocol.
 const QUOTE_SUB = JSON.stringify({ provider: 'TradingView', type: 'get', name: 'quoteSubscribe', id: 1, client_id: 'tvwl', data: {} });
 function syncFeeders(missing) {
+  if (typeof TradingView === 'undefined') return;   // tv.js not loaded yet; the next poll retries
   for (const sym in feeders) if (!missing.includes(sym)) { feeders[sym].el.remove(); delete feeders[sym]; }
   for (const sym of missing.slice(0, FEEDER_MAX)) {
     if (feeders[sym]) continue;
     const el = document.createElement('div');
-    el.id = 'feed_' + Math.random().toString(36).slice(2, 8);
+    el.id = 'feed_' + uid();
     $('feeders').appendChild(el);
     feeders[sym] = { el };
     new TradingView.widget({ container_id: el.id, width: 320, height: 220, symbol: sym, interval: '1', theme: 'dark', locale: 'en',
       hide_top_toolbar: true, hide_legend: true, hide_side_toolbar: true, allow_symbol_change: false, save_image: false, support_host: 'https://www.tradingview.com' });
     setTimeout(() => { const f = el.querySelector('iframe'); if (f) f.contentWindow.postMessage(QUOTE_SUB, '*'); }, 4000);
   }
-  // Re-ask every poll so a stalled stream resumes.
   for (const sym in feeders) { const f = feeders[sym].el.querySelector('iframe'); if (f) f.contentWindow.postMessage(QUOTE_SUB, '*'); }
 }
 function onFeederMessage(e) {
@@ -1838,122 +569,520 @@ function onFeederMessage(e) {
     const f = feeders[sym].el.querySelector('iframe');
     if (f && f.contentWindow === e.source) {
       const d = m.data;
-      onQuote(sym, { lp: d.last_price, ch: d.change, chp: d.change_percent, current_session: 'market', description: d.description, exchange: d.exchange, volume: d.volume, update_mode: 'streaming' });
+      onQuote(sym, { lp: d.last_price, chp: d.change_percent, current_session: 'market', description: d.description, exchange: d.exchange, update_mode: 'streaming' });
       return;
     }
   }
 }
 
-// Details panel: quote sheet for the selected symbol, built from the merged websocket fields in `raw`.
-const fmtN = (v, d = 2) => v == null ? '–' : new Intl.NumberFormat('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
-const fmtBig = v => v == null ? '–' : v >= 1e12 ? (v / 1e12).toFixed(2) + 'T' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'K' : String(v);
-const fmtPct = v => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(2) + '%';
-const signCls = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
-function fmtDays(unix) {
-  if (!unix) return null;
-  const d = new Date(unix * 1000), days = Math.round((d - Date.now()) / 864e5);
-  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  return days < 0 ? `${date} (past)` : days === 0 ? `${date}, today` : `${date}, in ${days}d`;
+// ================= Chart (TradingView widget; symbol/interval change via postMessage, no reload) =================
+const chart = { ready: false, pending: {}, hiddenAtMount: false };
+function send(name, data) {
+  const f = $('tv_chart').querySelector('iframe');
+  if (!chart.ready || !f) { chart.pending[name] = data; return; }
+  f.contentWindow.postMessage({ name, data }, '*');
 }
-function rangeBar(lo, hi, v) {
-  if (lo == null || hi == null || v == null || hi <= lo) return '';
-  const pct = Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
-  return `<div class="d-bar"><i style="left:${pct.toFixed(1)}%"></i></div><div class="d-bar-l"><span>${fmtN(lo)}</span><span>${fmtN(hi)}</span></div>`;
-}
-let detailsSym = null;
-function renderDetails() {
-  if (!state.detailsOpen) return;
-  const el = $('dbody'), sym = state.symbol, r = raw[sym], q = quotes[sym];
-  if (!sym || !r || r.lp == null) {
-    detailsSym = null;
-    el.innerHTML = `<div class="d-empty">${sym ? 'Waiting for data for ' + esc(sym) + '…' : 'Select a symbol in the list to see its details.'}</div>`;
-    return;
+window.addEventListener('message', e => {
+  const f = $('tv_chart').querySelector('iframe');
+  if (!f || f.contentWindow !== e.source) return onFeederMessage(e);
+  if (!chart.ready) {
+    chart.ready = true;
+    for (const k in chart.pending) send(k, chart.pending[k]);
+    chart.pending = {};
   }
-  const [ex, short] = sym.includes(':') ? sym.split(':') : ['', sym];
-  const cur = r.currency_code ? ' ' + r.currency_code : '';
-  const v = (k, html, cls = '') => `<span data-k="${k}" class="${cls}">${html}</span>`;
-  const kv = (k, html, cls = '') => html == null || html === '–' ? '' : `<div class="d-kv"><span>${k}</span>${v(k, html, cls)}</div>`;
-  const stock = r.type === 'stock' || r.type === 'dr' || r.type === 'fund';
-  const volRatio = r.volume && r.average_volume ? (r.volume / r.average_volume) : null;
-  const upside = r.price_target_average && r.lp ? (r.price_target_average / r.lp - 1) * 100 : null;
-  // Header mirrors the list: outside the regular session the big price is the extended-session price.
-  const extended = q && q.ep != null && !regular;
-  const big = extended ? q.ep : r.lp;
-  const extLine = extended
-    ? `<div class="d-ext"><i class="ss ${q.ss}"></i>${q.es} ${v('extp', fmtPct(q.e), signCls(q.e))}<span class="d-sep">·</span>Close ${v('close', fmtN(r.lp))}</div>`
-    : '';
-  const stale = r.update_mode === 'polled' ? `<div class="d-stale">Polled every 10s</div>` : r.update_mode && r.update_mode.startsWith('delayed') ? `<div class="d-stale">Delayed ${Math.round(parseInt(r.update_mode.split('_').pop(), 10) / 60) || 15} min</div>` : '';
-  const html = `
-    <div class="d-head">
-      <div class="d-sym"><b>${esc(short)}</b><small>${esc(r.exchange || ex)}</small></div>
-      <div class="d-desc" title="${esc(r.description || '')}">${esc(r.description || '')}</div>
-      <div class="d-price">${v('lp', fmtN(big) + `<small>${cur}</small>`, 'big ' + signCls(extended ? q.e : r.chp))}${v('chg', (r.ch != null ? (r.ch > 0 ? '+' : '') + fmtN(r.ch) : '') + ' ' + fmtPct(r.chp), signCls(r.chp))}</div>
-      ${extLine}${stale}
-    </div>
-    <div class="d-sec"><h4>Today</h4>
-      ${rangeBar(r.low_price, r.high_price, r.lp)}
-      ${kv('Open', fmtN(r.open_price))}${kv('Prev close', fmtN(r.prev_close_price))}
-      ${kv('Bid / Ask', r.bid != null && r.ask != null ? fmtN(r.bid) + ' / ' + fmtN(r.ask) : null)}
-      ${kv('Volume', r.volume != null ? fmtBig(r.volume) + (volRatio ? ` <small class="${volRatio >= 1.5 ? 'up' : ''}">${volRatio.toFixed(1)}× avg</small>` : '') : null)}
-    </div>
-    ${r.price_52_week_low != null ? `<div class="d-sec"><h4>52 weeks</h4>
-      ${rangeBar(r.price_52_week_low, r.price_52_week_high, r.lp)}
-      ${kv('1 week', fmtPct(r.price_percent_change_1_week), signCls(r.price_percent_change_1_week))}
-      ${kv('52 weeks', fmtPct(r.price_percent_change_52_week), signCls(r.price_percent_change_52_week))}
-      ${kv('From ATH', r.all_time_high ? fmtPct((r.lp / r.all_time_high - 1) * 100) : null, 'down')}
-    </div>` : ''}
-    ${stock ? `<div class="d-sec"><h4>Company</h4>
-      ${kv('Market cap', fmtBig(r.market_cap_basic))}
-      ${kv('Next earnings', fmtDays(r.earnings_release_next_date))}
-      ${kv('Analyst target', r.price_target_average ? fmtN(r.price_target_average) + ` <small class="${signCls(upside)}">${fmtPct(upside)}</small>` : null)}
-    </div>` : ''}`;
+});
+function mountChart() {
+  if (typeof TradingView === 'undefined') return;
+  const old = $('tv_chart'), fresh = document.createElement('div'); fresh.id = 'tv_chart'; old.replaceWith(fresh);
+  chart.ready = false; chart.pending = {};
+  chart.hiddenAtMount = $('chartWrap').offsetWidth === 0;   // hidden pane (phones start on the list) or no layout yet
+  new TradingView.widget({
+    autosize: true, container_id: 'tv_chart',
+    symbol: state.symbol || flatSymbols(activeList())[0] || 'BINANCE:BTCUSDT', interval: state.interval,
+    timezone: 'Etc/UTC', theme: 'dark', style: '1', locale: 'en',
+    allow_symbol_change: false, details: false, hotlist: false, calendar: false,
+    hide_side_toolbar: true, hide_top_toolbar: true, hide_legend: true, hide_volume: true,
+    backgroundColor: '#131722', gridColor: 'rgba(42, 46, 57, 0.4)',
+    overrides: { 'mainSeriesProperties.sessionId': '24h' },   // Session → 24 hours
+    disabled_features: ['header_indicators', 'header_compare', 'show_object_tree', 'legend_context_menu', 'control_bar'],
+    support_host: 'https://www.tradingview.com',
+  });
+}
+const showSymbol = () => send('set-symbol', { symbol: state.symbol });
+function setChartInterval(v) { state.interval = v; save(); send('set-interval', { interval: v }); renderHeader(); }
 
-  // Same symbol: patch changed values in place (and flash them) instead of rebuilding the panel.
-  if (detailsSym === sym) {
-    const tmp = document.createElement('div'); tmp.innerHTML = html;
-    const cur = new Map([...el.querySelectorAll('[data-k]')].map(n => [n.dataset.k, n]));
-    const next = [...tmp.querySelectorAll('[data-k]')];
-    if (next.length === cur.size && next.every(n => cur.has(n.dataset.k))) {
-      for (const n of next) {
-        const o = cur.get(n.dataset.k);
-        if (o.innerHTML === n.innerHTML) continue;
-        const a = parseFloat(o.textContent.replace(/[^\d.-]/g, '')), b = parseFloat(n.textContent.replace(/[^\d.-]/g, ''));
-        o.innerHTML = n.innerHTML; o.className = n.className;
-        flashNode(o, b > a ? 'f-up' : b < a ? 'f-down' : 'f-same');
-      }
-      // Range bar markers move without a flash.
-      const bars = el.querySelectorAll('.d-bar i'), nb = tmp.querySelectorAll('.d-bar i');
-      if (bars.length === nb.length) bars.forEach((b, i) => { b.style.left = nb[i].style.left; });
-      return;
+// ================= Rendering =================
+function render() { renderChips(); renderRows(); renderHeader(); $('sortBtn').classList.toggle('on', state.sort === 'chg'); }
+function renderChips() {
+  const el = $('chips'), x = el.scrollLeft;
+  el.innerHTML = state.lists.map(l => `<button class="chip${l.id === state.activeListId ? ' on' : ''}" data-act="list" data-id="${esc(l.id)}"><b>${esc(l.name)}</b><small data-lv="${esc(l.id)}"></small></button>`).join('');
+  el.scrollLeft = x;
+  const on = el.querySelector('.on');
+  if (on && (on.offsetLeft < el.scrollLeft || on.offsetLeft + on.offsetWidth > el.scrollLeft + el.clientWidth)) el.scrollLeft = on.offsetLeft - 10;
+  patchChips();
+}
+function patchChips() {
+  for (const s of $('chips').querySelectorAll('small[data-lv]')) {
+    const l = state.lists.find(x => x.id === s.dataset.lv); if (!l) continue;
+    const v = listValue(l);
+    const t = v != null ? pct(v) : l.summary ? '…' : flatSymbols(l).length + ' sym';
+    if (s.textContent !== t) s.textContent = t;
+    s.className = v != null ? dir(v) : '';
+  }
+}
+const ghHtml = (name, n, gi, collapsed, isStatic) =>
+  `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span><span class="gc">${n}</span></div>`;
+const rowHtml = (sym, gi) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}" data-sym="${esc(sym)}" data-g="${gi}">
+    <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
+    <button class="more" data-act="row-menu" aria-label="Actions"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div>`;
+let lastSortRender = 0;
+function renderRows() {
+  const l = activeList(), all = flatSymbols(l);
+  let html = '';
+  if (!all.length) html = '<div class="empty">This list is empty. Tap + to add a symbol.</div>';
+  else if (state.sort === 'chg') {
+    // Indices and other non-equities keep their order on top; everything else is one group, biggest Chg% first.
+    const giOf = sy => l.groups.findIndex(g => g.symbols.includes(sy));
+    const fixed = all.filter(sy => NON_EQUITY.has(raw[sy]?.type) || noChart(sy));
+    const rest = all.filter(sy => !fixed.includes(sy)).sort((a, b) => (quotes[b]?.c ?? -Infinity) - (quotes[a]?.c ?? -Infinity));   // by the Chg% column
+    if (fixed.length) html += ghHtml('Index', fixed.length, null, false, true) + fixed.map(sy => rowHtml(sy, giOf(sy))).join('');
+    html += ghHtml('By change', rest.length, null, false, true) + rest.map(sy => rowHtml(sy, giOf(sy))).join('');
+    lastSortRender = Date.now();
+  } else {
+    const single = l.groups.length === 1;
+    l.groups.forEach((g, gi) => {
+      if (!single) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false);
+      if (single || !g.collapsed) html += g.symbols.map(sy => rowHtml(sy, gi)).join('');
+    });
+  }
+  $('rows').innerHTML = html;
+  patchRows(false);
+}
+function cellsFor(sym) {
+  const q = quotes[sym];
+  if (!q) return { px: '', chg: '', chgCls: '', ext: '', extCls: '' };
+  const last = !regular && q.ep != null ? q.ep : q.p;   // outside regular hours Last is the extended price
+  return {
+    px: fmtPrice(last), chg: pct(q.c), chgCls: dir(q.c),
+    ext: q.e == null ? (q.ss ? `<i class="ss ${q.ss}"></i>` : '') : `<i class="ss ${q.ss}"></i>${pct(q.e)}`, extCls: dir(q.e),
+  };
+}
+function flash(node, cls) { if (node.classList.contains('flash')) return; node.classList.add('flash', cls); node.addEventListener('animationend', () => node.classList.remove('flash', cls), { once: true }); }
+function patchRows(withFlash = true) {
+  const now = Date.now();
+  for (const row of $('rows').querySelectorAll('.row')) {
+    const sym = row.dataset.sym, c = cellsFor(sym);
+    const px = row.querySelector('.px'), chg = row.querySelector('.chg'), ext = row.querySelector('.ext');
+    if (px.textContent !== c.px) {
+      const d = parseFloat(c.px.replace(/,/g, '')) - parseFloat(px.textContent.replace(/,/g, ''));
+      px.textContent = c.px;
+      if (withFlash && !isNaN(d)) flash(px, d > 0 ? 'f-up' : d < 0 ? 'f-down' : 'f-same');
     }
+    if (chg.textContent !== c.chg) { chg.textContent = c.chg; if (withFlash) flash(chg, 'f-same'); }
+    chg.classList.toggle('up', c.chgCls === 'up'); chg.classList.toggle('down', c.chgCls === 'down');
+    if (ext.innerHTML !== c.ext) { ext.innerHTML = c.ext; if (withFlash && c.ext) flash(ext, 'f-same'); }
+    ext.classList.toggle('up', c.extCls === 'up'); ext.classList.toggle('down', c.extCls === 'down');
+    // Earnings within a week: "3d" tag next to the ticker (filled on the day before and the day itself).
+    const t = raw[sym]?.earnings_release_next_date, days = t ? Math.round((t * 1000 - now) / 864e5) : null, tag = row.querySelector('.earn');
+    const show = days != null && days >= 0 && days <= 7;
+    tag.hidden = !show;
+    if (show) { tag.textContent = days === 0 ? 'today' : days + 'd'; tag.classList.toggle('soon', days <= 1);
+      tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
   }
-  el.innerHTML = html;
-  detailsSym = sym;
 }
-function flashNode(node, cls) {
-  if (!node || node.classList.contains('flash')) return;
-  node.classList.add('flash', cls);
-  node.addEventListener('animationend', () => node.classList.remove('flash', cls), { once: true });
+function renderHeader() {
+  const l = activeList(), v = listValue(l);
+  $('hlName').textContent = l.name;
+  $('hlPct').textContent = v == null ? '' : pct(v);
+  $('hlPct').className = 'v ' + (v == null ? '' : dir(v));
+  const sym = state.symbol || '', q = quotes[sym], r = raw[sym] || {};
+  $('hsSym').textContent = short(sym);
+  $('cbSym').textContent = short(sym);
+  const last = q ? (!regular && q.ep != null ? q.ep : q.p) : null;
+  $('hsPx').textContent = fmtPrice(last);
+  $('hsChg').textContent = q ? pct(q.c) : '';
+  $('hsChg').className = 'chg ' + (q ? dir(q.c) : '');
+  const desc = r.description || '';
+  $('hsDesc').textContent = desc.toUpperCase() === short(sym) ? '' : desc;
+  $('ivBtn').textContent = intervalLabel(state.interval);
+}
+function renderQuotes() {
+  regular = isRegularSession();
+  document.body.classList.toggle('regular', regular);
+  // In sorted view, re-order at most every 3 s and never under a finger or an open sheet.
+  if (state.sort === 'chg' && Date.now() - lastSortRender > 3000 && !press && $('sheet').hidden) renderRows();
+  else patchRows(true);
+  patchChips();
+  renderHeader();
 }
 
-// Boot (after every module above is defined).
-try { localStorage.removeItem('tvwl.eod.v1'); } catch (_) {}   // the end-of-day card is gone; drop its old snapshots
-state.histRange = 'session';   // the sentiment chart always opens on the current session
-render();
-renderQuotes();
+// ================= Views =================
+function setView(v) {
+  state.view = v; save();
+  document.body.dataset.view = v;
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+  if (v === 'chart') {
+    // A widget mounted while its pane was display:none stays blank; mount it fresh the first time it is shown.
+    if (chart.hiddenAtMount) { mountChart(); showSymbol(); }
+    else window.dispatchEvent(new Event('resize'));
+  }
+}
+function applyChartHidden() {
+  document.body.classList.toggle('chart-hidden', !!state.chartHidden);
+  $('chartToggle').title = state.chartHidden ? 'Show chart' : 'Hide chart';
+  if (!state.chartHidden && chart.hiddenAtMount && !isPhone()) mountChart();
+}
+function selectSymbol(sym, openChart = true) {
+  if (noChart(sym)) { toast(`${short(sym)} has no chart in the free widget`); return; }
+  state.symbol = sym; save();
+  $('rows').querySelectorAll('.row').forEach(r => r.classList.toggle('on', r.dataset.sym === sym));
+  showSymbol(); renderHeader();
+  if (openChart && isPhone()) setView('chart');
+}
+
+// ================= List edits =================
+function addSymbol(sym) {
+  const l = activeList();
+  sym = sym.trim().toUpperCase();
+  if (!sym) return;
+  if (flatSymbols(l).includes(sym)) { toast(`${short(sym)} is already in ${l.name}`); return; }
+  if (!l.groups.length) l.groups.push({ name: 'Main', collapsed: false, symbols: [] });
+  const g = l.groups[l.groups.length - 1];
+  g.symbols.push(sym); save(); renderRows(); patchChips(); wsSync();
+  toast(`${short(sym)} added to ${l.name}`, 'Undo', () => { g.symbols = g.symbols.filter(x => x !== sym); save(); renderRows(); wsSync(); refreshSearch(); });
+}
+function removeSymbol(sym, gi) {
+  const l = activeList(), g = l.groups[gi]; if (!g) return;
+  const at = g.symbols.indexOf(sym); if (at < 0) return;
+  g.symbols.splice(at, 1); save(); renderRows(); patchChips(); wsSync();
+  toast(`${short(sym)} removed`, 'Undo', () => { g.symbols.splice(Math.min(at, g.symbols.length), 0, sym); save(); renderRows(); patchChips(); wsSync(); });
+}
+function moveSymbol(sym, from, to, index) {
+  const l = activeList(), src = l.groups[from], dst = l.groups[to]; if (!src || !dst) return;
+  const i = src.symbols.indexOf(sym); if (i < 0) return;
+  src.symbols.splice(i, 1);
+  if (index == null || index > dst.symbols.length) index = dst.symbols.length;
+  dst.symbols.splice(index, 0, sym);
+  save(); renderRows();
+}
+
+// ================= Sheets =================
+let sheetKind = null;
+function openSheet(kind, title, body) {
+  sheetKind = kind;
+  $('shTitle').textContent = title;
+  $('shBody').innerHTML = body;
+  $('shBody').onclick = null;
+  $('sheet').hidden = false; $('scrim').hidden = false;
+}
+function closeSheet() {
+  if ($('sheet').hidden) return;
+  sheetKind = null;
+  $('sheet').hidden = true; $('scrim').hidden = true; $('shBody').innerHTML = '';
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  unshift();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); $('ivMenu').classList.remove('open'); } });
+
+function openRowMenu(sym, gi) {
+  const l = activeList(), g = l.groups[gi];
+  const opts = [];
+  if (!noChart(sym)) opts.push(`<button class="opt" data-o="chart">Show on chart</button>`);
+  if (l.groups.length > 1) opts.push(`<button class="opt" data-o="move">Move to group<span class="c">${esc(g?.name || '')}</span></button>`);
+  if (state.lists.length > 1) opts.push(`<button class="opt" data-o="copy">Copy to list</button>`);
+  if (g && g.symbols.indexOf(sym) > 0) opts.push(`<button class="opt" data-o="top">Move to top of group</button>`);
+  opts.push(`<button class="opt danger" data-o="rm">Remove from ${esc(l.name)}</button>`);
+  openSheet('row', `${short(sym)} · ${sym.split(':')[0]}`, opts.join(''));
+  $('shBody').onclick = e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    if (o === 'chart') { closeSheet(); selectSymbol(sym); }
+    if (o === 'move') openMoveSheet(sym, gi);
+    if (o === 'copy') openCopySheet(sym);
+    if (o === 'top') { closeSheet(); moveSymbol(sym, gi, gi, 0); }
+    if (o === 'rm') { closeSheet(); removeSymbol(sym, gi); }
+  };
+}
+function openMoveSheet(sym, from) {
+  const l = activeList();
+  openSheet('move', `Move ${short(sym)} to`, l.groups.map((g, i) => `<button class="opt${i === from ? ' on' : ''}" data-g="${i}">${esc(g.name)}<span class="c">${g.symbols.length}</span></button>`).join(''));
+  $('shBody').onclick = e => {
+    const b = e.target.closest('[data-g]'); if (!b) return;
+    closeSheet();
+    if (+b.dataset.g !== from) moveSymbol(sym, from, +b.dataset.g);
+  };
+}
+function openCopySheet(sym) {
+  const others = state.lists.filter(x => x.id !== state.activeListId);
+  openSheet('copy', `Copy ${short(sym)} to`, others.map(x => `<button class="opt" data-l="${esc(x.id)}">${esc(x.name)}<span class="c">${flatSymbols(x).includes(sym) ? 'already there' : flatSymbols(x).length}</span></button>`).join(''));
+  $('shBody').onclick = e => {
+    const b = e.target.closest('[data-l]'); if (!b) return;
+    const x = state.lists.find(y => y.id === b.dataset.l); closeSheet();
+    if (!x || flatSymbols(x).includes(sym)) { toast(`${short(sym)} is already in ${x?.name}`); return; }
+    if (!x.groups.length) x.groups.push({ name: 'Main', collapsed: false, symbols: [] });
+    x.groups[x.groups.length - 1].symbols.push(sym); save(); patchChips(); wsSync();
+    toast(`${short(sym)} copied to ${x.name}`);
+  };
+}
+
+// Interval: bottom sheet on phones, dropdown above the button on desktop.
+function openIntervals() {
+  const btns = INTERVALS.map(([lbl, v]) => `<button class="${v === state.interval ? 'on' : ''}" data-iv="${v}">${lbl}</button>`).join('');
+  if (isPhone()) {
+    openSheet('interval', 'Interval', `<div class="ivgrid">${btns}</div>`);
+    $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { closeSheet(); setChartInterval(b.dataset.iv); } };
+  } else {
+    const m = $('ivMenu'); m.innerHTML = btns; m.classList.toggle('open');
+  }
+}
+$('ivMenu').addEventListener('click', e => { const b = e.target.closest('[data-iv]'); if (b) { $('ivMenu').classList.remove('open'); setChartInterval(b.dataset.iv); } });
+document.addEventListener('click', e => { if (!e.target.closest('#ivMenu, #ivBtn')) $('ivMenu').classList.remove('open'); }, true);
+
+// Search: TradingView symbol search through the relay (scanner fallback). Tap a result → chart; + → add to the active list.
+const RELAY_HTTP = RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '');
+const PREFERRED_EX = ['NASDAQ', 'NYSE', 'AMEX', 'CBOE', 'BIST', 'BINANCE', 'OANDA', 'FX', 'TVC', 'SKILLING', 'CAPITALCOM', 'CME_MINI', 'OKX', 'FX_IDC', 'COINBASE', 'CRYPTOCAP', 'SP', 'DJ'];
+const stripEm = x => String(x || '').replace(/<\/?em>/g, '');
+async function searchSymbols(text) {
+  try {
+    const r = await fetch(`${RELAY_HTTP}/search?text=${encodeURIComponent(text)}`);
+    if (r.ok) {
+      const j = await r.json();
+      const items = (j.symbols || []).map(it => ({ sym: `${it.prefix || it.source_id || it.exchange}:${stripEm(it.symbol)}`, desc: stripEm(it.description), ex: it.exchange, type: it.type }));
+      if (items.length) return items.slice(0, 15);
+    }
+  } catch (_) {}
+  try {
+    const body = { filter: [{ left: 'is_primary', operation: 'equal', right: true }, { left: 'exchange', operation: 'in_range', right: PREFERRED_EX }],
+      filter2: { operator: 'or', operands: [{ expression: { left: 'name', operation: 'match', right: text } }, { expression: { left: 'description', operation: 'match', right: text } }] },
+      columns: ['name', 'exchange', 'description', 'type'], sort: { sortBy: 'market_cap_basic', sortOrder: 'desc', nullsFirst: false }, range: [0, 15] };
+    const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify(body) });
+    return ((await r.json()).data || []).map(row => ({ sym: row.s, desc: row.d[2], ex: row.d[1], type: row.d[3] }));
+  } catch (_) { return []; }
+}
+const search = { items: [], seq: 0, timer: null, pending: false };
+const PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg>';
+function openSearch() {
+  openSheet('search', `Search · add to ${activeList().name}`,
+    `<div class="sres" id="sres"><div class="shint">Type a ticker or a company name.</div></div>
+     <form class="sform" id="sform"><input class="field" id="sq" type="search" placeholder="Search symbol" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search"></form>`);
+  search.items = []; search.pending = false;
+  const q = $('sq');
+  q.addEventListener('input', () => {
+    const text = q.value.trim();
+    clearTimeout(search.timer); search.items = []; search.pending = !!text; refreshSearch();
+    if (!text) return;
+    search.timer = setTimeout(async () => {
+      const seq = ++search.seq, items = await searchSymbols(text);
+      if (seq !== search.seq) return;
+      search.items = items; search.pending = false; refreshSearch();
+    }, 220);
+  });
+  $('sform').addEventListener('submit', e => { e.preventDefault(); const it = search.items[0]; if (it) { closeSheet(); selectSymbol(it.sym); } });
+  $('shBody').onclick = e => {
+    const add = e.target.closest('[data-add]');
+    if (add) { addSymbol(add.dataset.add); refreshSearch(); return; }
+    const r = e.target.closest('[data-pick]');
+    if (r) { closeSheet(); selectSymbol(r.dataset.pick); }
+  };
+  setTimeout(() => q.focus(), 30);
+}
+function refreshSearch() {
+  const box = $('sres'); if (!box || sheetKind !== 'search') return;
+  const inList = new Set(flatSymbols(activeList())), text = $('sq').value.trim();
+  if (!text) { box.innerHTML = '<div class="shint">Type a ticker or a company name.</div>'; return; }
+  if (!search.items.length) { box.innerHTML = `<div class="shint">${search.pending ? 'Searching…' : 'No matches'}</div>`; return; }
+  box.innerHTML = search.items.map(it => `<div class="sr" data-pick="${esc(it.sym)}">
+      <span class="s"><b>${esc(short(it.sym))}</b><small>${esc(it.ex || it.sym.split(':')[0])}</small></span>
+      <button class="add${inList.has(it.sym) ? ' in' : ''}" ${inList.has(it.sym) ? 'disabled aria-label="In list"' : `data-add="${esc(it.sym)}" aria-label="Add to list"`}>${inList.has(it.sym) ? CHECK : PLUS}</button>
+      <span class="d">${esc(it.desc || '')}</span></div>`).join('');
+}
+
+// List manager: rename, reorder, sentiment on/off, delete (tap twice), new list.
+function openListManager() {
+  openSheet('lists', 'Lists', '');
+  renderListManager();
+  $('shBody').onclick = e => {
+    const b = e.target.closest('button[data-lm]'); if (!b) return;
+    const row = b.closest('.lm'), l = row && state.lists.find(x => x.id === row.dataset.id); if (!l) return;
+    if (b.dataset.lm === 'up' || b.dataset.lm === 'down') {
+      const i = state.lists.indexOf(l), j = i + (b.dataset.lm === 'up' ? -1 : 1);
+      if (j < 0 || j >= state.lists.length) return;
+      [state.lists[i], state.lists[j]] = [state.lists[j], state.lists[i]];
+      save(); renderChips(); renderListManager();
+    }
+    if (b.dataset.lm === 'sig') {
+      l.summary = l.summary ? false : (l.id === 'tr' ? 'BIST:XU100' : true);
+      save(); patchChips(); renderHeader(); renderListManager();
+    }
+    if (b.dataset.lm === 'del') {
+      if (state.lists.length === 1) { toast('Keep at least one list'); return; }
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Delete?'; return; }
+      state.lists = state.lists.filter(x => x !== l);
+      if (state.activeListId === l.id) state.activeListId = state.lists[0].id;
+      save(); render(); wsSync(); renderListManager();
+      toast(`${l.name} deleted`);
+    }
+  };
+}
+function renderListManager() {
+  if (sheetKind !== 'lists') return;
+  $('shBody').innerHTML = state.lists.map((l, i) => `<div class="lm" data-id="${esc(l.id)}">
+      <input class="field" value="${esc(l.name)}" aria-label="List name" data-name>
+      <button class="ib sig${l.summary ? ' on' : ''}" data-lm="sig" title="Sentiment % for this list">Σ</button>
+      <button class="ib" data-lm="up" title="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button class="ib" data-lm="down" title="Move down" ${i === state.lists.length - 1 ? 'disabled' : ''}>↓</button>
+      <button class="ib del" data-lm="del" title="Delete list">✕</button></div>`).join('')
+    + `<form class="lmnew" id="lmnew"><input class="field" id="lmname" placeholder="New list name" autocomplete="off"><button>Add</button></form>`;
+  $('shBody').querySelectorAll('input[data-name]').forEach(inp => {
+    const commit = () => { const l = state.lists.find(x => x.id === inp.closest('.lm').dataset.id), v = inp.value.trim(); if (l && v && v !== l.name) { l.name = v; save(); renderChips(); renderHeader(); } };
+    inp.addEventListener('change', commit);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+  });
+  $('lmnew').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('lmname').value.trim(); if (!name) return;
+    const l = { id: 'l' + uid(), name, summary: true, groups: [{ name: 'Main', collapsed: false, symbols: [] }] };
+    state.lists.push(l); state.activeListId = l.id; save(); render(); renderListManager();
+    toast(`${name} created`);
+  });
+}
+
+let toastTimer = null;
+function toast(text, action, fn) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div'); t.className = 'toast';
+  t.innerHTML = `<span>${esc(text)}</span>${action ? `<button>${esc(action)}</button>` : ''}`;
+  if (action) t.querySelector('button').addEventListener('click', () => { t.remove(); fn(); });
+  document.body.appendChild(t);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 4000);
+}
+
+// ================= Clicks =================
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  switch (el.dataset.act) {
+    case 'list': state.activeListId = el.dataset.id; save(); render(); $('rows').scrollTop = 0; break;
+    case 'view': setView(el.dataset.view); break;
+    case 'search': openSearch(); break;
+    case 'sort': state.sort = state.sort === 'chg' ? null : 'chg'; save(); render(); break;
+    case 'lists': openListManager(); break;
+    case 'reconnect': refreshQuotes(); break;
+    case 'interval': openIntervals(); break;
+    case 'toggle-chart': state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
+    case 'sheet-close': closeSheet(); break;
+    case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
+    case 'row-menu': { e.stopPropagation(); const r = el.closest('.row'); openRowMenu(r.dataset.sym, +r.dataset.g); break; }
+  }
+});
+
+// ================= Row gestures =================
+// Tap → chart. Press and hold (420 ms) → the row lifts: release in place for its actions, or drag it (touch or mouse)
+// to reorder, across groups too. Right-click also opens the actions on desktop.
+const rowsEl = $('rows');
+let press = null, suppressClick = false;
+rowsEl.addEventListener('pointerdown', e => {
+  if (e.button > 0 || e.target.closest('.more')) return;
+  const row = e.target.closest('.row'); if (!row) return;
+  press = { row, id: e.pointerId, type: e.pointerType, x: e.clientX, y: e.clientY, armed: false, drag: false, pos: null,
+    timer: setTimeout(() => { if (!press) return; press.armed = true; press.row.classList.add('lift'); navigator.vibrate?.(8); }, 420) };
+});
+rowsEl.addEventListener('pointermove', e => {
+  if (!press || e.pointerId !== press.id) return;
+  const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
+  if (!press.armed) { if (dist > 8) { clearTimeout(press.timer); press = null; } return; }
+  if (!press.drag) {
+    if (dist < 6 || state.sort) return;
+    press.drag = true; press.row.classList.add('dragging');
+    try { rowsEl.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+  updateDrop(e.clientY);
+  const r = rowsEl.getBoundingClientRect();
+  if (e.clientY < r.top + 44) rowsEl.scrollTop -= 10; else if (e.clientY > r.bottom - 44) rowsEl.scrollTop += 10;
+});
+// Once a row is lifted the finger must not scroll the list.
+rowsEl.addEventListener('touchmove', e => { if (press && press.armed) e.preventDefault(); }, { passive: false });
+function clearDrop() { rowsEl.querySelectorAll('.drop-before, .drop-after, .drop-into').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-into')); }
+function updateDrop(y) {
+  clearDrop();
+  let target = null, after = false;
+  for (const it of rowsEl.querySelectorAll('.row:not(.dragging), .gh[data-g]')) {
+    const r = it.getBoundingClientRect();
+    if (y < r.top + r.height / 2) { target = it; after = false; break; }
+    target = it; after = true;
+  }
+  if (!target) { press.pos = null; return; }
+  if (target.classList.contains('gh')) { target.classList.add('drop-into'); press.pos = { g: +target.dataset.g, index: 0 }; return; }
+  target.classList.add(after ? 'drop-after' : 'drop-before');
+  const g = activeList().groups[+target.dataset.g], i = g.symbols.indexOf(target.dataset.sym);
+  press.pos = { g: +target.dataset.g, index: i + (after ? 1 : 0) };
+}
+function endPress(cancel) {
+  if (!press) return;
+  clearTimeout(press.timer);
+  const p = press; press = null;
+  p.row.classList.remove('lift', 'dragging'); clearDrop();
+  if (!p.armed || cancel) return;
+  suppressClick = true; setTimeout(() => { suppressClick = false; }, 400);
+  if (p.drag) {
+    if (!p.pos) return;
+    const sym = p.row.dataset.sym, from = +p.row.dataset.g, src = activeList().groups[from];
+    let index = p.pos.index;
+    if (from === p.pos.g && src.symbols.indexOf(sym) < index) index--;   // removing it first shifts the slot up
+    moveSymbol(sym, from, p.pos.g, index);
+  } else openRowMenu(p.row.dataset.sym, +p.row.dataset.g);
+}
+rowsEl.addEventListener('pointerup', () => endPress(false));
+rowsEl.addEventListener('pointercancel', () => endPress(true));
+rowsEl.addEventListener('click', e => {
+  if (suppressClick) { e.stopPropagation(); return; }
+  if (e.target.closest('[data-act]')) return;
+  const row = e.target.closest('.row'); if (row) selectSymbol(row.dataset.sym);
+});
+rowsEl.addEventListener('contextmenu', e => {
+  const row = e.target.closest('.row'); if (!row) return;
+  e.preventDefault();
+  if (!press || press.type === 'mouse') { if (press) endPress(true); openRowMenu(row.dataset.sym, +row.dataset.g); }
+});
+
+// ================= iOS niceties =================
+// Focusing an input inside the fixed body scrolls the document on iOS; afterwards taps land off target. Snap back.
+function unshift() { if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0); }
+document.addEventListener('focusout', () => setTimeout(unshift, 60));
+// Keep bottom sheets above the on-screen keyboard.
+function trackKeyboard() {
+  const vv = window.visualViewport; if (!vv) return;
+  const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+  document.documentElement.style.setProperty('--kb', kb > 60 && isPhone() ? kb + 'px' : '0px');
+  document.body.classList.toggle('kb', kb > 60);
+  setTimeout(unshift, 60);
+}
+window.visualViewport?.addEventListener('resize', trackKeyboard);
+// Home-screen app: when iOS leaves a gap under the web view, the nav needs no home-indicator padding.
+function fitStandalone() {
+  if (!matchMedia('(display-mode: standalone)').matches && !navigator.standalone) return;
+  const portrait = matchMedia('(orientation: portrait)').matches;
+  const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const gap = Math.round(full - window.innerHeight);
+  document.body.classList.toggle('ios-gap', gap > 0 && gap <= 100);
+}
+fitStandalone();
+window.addEventListener('resize', fitStandalone);
+// A widget mounted while its pane had no size stays blank: remount it once the pane is actually on screen.
+window.addEventListener('resize', () => { if (chart.hiddenAtMount && $('chartWrap').offsetWidth > 0) { mountChart(); showSymbol(); } });
+
+// ================= Boot =================
+$('ver').textContent = $('hver').textContent = 'v' + APP_VERSION;
 renderSession();
-applyDetails();
-if (window.innerWidth < 768 && state.detailsOpen) { state.detailsOpen = false; applyDetails(); }
-setMobileView(state.mview === 'chart' ? 'chart' : 'lists');
+setInterval(renderSession, 30000);
+render();
+applyChartHidden();
+setView(isPhone() ? state.view : 'list');
 mountChart();
-renderHud();
 wsConnect();
 
-// Dev live reload: on localhost, poll the file's Last-Modified and reload when it changes. No-op elsewhere.
+// Prod: GitHub Pages caches for 10 min and the PWA holds on to old pages; reload when a newer version is live.
 const IS_LAN = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
-const IS_DEV = ['localhost', '127.0.0.1'].includes(location.hostname) || IS_LAN;
-// Prod: the PWA and GitHub Pages (max-age=600) happily serve a stale page. On load and whenever the app comes back
-// to the foreground, fetch the live index.html uncached and compare its APP_VERSION with ours; reload on a mismatch.
+const IS_DEV = IS_LOCAL || IS_LAN;
 if (!IS_DEV) {
   const check = async () => {
     try {
@@ -1965,6 +1094,7 @@ if (!IS_DEV) {
   setTimeout(check, 2000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
 }
+// Dev: live reload on localhost / LAN when the file changes.
 if (IS_DEV) (async () => {
   const stamp = async () => { try { const r = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store' }); return r.headers.get('last-modified') || r.headers.get('etag'); } catch (_) { return null; } };
   let last = await stamp();
