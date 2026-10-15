@@ -1,3 +1,12 @@
 name = "tv-watchlist-relay"
 main = "worker.js"
 compatibility_date = "2026-09-01"
+
+# Watchlist sync: one Durable Object per sync code (SQLite-backed, available on the free plan).
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "SyncRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncRoom"]
