@@ -485,7 +485,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '2.3';  // bump on every push to main
+const APP_VERSION = '2.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -653,7 +653,7 @@ function syncConnect() {
   if (syncWs) { syncWs.onclose = null; try { syncWs.close(); } catch (_) {} clearInterval(syncWs._ping); syncWs = null; }
   const code = state.sync?.code; if (!code || document.hidden) return;
   const w = syncWs = new WebSocket(syncApi().replace(/^http/, 'ws').replace(/\/state\/$/, '/sync/') + code + '?client=' + SYNC_CLIENT + '&name=' + encodeURIComponent(SYNC_NAME));
-  w.onopen = () => { syncWsRetry = 0; w._ping = setInterval(() => { if (w.readyState === 1) w.send('ping'); }, 30000); };
+  w.onopen = () => { syncWsRetry = 0; w.send('peers'); w._ping = setInterval(() => { if (w.readyState === 1) w.send('ping'); }, 30000); };
   w.onmessage = e => {
     if (e.data === 'pong') return;
     let m; try { m = JSON.parse(e.data); } catch (_) { return; }
@@ -1638,6 +1638,7 @@ function renderListManager() {
 function devicesHtml() {
   if (!syncPeers) return '';
   const live = new Set(syncPeers.live || []), devs = Object.entries(syncPeers.devices || {});
+  for (const id of live) if (!syncPeers.devices?.[id]) devs.push([id, { name: 'Device (older version)', seen: Date.now() }]);   // pre-2.3 clients send no name
   if (!devs.length) return '';
   const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
   devs.sort((a, b) => (live.has(b[0]) - live.has(a[0])) || b[1].seen - a[1].seen);

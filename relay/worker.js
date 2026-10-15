@@ -79,16 +79,17 @@ export class SyncRoom extends DurableObject {
     }
     return json({ error: 'method' }, 405, cors);
   }
-  webSocketMessage() {}
+  async webSocketMessage(ws, msg) { if (msg === 'peers') await this.peers(); }   // a client asking who is here (ping/pong is automatic)
   async webSocketClose(ws, code) {
     try { ws.close(code === 1005 ? 1000 : code); } catch (_) {}
-    await this.touch(this.ctx.getTags(ws)[0]);
+    await this.touch(this.ctx.getTags(ws)[0], null, false);
     await this.peers(ws);
   }
   // Devices seen on this code: client id → { name, seen }, kept 90 days. Every client learns who is live and who was here.
-  async touch(id, name) {
+  async touch(id, name, create = true) {
     if (!id) return;
     const devices = (await this.ctx.storage.get('devices')) || {}, now = Date.now();
+    if (!create && !devices[id]) return;   // a socket from an older client (random id) just closing: don't record it
     for (const k of Object.keys(devices)) if (now - devices[k].seen > 90 * 864e5) delete devices[k];
     devices[id] = { name: (name || devices[id]?.name || '').slice(0, 40), seen: now };
     await this.ctx.storage.put('devices', devices);
