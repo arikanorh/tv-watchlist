@@ -64,7 +64,7 @@
   .hbtn svg { width: 18px; height: 18px; }
   .hbtn:hover { background: var(--bg3); color: var(--text); }
   .hver { display: none; font-size: 11px; color: var(--muted); }
-  .hr { display: contents; }   /* phones: its children sit directly in the header; desktop: a compact two-line block in the chart toolbar */
+  .hr { display: none; }   /* phones: no session/clock block (the tint says the session; reconnect lives in Settings); desktop: shown in the header while the chart is hidden */
   .hinfo { display: contents; }
   /* phones: the header follows the pane on screen */
   .hs { display: none; }
@@ -166,7 +166,18 @@
   .sbtn .q { display: none; }
   /* Interval: segmented control. Phones: under the chart (thumb side). Desktop: on top of the chart. */
   .ctools { order: 2; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg2); border-top: 1px solid var(--line); }
-  .ivbtn, .pins { display: none; }
+  .ivbtn { display: none; }
+  /* Pinned symbols on phones: inside the header, one line between the list name and the clock (scrolls if tight) */
+  .pins { flex: 1; min-width: 0; display: flex; justify-content: flex-start; gap: 0; overflow-x: auto; scrollbar-width: none; margin: 0 2px; }
+  .pins::-webkit-scrollbar { display: none; }
+  .pin { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 38px; padding: 0 5px; border-radius: 6px; font-size: 9.5px; line-height: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+  .pin b { font-weight: 600; color: var(--text); font-size: 10px; }
+  .pin .p { color: var(--text); }
+  .pin .v { font-weight: 600; }
+  .pin.on { background: rgba(255, 255, 255, .08); }
+  .top .sp { display: none; }           /* phones: the pins take the middle */
+  .top { gap: 8px; }
+  body[data-view="list"] .pins { order: 0; }
   .seg { display: flex; gap: 4px; padding: 8px 10px 0; }
   .seg button { flex: 1; height: 36px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); background: var(--bg3); font-variant-numeric: tabular-nums; }
   .seg button.on { color: #fff; background: var(--accent); }
@@ -222,7 +233,8 @@
   .lmnew { display: flex; gap: 8px; padding: 10px 12px 2px; border-top: 1px solid var(--line); flex-shrink: 0; }
   .lmnew button { flex: none; padding: 0 16px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; }
   /* Sync across devices (inside the list manager) */
-  .sync { flex-shrink: 0; margin-top: 10px; padding: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .sync { flex-shrink: 0; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .about { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
   .sync h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
   .sync h4 i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
   .sync h4 i.ok { background: var(--up); } .sync h4 i.err { background: var(--down); } .sync h4 i.busy { background: var(--pre); }
@@ -380,13 +392,12 @@
     .ivbtn { order: -1; display: flex; align-items: center; gap: 4px; height: auto; align-self: stretch; padding: 0 10px 0 12px; font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
     .ivbtn svg { width: 14px; height: 14px; color: var(--muted); }
     .ivbtn:hover { background: var(--bg3); }
-    .pins { order: -1; display: flex; align-items: stretch; min-width: 0; overflow: hidden; border-left: 1px solid var(--line); }
-    .pin { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 9px; font-size: 10.5px; line-height: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
-    .pin b { font-weight: 600; color: var(--text); font-size: 11px; }
-    .pin .p { color: var(--text); }
-    .pin .v { font-weight: 600; }
+    .pins { order: -1; flex: 0 1 auto; justify-content: flex-start; gap: 0; margin: 0; align-items: stretch; overflow: hidden; border-left: 1px solid var(--line); }
+    .pin { height: auto; padding: 0 9px; border-radius: 0; font-size: 10.5px; line-height: 13px; }
+    .pin b { font-size: 11px; }
+    .pin.on { background: none; }
+    .top .sp { display: block; }
     .pin:hover { background: var(--bg3); }
-    .pin.on { box-shadow: inset 0 -2px 0 var(--accent); }
     .cbar { display: contents; }   /* search box (with the symbol), intervals, details; the session/tick block at the far right */
     .cbar .sbtn { order: -2; flex: none; height: auto; align-self: stretch; border-radius: 0; gap: 8px; padding: 0 14px; }
     .cbar .sbtn:hover { color: var(--text); }
@@ -447,6 +458,7 @@
       <div class="chips" id="chips"></div>
       <div class="acts">
         <button class="ib" data-act="lists" aria-label="Manage lists"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+        <button class="ib gear" data-act="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
       </div>
     </div>
   </section>
@@ -485,7 +497,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '2.4';  // bump on every push to main
+const APP_VERSION = '2.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -601,7 +613,7 @@ async function freeSyncCode() {
   return newSyncCode();
 }
 function parseSyncCode(t) { const c = String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length >= 4 && c.length <= 12 ? c : null; }
-function setSyncStatus(st, msg = '') { syncStatus = { st, at: st === 'ok' ? Date.now() : syncStatus.at, msg }; if (typeof sheetKind !== 'undefined' && sheetKind === 'lists') renderSyncBox(); }
+function setSyncStatus(st, msg = '') { syncStatus = { st, at: st === 'ok' ? Date.now() : syncStatus.at, msg }; if (typeof sheetKind !== 'undefined' && sheetKind === 'settings') renderSyncBox(); }
 // Called from save(): a change in the synced shape stamps the edit time and schedules a push.
 function syncNoteChange() {
   const j = syncJson();
@@ -1106,8 +1118,10 @@ const ICON = {
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
   rm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M4 12h10M4 18h6M17 13v8M13 17h8"/></svg>',
+  sec: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h16M4 16h16M4 20h16" stroke-dasharray="0"/><path d="M4 12h8" opacity=".4"/></svg>',
 };
 const groupMovable = gi => { const gs = activeList().groups, g = gs[gi]; return g && !g.auto && gs.filter(x => !x.auto).length > 1; };
+const dividerDraggable = gi => groupMovable(gi) && activeList().groups.findIndex(g => !g.auto) !== gi;
 const ghHtml = (name, n, gi, collapsed, isStatic) => {
   return `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span><span class="gc">${n}</span></div>`;
 };
@@ -1122,7 +1136,7 @@ function openGroupMenu(gi) {
   openSheet('group', g.name, `<form class="lmnew" id="gname"><input class="field" value="${esc(g.name)}" aria-label="Section name" autocomplete="off"><button>Rename</button></form>
     <button class="opt" data-o="up"${movable && gi > first ? '' : ' disabled'}>${ICON.up}Move up</button>
     <button class="opt" data-o="down"${movable && gi < last ? '' : ' disabled'}>${ICON.down}Move down</button>
-    <button class="opt danger" data-o="del"${g.symbols.length || own < 2 ? ' disabled' : ''}>${ICON.rm}Delete section${g.symbols.length ? '<span class="c">move its symbols out first</span>' : ''}</button>`);
+    <button class="opt danger" data-o="del"${own < 2 ? ' disabled' : ''}>${ICON.rm}Delete section${g.symbols.length ? '<span class="c">symbols stay in the list</span>' : ''}</button>`);
   $('gname').addEventListener('submit', e => {
     e.preventDefault();
     const v = $('gname').querySelector('input').value.trim(); if (!v || v === g.name) { closeSheet(); return; }
@@ -1131,7 +1145,12 @@ function openGroupMenu(gi) {
   });
   $('shBody').onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return; closeSheet();
-    if (o === 'del') { gs.splice(gi, 1); save(); renderRows(); toast(`${g.name} deleted`); }
+    if (o === 'del') {
+      const snap = JSON.stringify(gs), into = gs[gi - 1] && !gs[gi - 1].auto ? gs[gi - 1] : gs.slice(gi + 1).find(x => !x.auto);
+      if (into === gs[gi - 1]) into.symbols.push(...g.symbols); else into.symbols.unshift(...g.symbols);
+      gs.splice(gi, 1); save(); renderRows();
+      toast(`${g.name} deleted`, 'Undo', () => { l.groups = JSON.parse(snap); save(); renderRows(); });
+    }
     else moveGroup(gi, gi + (o === 'up' ? -1 : 1));
   };
 }
@@ -1211,7 +1230,7 @@ function updateEarnings() {
   patchChips();
 }
 function renderPins() {
-  const el = $('pins'); if (!el || isPhone()) return;
+  const el = $('pins'); if (!el) return;
   if (!el.childElementCount) el.innerHTML = PINS.map(([sym, lbl]) => `<button class="pin" data-act="pin" data-sym="${esc(sym)}"><b>${lbl}</b><span class="p"></span><span class="v"></span></button>`).join('');
   for (const b of el.children) {
     const sym = b.dataset.sym, q = quotes[sym], last = q ? (!regular && q.ep != null ? q.ep : q.p) : null, v = b.querySelector('.v'), pr = b.querySelector('.p');
@@ -1337,6 +1356,10 @@ function setView(v) {
 function placeTools() {   // the session/tick/toggle block stays in the header (phones; desktop only while the chart is hidden)
   const hr = $('hr'), dest = document.querySelector('.top');
   if (hr.parentElement !== dest) dest.appendChild(hr);
+  // pinned symbols: a strip under the header on phones, part of the chart toolbar on desktop
+  const pins = $('pins'), pdest = isPhone() ? document.querySelector('.top') : document.querySelector('.ctools'), before = isPhone() ? document.querySelector('.top .sp') : document.querySelector('.cbar');
+  if (pins.parentElement !== pdest) pdest.insertBefore(pins, before);
+  renderPins();
 }
 function applyListHidden() {
   document.body.classList.toggle('list-hidden', !!state.listHidden && !isPhone());
@@ -1448,6 +1471,7 @@ function openRowMenu(sym, gi) {
   const opts = [`<button class="opt" data-o="details">${ICON.details}Details</button>`,
     `<button class="opt" data-o="flag"><i class="fsw" style="--c:${flagColor(sym) || 'var(--muted)'}"></i>Flag</button>`];
   if (state.lists.length > 1) opts.push(`<button class="opt" data-o="add">${ICON.add}Add to list</button>`);
+  if (ordered) opts.push(`<button class="opt" data-o="sec">${ICON.sec}Add section above</button>`);
   if (ordered && i > 0) opts.push(`<button class="opt" data-o="up">${ICON.up}Move up</button>`);
   if (ordered && i >= 0 && i < g.symbols.length - 1) opts.push(`<button class="opt" data-o="down">${ICON.down}Move down</button>`);
   if (!g?.auto) opts.push(`<button class="opt danger" data-o="rm">${ICON.rm}Remove from ${esc(l.name)}</button>`);
@@ -1457,22 +1481,24 @@ function openRowMenu(sym, gi) {
     if (o === 'details') { if (isPhone()) toggleDetails(sym); else { closeSheet(); if (sym !== state.symbol) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); } }
     if (o === 'flag') openFlagSheet(sym);
     if (o === 'add') openCopySheet(sym);
+    if (o === 'sec') addSection({ gi, i });
     if (o === 'up') { closeSheet(); moveSymbol(sym, gi, gi, i - 1); }
     if (o === 'down') { closeSheet(); moveSymbol(sym, gi, gi, i + 1); }
     if (o === 'rm') { closeSheet(); removeSymbol(sym, gi); }
   };
 }
 
-function openSectionSheet() {   // a new group at the end of the active list
-  openSheet('section', `New section in ${activeList().name}`, `<form class="lmnew" id="secform"><input class="field" id="secname" placeholder="Section name" autocomplete="off"><button>Add</button></form>`);
-  $('secform').addEventListener('submit', e => {
-    e.preventDefault();
-    const name = $('secname').value.trim(), l = activeList(); if (!name) return;
-    if (l.groups.some(g => g.name.toLowerCase() === name.toLowerCase())) { toast(`${name} already exists`); return; }
-    l.groups.push({ name, collapsed: false, symbols: [] }); save(); renderRows(); wsSync(); closeSheet();
-    toast(`${name} added`);
-  });
-  setTimeout(() => $('secname').focus(), 30);
+// A new group named Section (Section 2, …) at the end of the active list, or (split) above row i of group gi:
+// that row and the ones below it move into it. Rename from the section's menu.
+function addSection(split) {
+  const l = activeList(), taken = n => l.groups.some(g => g.name.toLowerCase() === n.toLowerCase());
+  let name = 'Section', k = 2; while (taken(name)) name = 'Section ' + k++;
+  if (split && l.groups[split.gi]) {
+    const g = l.groups[split.gi], moved = g.symbols.splice(split.i);
+    l.groups.splice(split.gi + (split.i > 0 ? 1 : 0), 0, { name, collapsed: false, symbols: moved });
+  } else l.groups.push({ name, collapsed: false, symbols: [] });
+  save(); renderRows(); closeSheet();
+  toast(`${name} added`);
 }
 function openCopySheet(sym) {   // add the symbol to another list (it stays in this one)
   const others = state.lists.filter(x => x.id !== state.activeListId);
@@ -1582,6 +1608,11 @@ function refreshSearch() {
 }
 
 // List manager: rename, reorder, sentiment on/off, delete (tap twice), new list.
+function openSettings() {
+  openSheet('settings', 'Settings', `<div class="sync" id="syncBox"></div>
+    <div class="about"><span>tv-watchlist v${APP_VERSION}</span><button class="btn link" data-act="reconnect">Reconnect quotes</button></div>`);
+  renderSyncBox();
+}
 function openListManager() {
   openSheet('lists', 'Lists', '');
   renderListManager();
@@ -1617,9 +1648,7 @@ function renderListManager() {
       <button class="ib" data-lm="up" title="Move up" ${i === 0 || l.auto ? 'disabled' : ''}>↑</button>
       <button class="ib" data-lm="down" title="Move down" ${i >= state.lists.length - 1 || state.lists[i + 1].auto || l.auto ? 'disabled' : ''}>↓</button>
       <button class="ib del" data-lm="del" title="${l.auto ? 'Fills itself from the other lists' : 'Delete list'}" ${l.auto ? 'disabled' : ''}>✕</button></div>`).join('')
-    + `<form class="lmnew" id="lmnew"><input class="field" id="lmname" placeholder="New list name" autocomplete="off"><button>Add</button></form>`
-    + `<div class="sync" id="syncBox"></div>`;
-  renderSyncBox();
+    + `<form class="lmnew" id="lmnew"><input class="field" id="lmname" placeholder="New list name" autocomplete="off"><button>Add</button></form>`;
   $('shBody').querySelectorAll('input[data-name]').forEach(inp => {
     const commit = () => { const l = state.lists.find(x => x.id === inp.closest('.lm').dataset.id), v = inp.value.trim(); if (l && v && v !== l.name) { l.name = v; save(); renderChips(); renderHeader(); } };
     inp.addEventListener('change', commit);
@@ -1721,6 +1750,7 @@ document.addEventListener('click', e => {
     case 'add': openSearch(true); break;
     case 'sort': state.sort = state.sort === el.dataset.by ? null : el.dataset.by; save(); render(); break;
     case 'lists': openListManager(); break;
+    case 'settings': openSettings(); break;
     case 'reconnect': refreshQuotes(); break;
     case 'details': toggleDetails(); break;
     case 'hist-range': state.histRange = HIST_RANGES[(HIST_RANGES.indexOf(histRange()) + 1) % HIST_RANGES.length]; save(); renderSentiment(); break;
@@ -1729,7 +1759,7 @@ document.addEventListener('click', e => {
     case 'sheet-close': closeSheet(); break;
     case 'interval': openIntervalPicker(); break;
     case 'pin': selectSymbol(el.dataset.sym, false); break;
-    case 'add-section': openSectionSheet(); break;
+    case 'add-section': addSection(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
     case 'row-flag': case 'row-details': case 'row-add': case 'row-up': case 'row-down': case 'row-rm': {
       e.stopPropagation();
@@ -1757,7 +1787,7 @@ rowsEl.addEventListener('pointerdown', e => {
   press = { row, group, id: e.pointerId, type: e.pointerType, x: e.clientX, y: e.clientY, armed: false, drag: false, pos: null,
     timer: setTimeout(() => { if (!press) return; press.armed = true; press.row.classList.add('lift'); navigator.vibrate?.(8); }, 420) };
 });
-const canDrag = () => !state.sort && !press.row.classList.contains('auto') && (!press.group || groupMovable(+press.row.dataset.g));
+const canDrag = () => !state.sort && !press.row.classList.contains('auto') && (!press.group || dividerDraggable(+press.row.dataset.g));
 rowsEl.addEventListener('pointermove', e => {
   if (!press || e.pointerId !== press.id) return;
   const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
@@ -1783,23 +1813,32 @@ rowsEl.addEventListener('pointermove', e => {
 // Once a row is lifted the finger must not scroll the list.
 rowsEl.addEventListener('touchmove', e => { if (press && press.armed) e.preventDefault(); }, { passive: false });
 function clearDrop() { rowsEl.querySelectorAll('.drop-before, .drop-after, .drop-into').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-into')); }
-// Dragging a section: drop before/after another section header (never above the Earnings "Upcoming" group).
+// Dragging a section header moves it like a divider between rows: the rows it passes change section. The target slot is a
+// position in the list's flat symbol order (`flatSymbols` of the user's groups); the first header can't move (nothing is above it).
 function updateGroupDrop(y) {
   clearDrop();
-  const gs = activeList().groups, from = +press.row.dataset.g;
-  let to = null, mark = null, after = false;
-  for (const h of rowsEl.querySelectorAll('.gh[data-g]:not(.dragging)')) {
-    const gi = +h.dataset.g; if (gs[gi]?.auto) continue;
-    const r = h.getBoundingClientRect();
-    if (y < r.top + r.height / 2) { to = gi; mark = h; after = false; break; }
-    to = gi; mark = h; after = true;
+  const l = activeList(), own = l.groups.filter(g => !g.auto), flat = own.flatMap(g => g.symbols);
+  let slot = flat.length, mark = null;
+  for (const r of rowsEl.querySelectorAll('.row:not(.auto)')) {
+    const b = r.getBoundingClientRect();
+    if (y < b.top + b.height / 2) { slot = flat.indexOf(r.dataset.sym); mark = r; break; }
   }
-  if (to == null) { press.pos = null; return; }
-  if (after) { to = to + 1; }
-  if (from < to) to--;   // removing the dragged group first shifts later slots up
-  if (to === from) { press.pos = null; return; }
-  mark.classList.add(after ? 'drop-after' : 'drop-before');
-  press.pos = { to };
+  const gi = +press.row.dataset.g, k = own.indexOf(l.groups[gi]);
+  const cur = own.slice(0, k).reduce((n, g) => n + g.symbols.length, 0);
+  if (slot === cur) { press.pos = null; return; }
+  if (mark) mark.classList.add('drop-before'); else rowsEl.querySelector('.row:not(.auto):last-of-type')?.classList.add('drop-after');
+  press.pos = { slot };
+}
+function moveDivider(gi, slot) {   // re-cut the user's groups so header gi starts at flat position `slot`
+  const l = activeList(), own = l.groups.filter(g => !g.auto), flat = own.flatMap(g => g.symbols), k = own.indexOf(l.groups[gi]);
+  if (k <= 0) return;
+  const divs = own.map((g, i) => ({ g, pos: own.slice(0, i).reduce((n, x) => n + x.symbols.length, 0), moved: i === k }));
+  divs[k].pos = slot;
+  divs.sort((a, b) => a.pos - b.pos || (a.moved ? 1 : 0) - (b.moved ? 1 : 0));
+  divs[0].pos = 0;
+  divs.forEach((d, i) => { d.g.symbols = flat.slice(d.pos, divs[i + 1]?.pos ?? flat.length); });
+  l.groups = [...l.groups.filter(g => g.auto), ...divs.map(d => d.g)];
+  save(); renderRows();
 }
 function updateDrop(y) {
   clearDrop();
@@ -1824,7 +1863,7 @@ function endPress(cancel) {
   p.row.classList.remove('lift', 'dragging'); clearDrop(); p.ghost?.remove();
   if (!p.armed || cancel) return;
   suppressClick = true; setTimeout(() => { suppressClick = false; }, 400);
-  if (p.group) { if (p.drag) { if (p.pos) moveGroup(+p.row.dataset.g, p.pos.to); } else openGroupMenu(+p.row.dataset.g); return; }
+  if (p.group) { if (p.drag) { if (p.pos) moveDivider(+p.row.dataset.g, p.pos.slot); } else openGroupMenu(+p.row.dataset.g); return; }
   if (p.drag) {
     if (!p.pos) return;
     const sym = p.row.dataset.sym, from = +p.row.dataset.g, src = activeList().groups[from];
@@ -1891,7 +1930,7 @@ wsConnect();
 syncLast = syncJson();
 { const m = location.hash.match(/sync=([A-Za-z0-9-]+)/); const c = m && parseSyncCode(m[1]);
   if (c) { history.replaceState(null, '', location.pathname + location.search);
-    if (state.sync?.code !== c) { pendingSyncCode = fmtCode(c); setTimeout(openListManager, 300); } } }
+    if (state.sync?.code !== c) { pendingSyncCode = fmtCode(c); setTimeout(openSettings, 300); } } }
 syncPull();
 syncConnect();
 document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (!syncLive()) { syncConnect(); syncPull(); } });
