@@ -42,6 +42,8 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 
 **PWA / iOS** — `fitStandalone()` drops the nav's home-indicator padding when iOS stops the web view short of the screen (`body.ios-gap`); `unshift()` snaps the document back after keyboard use (otherwise taps land off target); `trackKeyboard()` keeps bottom sheets above the keyboard (`--kb`).
 
+**Tab title** — `renderHeader` sets `document.title` to the chart symbol and its chg% (e.g. `CRWV -15.46%`).
+
 **Versioning** — `APP_VERSION` shows in the nav (phones) and header (desktop); bump it on every push to `main`. Off localhost the page re-fetches itself on load and on resume and reloads when the live version differs. On localhost/LAN it live-reloads on file change.
 
 ## Vocabulary
