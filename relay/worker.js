@@ -48,9 +48,12 @@ export class SyncRoom extends DurableObject {
     const url = new URL(request.url), code = url.pathname.split('/')[2], cors = JSON.parse(request.headers.get('X-Cors') || '{}');
     if (request.headers.get('Upgrade') === 'websocket') {
       const [client, server] = Object.values(new WebSocketPair());
-      this.ctx.acceptWebSocket(server, [(url.searchParams.get('client') || '').slice(0, 40)]);
+      const id = (url.searchParams.get('client') || '').slice(0, 40);
+      this.ctx.acceptWebSocket(server, [id]);
       const d = await this.doc(code);
       if (d) server.send(JSON.stringify({ type: 'state', doc: d }));
+      await this.touch(id, url.searchParams.get('name'));
+      await this.peers();
       return new Response(null, { status: 101, webSocket: client });
     }
     if (request.method === 'GET') {
@@ -71,12 +74,31 @@ export class SyncRoom extends DurableObject {
       await this.ctx.storage.put('doc', d);
       const from = request.headers.get('X-Client-Id') || '', msg = JSON.stringify({ type: 'state', doc: d });
       for (const ws of this.ctx.getWebSockets()) if (this.ctx.getTags(ws)[0] !== from) { try { ws.send(msg); } catch (_) {} }
+      await this.touch(from, url.searchParams.get('name') || request.headers.get('X-Client-Name'));
       return json({ updatedAt: d.updatedAt }, 200, cors);
     }
     return json({ error: 'method' }, 405, cors);
   }
   webSocketMessage() {}
-  webSocketClose(ws, code) { try { ws.close(code === 1005 ? 1000 : code); } catch (_) {} }
+  async webSocketClose(ws, code) {
+    try { ws.close(code === 1005 ? 1000 : code); } catch (_) {}
+    await this.touch(this.ctx.getTags(ws)[0]);
+    await this.peers(ws);
+  }
+  // Devices seen on this code: client id → { name, seen }, kept 90 days. Every client learns who is live and who was here.
+  async touch(id, name) {
+    if (!id) return;
+    const devices = (await this.ctx.storage.get('devices')) || {}, now = Date.now();
+    for (const k of Object.keys(devices)) if (now - devices[k].seen > 90 * 864e5) delete devices[k];
+    devices[id] = { name: (name || devices[id]?.name || '').slice(0, 40), seen: now };
+    await this.ctx.storage.put('devices', devices);
+  }
+  async peers(closing) {
+    const devices = (await this.ctx.storage.get('devices')) || {};
+    const live = [...new Set(this.ctx.getWebSockets().filter(ws => ws !== closing).map(ws => this.ctx.getTags(ws)[0]))];
+    const msg = JSON.stringify({ type: 'peers', live, devices });
+    for (const ws of this.ctx.getWebSockets()) if (ws !== closing) { try { ws.send(msg); } catch (_) {} }
+  }
 }
 function toRoom(request, env, code, cors) {
   if (!env.ROOMS) return json({ error: 'sync storage not configured' }, 503, cors);
@@ -93,7 +115,7 @@ export default {
 
     if (url.pathname.startsWith('/state/')) {
       if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
-      const cors = { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-Client-Id' };
+      const cors = { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-Client-Id, X-Client-Name' };
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
       return toRoom(request, env, url.pathname.split('/')[2] || '', cors);
     }

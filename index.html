@@ -166,6 +166,7 @@
   .sbtn .q { display: none; }
   /* Interval: segmented control. Phones: under the chart (thumb side). Desktop: on top of the chart. */
   .ctools { order: 2; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg2); border-top: 1px solid var(--line); }
+  .ivbtn, .pins { display: none; }
   .seg { display: flex; gap: 4px; padding: 8px 10px 0; }
   .seg button { flex: 1; height: 36px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); background: var(--bg3); font-variant-numeric: tabular-nums; }
   .seg button.on { color: #fff; background: var(--accent); }
@@ -234,6 +235,13 @@
   .sync .btn.link { height: auto; padding: 0; background: none; color: var(--muted); font-weight: 400; font-size: 13px; text-align: left; }
   .sync .code { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; background: var(--bg);
     font: 600 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; user-select: all; -webkit-user-select: all; }
+  .devs { margin: 10px 0 2px; }
+  .devs h5 { margin: 0 0 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .dev { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+  .dev i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: .5; flex-shrink: 0; }
+  .dev i.live { background: var(--up); opacity: 1; }
+  .dev em { font-style: normal; color: var(--muted); font-size: 11px; }
+  .dev .when { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   .sync .msg { font-size: 12px; color: var(--down); }
   .snote { position: fixed; left: 50%; top: calc(var(--safe-t) + 60px); z-index: 45; transform: translate(-50%, -8px); opacity: 0; transition: opacity .2s, transform .2s;
     display: flex; align-items: flex-start; gap: 8px; max-width: min(460px, calc(100vw - 24px)); padding: 9px 14px; border-radius: 10px;
@@ -368,19 +376,36 @@
     .sbtn, .infobtn { height: 38px; border-radius: 10px; }
     .infobtn { width: 38px; }
     .ctools { order: 0; flex-direction: row; align-items: stretch; gap: 6px; height: 50px; padding: 0 8px 0 0; border-top: 0; border-bottom: 1px solid var(--line); }
-    .seg { order: -1; flex: 0 1 auto; min-width: 0; align-items: stretch; gap: 0; padding: 0; overflow-x: auto; scrollbar-width: none; }
+    .seg { display: none; }
+    .ivbtn { order: -1; display: flex; align-items: center; gap: 4px; height: auto; align-self: stretch; padding: 0 10px 0 12px; font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+    .ivbtn svg { width: 14px; height: 14px; color: var(--muted); }
+    .ivbtn:hover { background: var(--bg3); }
+    .pins { order: -1; display: flex; align-items: stretch; min-width: 0; overflow: hidden; border-left: 1px solid var(--line); }
+    .pin { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 9px; font-size: 10.5px; line-height: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+    .pin b { font-weight: 600; color: var(--text); font-size: 11px; }
+    .pin .p { color: var(--text); }
+    .pin .v { font-weight: 600; }
+    .pin:hover { background: var(--bg3); }
+    .pin.on { box-shadow: inset 0 -2px 0 var(--accent); }
     .cbar { display: contents; }   /* search box (with the symbol), intervals, details; the session/tick block at the far right */
     .cbar .sbtn { order: -2; flex: none; height: auto; align-self: stretch; border-radius: 0; gap: 8px; padding: 0 14px; }
     .cbar .sbtn:hover { color: var(--text); }
-    .sbtn .q { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+    .sbtn .q { display: flex; flex-direction: column; align-items: flex-start; gap: 0; line-height: 15px; font-variant-numeric: tabular-nums; }
     .sbtn .q b { color: var(--text); font-size: 14px; }
-    .sbtn .q .px { color: var(--text); font-size: 13px; }
+    .sbtn .q2 { display: flex; gap: 6px; }
+    .sbtn .q .px { color: var(--text); font-size: 12px; }
     .sbtn .q .chg { font-size: 12px; font-weight: 600; }
     .sbtn.has .ph { display: none; }
-    .cbar .infobtn { width: 40px; height: auto; border-radius: 0; background: none; color: var(--muted); }
+    .cbar .infobtn { display: none; }   /* desktop: details from the row's hover tools */
     .cbar .infobtn:hover { background: var(--bg3); color: var(--text); }
     body.details-open .cbar .infobtn { color: var(--accent); }
-    .ctools .hbtn { width: 40px; height: auto; align-self: stretch; border-radius: 0; }
+    .ltog { margin-left: auto; align-self: center; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--bg3); }
+    .ltog .hbtn { width: 30px; height: 24px; border-radius: 5px; }
+    .ltog .hbtn svg { width: 15px; height: 15px; }
+    .ltog .hbtn:hover { background: var(--bg2); }
+    body.list-hidden { grid-template-columns: 0 auto 1fr; }
+    body.list-hidden .listpane { display: none; }
+    body.list-hidden .lbtn { background: var(--accent); color: #fff; }
     .seg button { flex: none; height: auto; min-width: 40px; padding: 0 10px; border-radius: 0; font-size: 13px; background: none; }
     .seg button:hover { color: var(--text); background: var(--bg3); }
     .seg button.on { color: #fff; background: var(--accent); }
@@ -433,10 +458,13 @@
     <div id="tv_chart"></div>
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
+    <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="pins" id="pins"></div>
     <div class="cbar">
-      <button class="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="q"><b id="cbSym"></b><span class="px" id="cbPx"></span><span class="chg" id="cbChg"></span></span><span class="ph">Search</span></button>
+      <button class="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="q"><b id="cbSym"></b><span class="q2"><span class="px" id="cbPx"></span><span class="chg" id="cbChg"></span></span></span><span class="ph">Search</span></button>
       <button class="infobtn" data-act="details" aria-label="Details" title="Details"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button>
     </div>
+    <div class="ltog"><button class="hbtn lbtn" data-act="toggle-list" title="Hide watchlist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 4v16"/></svg></button><button class="hbtn" data-act="toggle-chart" title="Hide chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg></button></div>
     </div>
   </section>
 </main>
@@ -457,7 +485,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '2.2';  // bump on every push to main
+const APP_VERSION = '2.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -508,10 +536,10 @@ const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'SKILLING:US100', 'CAPITALCOM:SPX500'
   'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS' };
 const REMOVED = new Set(['NASDAQ:NDX', 'SP:SPX']);   // no chart in the free widget
 // The free widget has no chart for plain indices and BIST; these stay quote-only.
-const noChart = sym => /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|BIST:)/.test(sym);
+const noChart = sym => !CHART_ALIAS[sym] && /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|BIST:)/.test(sym);
 // Some symbols quote fine but the free widget won't chart them; chart an equivalent feed instead.
 // TVC:US10Y (US 10Y yield) spins forever in the embed; PYTH:US10Y carries the same yield and charts.
-const CHART_ALIAS = { 'TVC:US10Y': 'PYTH:US10Y' };
+const CHART_ALIAS = { 'TVC:US10Y': 'PYTH:US10Y', 'TVC:VIX': 'CAPITALCOM:VIX' };
 const chartSymbol = sym => CHART_ALIAS[sym] || sym;
 // The Earnings list (auto: 'earnings') stays last; its "Upcoming" group (auto) is rebuilt from the other lists' earnings dates
 // (updateEarnings) and never synced; the "Manual" group is the user's own. A list already named "Earnings" is adopted.
@@ -589,7 +617,7 @@ async function syncPush() {
   const code = state.sync?.code; if (!code) return;
   setSyncStatus('busy');
   try {
-    const r = await fetch(syncApi() + code, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client-Id': SYNC_CLIENT },
+    const r = await fetch(syncApi() + code + '?name=' + encodeURIComponent(SYNC_NAME), { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client-Id': SYNC_CLIENT },   // name in the URL: no new CORS header for older workers
       body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists), flags: state.flags || {} }) });
     if (r.status === 409) { syncAdopt(await r.json()); return setSyncStatus('ok'); }
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -612,23 +640,30 @@ async function syncPull() {
 }
 // Live updates: a websocket to this code's sync room. The room sends its copy on connect and after every save from another
 // device; a newer copy is adopted, an older one means this device has unsent edits, so they are pushed.
-const SYNC_CLIENT = Math.random().toString(36).slice(2, 12);
-var syncWs = null, syncWsRetry = 0, syncWsTimer = null;
+// This device's id sticks (localStorage) so the room can tell devices apart across reloads; the name is a rough UA label.
+const SYNC_CLIENT = (() => { try { let id = localStorage.getItem('tvwl.client'); if (!id) { id = Math.random().toString(36).slice(2, 12); localStorage.setItem('tvwl.client', id); } return id; } catch (_) { return Math.random().toString(36).slice(2, 12); } })();
+const SYNC_NAME = (() => {
+  const ua = navigator.userAgent, dev = /iPhone/.test(ua) ? 'iPhone' : /iPad|Macintosh.*Mobile/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : 'Device';
+  const app = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches ? 'app' : /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'browser';
+  return `${dev} · ${app}`;
+})();
+var syncWs = null, syncWsRetry = 0, syncWsTimer = null, syncPeers = null;
 function syncConnect() {
   clearTimeout(syncWsTimer);
   if (syncWs) { syncWs.onclose = null; try { syncWs.close(); } catch (_) {} clearInterval(syncWs._ping); syncWs = null; }
   const code = state.sync?.code; if (!code || document.hidden) return;
-  const w = syncWs = new WebSocket(syncApi().replace(/^http/, 'ws').replace(/\/state\/$/, '/sync/') + code + '?client=' + SYNC_CLIENT);
+  const w = syncWs = new WebSocket(syncApi().replace(/^http/, 'ws').replace(/\/state\/$/, '/sync/') + code + '?client=' + SYNC_CLIENT + '&name=' + encodeURIComponent(SYNC_NAME));
   w.onopen = () => { syncWsRetry = 0; w._ping = setInterval(() => { if (w.readyState === 1) w.send('ping'); }, 30000); };
   w.onmessage = e => {
     if (e.data === 'pong') return;
     let m; try { m = JSON.parse(e.data); } catch (_) { return; }
     if (m.type === 'state' && m.doc) syncReceive(m.doc);
+    if (m.type === 'peers') { syncPeers = m; renderSyncBox(); }
   };
   w.onclose = () => {
     clearInterval(w._ping);
     if (syncWs !== w) return;
-    syncWs = null;
+    syncWs = null; syncPeers = null; renderSyncBox();
     if (state.sync?.code && !document.hidden) syncWsTimer = setTimeout(syncConnect, Math.min(30000, 1000 * 2 ** syncWsRetry++));
   };
 }
@@ -691,7 +726,8 @@ function showSyncNote(changes) {
 try { localStorage.removeItem('tvwl.eod.v1'); } catch (_) {}
 const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
 const flatSymbols = list => list.groups.flatMap(g => g.symbols);
-const allSymbols = () => [...new Set(state.lists.flatMap(flatSymbols))];
+const PINS = [['SKILLING:US100', 'US100'], ['BINANCE:BTCUSDT', 'BTC'], ['TVC:US10Y', 'US10Y'], ['TVC:VIX', 'VIX']];   // quick symbols in the desktop toolbar
+const allSymbols = () => [...new Set([...state.lists.flatMap(flatSymbols), ...PINS.map(p => p[0])])];
 
 // ================= Formatting =================
 const NF2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1050,14 +1086,14 @@ function patchChips() {
   }
 }
 // Flags like TradingView's: one color per symbol, shared by every list and synced (state.flags[sym] = color name).
-const FLAGS = [['red', '#f23645'], ['orange', '#ff9800'], ['yellow', '#fbc02d'], ['green', '#089981'], ['blue', '#2962ff'], ['purple', '#9c27b0']];
+const FLAGS = [['red', '#f23645'], ['green', '#089981'], ['blue', '#2962ff'], ['orange', '#ff9800'], ['yellow', '#fbc02d'], ['purple', '#9c27b0']];
 const flagColor = sym => FLAGS.find(f => f[0] === state.flags?.[sym])?.[1] || '';
 function setFlag(sym, color) {
   state.flags = state.flags || {};
   if (color) state.flags[sym] = color; else delete state.flags[sym];
   save(); renderRows();
 }
-const cycleFlag = sym => { const i = FLAGS.findIndex(f => f[0] === state.flags?.[sym]); setFlag(sym, FLAGS[i + 1]?.[0] || null); };   // none → red → … → purple → none
+const cycleFlag = sym => { const i = FLAGS.findIndex(f => f[0] === state.flags?.[sym]); setFlag(sym, FLAGS[i + 1]?.[0] || null); };   // none → red → green → blue → … → none
 function openFlagSheet(sym) {
   const cur = state.flags?.[sym];
   openSheet('flag', `Flag ${short(sym)}`, `<div class="fpick">${FLAGS.map(([n, c]) =>
@@ -1081,16 +1117,29 @@ function moveGroup(from, to) {   // reorder sections; the Earnings "Upcoming" gr
   save(); renderRows();
 }
 function openGroupMenu(gi) {
-  const gs = activeList().groups, g = gs[gi]; if (!g) return;
-  const first = gs.findIndex(x => !x.auto), last = gs.length - 1;
-  openSheet('group', g.name, `<button class="opt" data-o="up"${gi > first ? '' : ' disabled'}>${ICON.up}Move up</button><button class="opt" data-o="down"${gi < last ? '' : ' disabled'}>${ICON.down}Move down</button>`);
-  $('shBody').onclick = e => { const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return; closeSheet(); moveGroup(gi, gi + (o === 'up' ? -1 : 1)); };
+  const l = activeList(), gs = l.groups, g = gs[gi]; if (!g || g.auto) return;
+  const first = gs.findIndex(x => !x.auto), last = gs.length - 1, movable = groupMovable(gi), own = gs.filter(x => !x.auto).length;
+  openSheet('group', g.name, `<form class="lmnew" id="gname"><input class="field" value="${esc(g.name)}" aria-label="Section name" autocomplete="off"><button>Rename</button></form>
+    <button class="opt" data-o="up"${movable && gi > first ? '' : ' disabled'}>${ICON.up}Move up</button>
+    <button class="opt" data-o="down"${movable && gi < last ? '' : ' disabled'}>${ICON.down}Move down</button>
+    <button class="opt danger" data-o="del"${g.symbols.length || own < 2 ? ' disabled' : ''}>${ICON.rm}Delete section${g.symbols.length ? '<span class="c">move its symbols out first</span>' : ''}</button>`);
+  $('gname').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = $('gname').querySelector('input').value.trim(); if (!v || v === g.name) { closeSheet(); return; }
+    if (gs.some(x => x !== g && x.name.toLowerCase() === v.toLowerCase())) { toast(`${v} already exists`); return; }
+    g.name = v; save(); renderRows(); closeSheet();
+  });
+  $('shBody').onclick = e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return; closeSheet();
+    if (o === 'del') { gs.splice(gi, 1); save(); renderRows(); toast(`${g.name} deleted`); }
+    else moveGroup(gi, gi + (o === 'up' ? -1 : 1));
+  };
 }
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
 const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
     <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
-    <span class="rt"><button data-act="row-add" title="Add to another list">${ICON.add}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
+    <span class="rt"><button data-act="row-details" title="Details">${ICON.details}</button><button data-act="row-add" title="Add to another list">${ICON.add}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
 let lastSortRender = 0;
 function renderRows() {
   const l = activeList(), all = flatSymbols(l);
@@ -1161,6 +1210,19 @@ function updateEarnings() {
   if (activeList() === l) renderRows();
   patchChips();
 }
+function renderPins() {
+  const el = $('pins'); if (!el || isPhone()) return;
+  if (!el.childElementCount) el.innerHTML = PINS.map(([sym, lbl]) => `<button class="pin" data-act="pin" data-sym="${esc(sym)}"><b>${lbl}</b><span class="p"></span><span class="v"></span></button>`).join('');
+  for (const b of el.children) {
+    const sym = b.dataset.sym, q = quotes[sym], last = q ? (!regular && q.ep != null ? q.ep : q.p) : null, v = b.querySelector('.v'), pr = b.querySelector('.p');
+    const t = q ? pct(q.c) : '', px = last != null ? fmtPrice(last) : '';
+    if (v.textContent !== t) v.textContent = t;
+    if (pr.textContent !== px) pr.textContent = px;
+    v.className = 'v ' + (q ? dir(q.c) : '');
+    b.title = sym;
+    b.classList.toggle('on', sym === state.symbol);
+  }
+}
 function renderHeader() {
   const l = activeList(), v = listValue(l);
   for (const [n, p] of [['hlName', 'hlPct'], ['lhName', 'lhPct']]) {
@@ -1179,6 +1241,8 @@ function renderHeader() {
   $('cbChg').textContent = q ? pct(q.c) : '';
   $('cbChg').className = 'chg ' + (q ? dir(q.c) : '');
   document.querySelector('.sbtn').classList.toggle('has', !!sym);
+  $('ivLbl').textContent = INTERVALS.find(x => x[1] === state.interval)?.[0] || state.interval;
+  renderPins();
   const seg = $('seg');
   if (seg.dataset.iv !== state.interval) {
     seg.dataset.iv = state.interval;
@@ -1270,13 +1334,19 @@ function setView(v) {
     else window.dispatchEvent(new Event('resize'));
   }
 }
-function placeTools() {   // desktop with the chart showing: session/tick/toggle live in the chart toolbar, otherwise in the header
-  const hr = $('hr'), dest = document.querySelector(!isPhone() && !state.chartHidden ? '.ctools' : '.top');
+function placeTools() {   // the session/tick/toggle block stays in the header (phones; desktop only while the chart is hidden)
+  const hr = $('hr'), dest = document.querySelector('.top');
   if (hr.parentElement !== dest) dest.appendChild(hr);
 }
+function applyListHidden() {
+  document.body.classList.toggle('list-hidden', !!state.listHidden && !isPhone());
+  for (const b of document.querySelectorAll('[data-act="toggle-list"]')) b.title = state.listHidden ? 'Show watchlist' : 'Hide watchlist';
+  if (chart.hiddenAtMount && !isPhone()) mountChart(); else window.dispatchEvent(new Event('resize'));
+}
 function applyChartHidden() {
+  if (state.chartHidden && state.listHidden) { state.listHidden = false; applyListHidden(); }   // never both
   document.body.classList.toggle('chart-hidden', !!state.chartHidden);
-  $('chartToggle').title = state.chartHidden ? 'Show chart' : 'Hide chart';
+  for (const b of document.querySelectorAll('[data-act="toggle-chart"]')) b.title = state.chartHidden ? 'Show chart' : 'Hide chart';
   placeTools();
   if (!state.chartHidden && chart.hiddenAtMount && !isPhone()) mountChart();
 }
@@ -1564,6 +1634,16 @@ function renderListManager() {
   });
 }
 
+// Devices on this code (from the room's "peers" message): live ones first, then the rest by last seen.
+function devicesHtml() {
+  if (!syncPeers) return '';
+  const live = new Set(syncPeers.live || []), devs = Object.entries(syncPeers.devices || {});
+  if (!devs.length) return '';
+  const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
+  devs.sort((a, b) => (live.has(b[0]) - live.has(a[0])) || b[1].seen - a[1].seen);
+  return `<div class="devs"><h5>${live.size} live · ${devs.length} device${devs.length === 1 ? '' : 's'}</h5>` + devs.map(([id, d]) =>
+    `<div class="dev"><i class="${live.has(id) ? 'live' : ''}"></i><span>${esc(d.name || 'Device')}${id === SYNC_CLIENT ? ' <em>this device</em>' : ''}</span><span class="when">${live.has(id) ? 'live' : ago(d.seen)}</span></div>`).join('') + '</div>';
+}
 function renderSyncBox() {
   const box = $('syncBox'); if (!box) return;
   const code = state.sync?.code, st = syncStatus;
@@ -1575,7 +1655,7 @@ function renderSyncBox() {
     box.innerHTML = `<h4><i class="${dot}"></i>Sync across devices<span>${label}</span></h4>
       <p>Enter this code on your other devices to keep the same lists.</p>
       <div class="row2"><span class="code">${fmtCode(code)}</span><button class="btn" data-sync="copy">Copy</button></div>
-      ${msg}
+      ${msg}${devicesHtml()}
       <button class="btn link" data-sync="off">Turn off</button>`;
     return;
   }
@@ -1603,11 +1683,11 @@ async function useSyncCode(code) {
     state.sync = { ...(state.sync || {}), code, lastCode: code, updatedAt: state.sync?.updatedAt || Date.now() }; save();
     await syncPush();
     if (syncStatus.st === 'err') { state.sync.code = null; save(); return false; }
-    return true;
+    syncConnect(); return true;
   }
   if (!r.ok) { setSyncStatus(r.status === 400 ? 'bad' : 'err', r.status === 400 ? 'The sync service doesn\'t accept that code. Use 4–12 letters or digits.' : 'Couldn\'t reach the sync service.'); return false; }
   state.sync = { ...(state.sync || {}), code, lastCode: code }; save();
-  syncAdopt(await r.json(), false); setSyncStatus('ok');
+  syncAdopt(await r.json(), false); setSyncStatus('ok'); syncConnect();
   toast(`Lists loaded from code ${fmtCode(code)}`); return true;
 }
 var pendingSyncCode = null, syncSuggest = null;
@@ -1644,7 +1724,10 @@ document.addEventListener('click', e => {
     case 'details': toggleDetails(); break;
     case 'hist-range': state.histRange = HIST_RANGES[(HIST_RANGES.indexOf(histRange()) + 1) % HIST_RANGES.length]; save(); renderSentiment(); break;
     case 'toggle-chart': state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
+    case 'toggle-list': state.listHidden = !state.listHidden; if (state.listHidden && state.chartHidden) state.chartHidden = false; save(); applyChartHidden(); applyListHidden(); break;
     case 'sheet-close': closeSheet(); break;
+    case 'interval': openIntervalPicker(); break;
+    case 'pin': selectSymbol(el.dataset.sym, false); break;
     case 'add-section': openSectionSheet(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
     case 'row-flag': case 'row-details': case 'row-add': case 'row-up': case 'row-down': case 'row-rm': {
@@ -1757,9 +1840,9 @@ rowsEl.addEventListener('click', e => {
   const row = e.target.closest('.row'); if (row) selectSymbol(row.dataset.sym);
 });
 rowsEl.addEventListener('contextmenu', e => {
-  const row = e.target.closest('.row'); if (!row) return;
+  const row = e.target.closest('.row, .gh[data-g]'); if (!row) return;
   e.preventDefault();
-  if (!press || press.type === 'mouse') { if (press) endPress(true); openRowMenu(row.dataset.sym, +row.dataset.g); }
+  if (!press || press.type === 'mouse') { if (press) endPress(true); row.classList.contains('gh') ? openGroupMenu(+row.dataset.g) : openRowMenu(row.dataset.sym, +row.dataset.g); }
 });
 
 // ================= iOS niceties =================
@@ -1796,10 +1879,11 @@ $('ver').textContent = $('hver').textContent = 'v' + APP_VERSION;
 renderSession();
 setInterval(renderSession, 30000);
 render();
-applyChartHidden();
+applyChartHidden(); applyListHidden();
 applyDetails();
 window.addEventListener('resize', () => { if (document.body.classList.contains('details-open') !== (!!state.detailsOpen && !isPhone())) applyDetails(); });
 window.addEventListener('resize', placeTools);
+window.addEventListener('resize', () => { if (document.body.classList.contains('list-hidden') !== (!!state.listHidden && !isPhone())) applyListHidden(); });
 setView(isPhone() ? state.view : 'list');
 mountChart();
 wsConnect();
