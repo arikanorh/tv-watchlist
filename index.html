@@ -125,6 +125,12 @@
   .gh .gc { margin-left: auto; color: var(--muted); font-weight: 400; letter-spacing: 0; }
   .gh.static { cursor: default; }
   .gh.drop-into { box-shadow: inset 0 0 0 1px var(--accent); }
+  .gh.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); z-index: 3; }
+  .ghost { position: fixed; z-index: 60; pointer-events: none; background: var(--bg3); box-shadow: 0 10px 28px rgba(0, 0, 0, .6); opacity: .92; border-radius: 6px; }
+  .ghost .rt, .ghost .fl { display: none; }
+  .gh.dragging { opacity: .55; }
+  .gh.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+  .gh.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
   .flash { animation: flash .9s ease-out; border-radius: 3px; }
   .f-up { --fl: rgba(8, 153, 129, .45); } .f-down { --fl: rgba(242, 54, 69, .45); } .f-same { --fl: rgba(41, 98, 255, .35); }
   @keyframes flash { 0% { background: var(--fl); } 100% { background: transparent; } }
@@ -344,10 +350,6 @@
     .row:hover:not(.flagged) .fl { background: var(--muted); opacity: .35; }
     .row:hover:not(.flagged) .fl:hover { opacity: .6; }
     .row.flagged .fl:hover { box-shadow: inset 0 0 0 8px rgba(255, 255, 255, .12); }
-    .row .rt .ud { display: flex; flex-direction: column; }
-    .row .rt .ud button { width: 24px; height: 15px; border-radius: 4px; }
-    .row .rt .ud svg { width: 12px; height: 12px; }
-    body.sorted .row .rt .ud, .row.auto .rt .ud { display: none; }
     .row:hover { background: var(--bg2); }
     .row.on:hover { background: var(--accent-bg); }
     /* Dock as a tab bar: name + sentiment % on one line, the active list underlined */
@@ -455,7 +457,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '2.1';  // bump on every push to main
+const APP_VERSION = '2.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -651,7 +653,7 @@ function syncAdopt(remote, notify = true) {
   syncLast = syncJson();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
   if (typeof render === 'function' && document.getElementById('rows')) {
-    if (['row', 'copy', 'flag'].includes(sheetKind)) closeSheet();
+    if (['row', 'copy', 'flag', 'group'].includes(sheetKind)) closeSheet();
     render(); wsSync();
     if (sheetKind === 'lists') renderListManager();
     if (changes.length) showSyncNote(changes);
@@ -1069,13 +1071,26 @@ const ICON = {
   rm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M4 12h10M4 18h6M17 13v8M13 17h8"/></svg>',
 };
-const ghHtml = (name, n, gi, collapsed, isStatic) =>
-  `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span><span class="gc">${n}</span></div>`;
+const groupMovable = gi => { const gs = activeList().groups, g = gs[gi]; return g && !g.auto && gs.filter(x => !x.auto).length > 1; };
+const ghHtml = (name, n, gi, collapsed, isStatic) => {
+  return `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span><span class="gc">${n}</span></div>`;
+};
+function moveGroup(from, to) {   // reorder sections; the Earnings "Upcoming" group stays first
+  const gs = activeList().groups; if (!groupMovable(from) || to < 0 || to >= gs.length || gs[to]?.auto) return;
+  const [g] = gs.splice(from, 1); gs.splice(to, 0, g);
+  save(); renderRows();
+}
+function openGroupMenu(gi) {
+  const gs = activeList().groups, g = gs[gi]; if (!g) return;
+  const first = gs.findIndex(x => !x.auto), last = gs.length - 1;
+  openSheet('group', g.name, `<button class="opt" data-o="up"${gi > first ? '' : ' disabled'}>${ICON.up}Move up</button><button class="opt" data-o="down"${gi < last ? '' : ' disabled'}>${ICON.down}Move down</button>`);
+  $('shBody').onclick = e => { const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return; closeSheet(); moveGroup(gi, gi + (o === 'up' ? -1 : 1)); };
+}
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
 const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
     <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
-    <span class="rt"><button data-act="row-add" title="Add to another list">${ICON.add}</button><span class="ud"><button data-act="row-up" title="Move up"${i > 0 ? '' : ' disabled'}>${ICON.up}</button><button data-act="row-down" title="Move down"${i >= 0 && i < n - 1 ? '' : ' disabled'}>${ICON.down}</button></span><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
+    <span class="rt"><button data-act="row-add" title="Add to another list">${ICON.add}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
 let lastSortRender = 0;
 function renderRows() {
   const l = activeList(), all = flatSymbols(l);
@@ -1652,27 +1667,56 @@ document.addEventListener('click', e => {
 const rowsEl = $('rows');
 let press = null, suppressClick = false;
 rowsEl.addEventListener('pointerdown', e => {
-  if (e.button > 0 || e.target.closest('.rt')) return;
-  const row = e.target.closest('.row'); if (!row) return;
-  press = { row, id: e.pointerId, type: e.pointerType, x: e.clientX, y: e.clientY, armed: false, drag: false, pos: null,
+  if (e.button > 0 || e.target.closest('.rt, .fl')) return;
+  const row = e.target.closest('.row, .gh[data-g]'); if (!row) return;
+  const group = row.classList.contains('gh');
+  press = { row, group, id: e.pointerId, type: e.pointerType, x: e.clientX, y: e.clientY, armed: false, drag: false, pos: null,
     timer: setTimeout(() => { if (!press) return; press.armed = true; press.row.classList.add('lift'); navigator.vibrate?.(8); }, 420) };
 });
+const canDrag = () => !state.sort && !press.row.classList.contains('auto') && (!press.group || groupMovable(+press.row.dataset.g));
 rowsEl.addEventListener('pointermove', e => {
   if (!press || e.pointerId !== press.id) return;
   const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
-  if (!press.armed) { if (dist > 8) { clearTimeout(press.timer); press = null; } return; }
+  if (!press.armed) {
+    if (dist <= 8) return;
+    if (press.type === 'mouse' && canDrag()) { clearTimeout(press.timer); press.armed = true; press.row.classList.add('lift'); }   // mouse: drag right away
+    else { clearTimeout(press.timer); press = null; return; }
+  }
   if (!press.drag) {
-    if (dist < 6 || state.sort || press.row.classList.contains('auto')) return;
+    if (dist < 6 || !canDrag()) return;
     press.drag = true; press.row.classList.add('dragging');
     try { rowsEl.setPointerCapture(e.pointerId); } catch (_) {}
+    const r = press.row.getBoundingClientRect(), g = press.row.cloneNode(true);   // preview that follows the pointer
+    g.className = press.row.className.replace(/\b(lift|dragging|on)\b/g, '') + ' ghost'; g.removeAttribute('data-act');
+    g.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
+    press.ghost = g; press.dy = press.y - r.top; document.body.appendChild(g);   // keep the grab point where the pointer went down
   }
-  updateDrop(e.clientY);
+  press.ghost.style.top = (e.clientY - press.dy) + 'px';
+  if (press.group) updateGroupDrop(e.clientY); else updateDrop(e.clientY);
   const r = rowsEl.getBoundingClientRect();
   if (e.clientY < r.top + 44) rowsEl.scrollTop -= 10; else if (e.clientY > r.bottom - 44) rowsEl.scrollTop += 10;
 });
 // Once a row is lifted the finger must not scroll the list.
 rowsEl.addEventListener('touchmove', e => { if (press && press.armed) e.preventDefault(); }, { passive: false });
 function clearDrop() { rowsEl.querySelectorAll('.drop-before, .drop-after, .drop-into').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-into')); }
+// Dragging a section: drop before/after another section header (never above the Earnings "Upcoming" group).
+function updateGroupDrop(y) {
+  clearDrop();
+  const gs = activeList().groups, from = +press.row.dataset.g;
+  let to = null, mark = null, after = false;
+  for (const h of rowsEl.querySelectorAll('.gh[data-g]:not(.dragging)')) {
+    const gi = +h.dataset.g; if (gs[gi]?.auto) continue;
+    const r = h.getBoundingClientRect();
+    if (y < r.top + r.height / 2) { to = gi; mark = h; after = false; break; }
+    to = gi; mark = h; after = true;
+  }
+  if (to == null) { press.pos = null; return; }
+  if (after) { to = to + 1; }
+  if (from < to) to--;   // removing the dragged group first shifts later slots up
+  if (to === from) { press.pos = null; return; }
+  mark.classList.add(after ? 'drop-after' : 'drop-before');
+  press.pos = { to };
+}
 function updateDrop(y) {
   clearDrop();
   let target = null, after = false;
@@ -1693,9 +1737,10 @@ function endPress(cancel) {
   if (!press) return;
   clearTimeout(press.timer);
   const p = press; press = null;
-  p.row.classList.remove('lift', 'dragging'); clearDrop();
+  p.row.classList.remove('lift', 'dragging'); clearDrop(); p.ghost?.remove();
   if (!p.armed || cancel) return;
   suppressClick = true; setTimeout(() => { suppressClick = false; }, 400);
+  if (p.group) { if (p.drag) { if (p.pos) moveGroup(+p.row.dataset.g, p.pos.to); } else openGroupMenu(+p.row.dataset.g); return; }
   if (p.drag) {
     if (!p.pos) return;
     const sym = p.row.dataset.sym, from = +p.row.dataset.g, src = activeList().groups[from];
