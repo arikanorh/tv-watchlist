@@ -356,7 +356,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '1.5';  // bump on every push to main
+const APP_VERSION = '1.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -442,7 +442,7 @@ function save() {
 }
 
 // ================= Sync across devices =================
-// The lists (names, groups, symbols, sentiment flag, order) live under a 12-character sync code in the relay worker's KV
+// The lists (names, groups, symbols, sentiment flag, order) live under a 4-character sync code (12 in v1.3–1.5) in the relay worker's KV
 // (GET/PUT /state/<code>). Per-device things stay local: active list, symbol, view, interval, collapsed groups.
 // Last edit wins: every local edit stamps state.sync.updatedAt; the worker refuses a PUT older than what it holds (409).
 var syncTimer = null, syncStatus = { st: 'idle', at: 0, msg: '' }, syncLast = null;
@@ -450,9 +450,14 @@ const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
 const syncShape = lists => lists.map(l => ({ id: l.id, name: l.name, summary: l.summary, groups: l.groups.map(g => ({ name: g.name, symbols: g.symbols })) }));
 const syncJson = () => JSON.stringify(syncShape(state.lists));
-const fmtCode = c => c.replace(/(.{4})(?=.)/g, '$1-');
-function newSyncCode() { const b = crypto.getRandomValues(new Uint8Array(12)); return [...b].map(x => SYNC_ALPHA[x & 31]).join(''); }
-function parseSyncCode(t) { const c = String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length === 12 && [...c].every(ch => SYNC_ALPHA.includes(ch)) ? c : null; }
+const fmtCode = c => c.length === 12 ? c.replace(/(.{4})(?=.)/g, '$1-') : c;   // 12-character codes from v1.3–1.5 read in groups
+function newSyncCode() { const b = crypto.getRandomValues(new Uint8Array(4)); return [...b].map(x => SYNC_ALPHA[x & 31]).join(''); }
+// A free code: one nobody has stored lists under yet.
+async function freeSyncCode() {
+  for (let i = 0; i < 8; i++) { const c = newSyncCode(); try { if ((await fetch(syncApi() + c, { cache: 'no-store' })).status === 404) return c; } catch (_) { return c; } }
+  return newSyncCode();
+}
+function parseSyncCode(t) { const c = String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length >= 4 && c.length <= 12 ? c : null; }
 function setSyncStatus(st, msg = '') { syncStatus = { st, at: st === 'ok' ? Date.now() : syncStatus.at, msg }; if (typeof sheetKind !== 'undefined' && sheetKind === 'lists') renderSyncBox(); }
 // Called from save(): a change in the synced shape stamps the edit time and schedules a push.
 function syncNoteChange() {
@@ -476,16 +481,15 @@ async function syncPush() {
     setSyncStatus('ok');
   } catch (e) { setSyncStatus('err', 'Couldn\'t reach the sync service. Retrying on the next change.'); }
 }
-// join: the synced copy replaces this device's lists whatever their age.
-async function syncPull(join = false) {
-  const code = state.sync?.code; if (!code || (!join && (press || document.hidden))) return;
+async function syncPull() {
+  const code = state.sync?.code; if (!code || press || document.hidden) return;
   setSyncStatus('busy');
   try {
     const r = await fetch(syncApi() + code, { cache: 'no-store' });
-    if (r.status === 404) { if (join) { setSyncStatus('err', 'No lists are stored under this code yet.'); return false; } return syncPush(); }
+    if (r.status === 404) return syncPush();
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const remote = await r.json(), local = state.sync.updatedAt || 0;
-    if (join || remote.updatedAt > local) syncAdopt(remote);
+    if (remote.updatedAt > local) syncAdopt(remote);
     else if (remote.updatedAt < local) return syncPush();
     setSyncStatus('ok');
     return true;
@@ -1264,49 +1268,56 @@ function renderSyncBox() {
   const box = $('syncBox'); if (!box) return;
   const code = state.sync?.code, st = syncStatus;
   const when = st.at ? new Date(st.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
-  const stTxt = { busy: 'Syncing…', ok: when ? 'Synced ' + when : 'On', err: 'Offline', idle: 'On' }[st.st];
-  const last = state.sync?.lastCode;
-  const err = st.st === 'err' && st.msg ? `<div class="msg">${esc(st.msg)}</div>` : '';
-  const joinForm = `<form class="row2" id="syncJoin"><input class="field" id="syncCode" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(pendingSyncCode || '')}"><button class="btn primary">Join</button></form>`;
-  box.innerHTML = code
-    ? `<h4><i class="${st.st === 'ok' ? 'ok' : st.st === 'err' ? 'err' : st.st === 'busy' ? 'busy' : ''}"></i>Sync across devices<span>${stTxt}</span></h4>
-       <p>This device is syncing. Enter this code on your other devices to keep the same lists.</p>
-       <div class="row2"><span class="code">${fmtCode(code)}</span><button class="btn" data-sync="copy">Copy</button></div>
-       ${err}
-       <button class="btn link" data-sync="off">Stop syncing on this device</button>`
-    : `<h4><i></i>Sync across devices<span>Off</span></h4>
-       ${last ? `<div class="row2"><span class="code">${fmtCode(last)}</span><button class="btn" data-sync="copy">Copy</button><button class="btn primary" data-sync="resume">Turn on</button></div>` : ''}
-       <p>Synced on another device? Enter its code. Its lists replace the ones here.</p>
-       ${joinForm}
-       ${err}
-       ${last ? '' : `<button class="btn link" data-sync="on">First device? Start syncing with the lists on this one</button>`}`;
-  $('syncJoin')?.addEventListener('submit', async e => {
+  const msg = st.msg && (st.st === 'err' || st.st === 'bad') ? `<div class="msg">${esc(st.msg)}</div>` : '';
+  if (code) {
+    const dot = st.st === 'err' ? 'err' : st.st === 'busy' ? 'busy' : 'ok';
+    const label = st.st === 'err' ? 'Offline' : st.st === 'busy' ? 'Syncing…' : when ? 'Synced ' + when : 'On';
+    box.innerHTML = `<h4><i class="${dot}"></i>Sync across devices<span>${label}</span></h4>
+      <p>Enter this code on your other devices to keep the same lists.</p>
+      <div class="row2"><span class="code">${fmtCode(code)}</span><button class="btn" data-sync="copy">Copy</button></div>
+      ${msg}
+      <button class="btn link" data-sync="off">Turn off</button>`;
+    return;
+  }
+  // Off: one field, prefilled with the last code (or a random suggestion), and Turn on.
+  syncSuggest = syncSuggest || newSyncCode();
+  const val = pendingSyncCode || state.sync?.lastCode || syncSuggest;
+  box.innerHTML = `<h4><i></i>Sync across devices<span>Off</span></h4>
+    <p>Use the same code on each device. If a code is already in use, its lists replace the ones here.</p>
+    <form class="row2" id="syncJoin"><input class="field" id="syncCode" maxlength="14" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(fmtCode(val))}"><button class="btn primary">Turn on</button></form>
+    ${msg}`;
+  $('syncJoin').addEventListener('submit', async e => {
     e.preventDefault();
-    const c = parseSyncCode($('syncCode').value);
-    if (!c) { setSyncStatus('err', 'A code is 12 letters and digits, like ABCD-EFGH-JK23.'); return; }
-    const prev = state.sync?.code || null;
-    if (c === prev) { toast('This device already uses that code'); return; }
-    state.sync = { ...(state.sync || {}), code: c }; save();
-    const ok = await syncPull(true);
-    if (ok) { pendingSyncCode = null; state.sync.lastCode = c; save(); toast('Sync on. Lists loaded from your other device.'); renderSyncBox(); }
-    else { state.sync.code = prev; save(); renderSyncBox(); }
+    let c = parseSyncCode($('syncCode').value);
+    if (!c) { setSyncStatus('bad', 'A code is 4–12 letters or digits, like K7P2.'); return; }
+    if (c === syncSuggest) c = await freeSyncCode();   // an untouched suggestion must not land on someone else's lists
+    if (await useSyncCode(c)) { pendingSyncCode = null; syncSuggest = null; renderSyncBox(); }
   });
 }
-var pendingSyncCode = null;
+// Switch this device to `code`: in use → its lists replace ours; free → our lists start it.
+async function useSyncCode(code) {
+  setSyncStatus('busy');
+  let r;
+  try { r = await fetch(syncApi() + code, { cache: 'no-store' }); } catch (_) { setSyncStatus('err', 'Couldn\'t reach the sync service.'); return false; }
+  if (r.status === 404) {
+    state.sync = { ...(state.sync || {}), code, lastCode: code, updatedAt: state.sync?.updatedAt || Date.now() }; save();
+    await syncPush();
+    if (syncStatus.st === 'err') { state.sync.code = null; save(); return false; }
+    return true;
+  }
+  if (!r.ok) { setSyncStatus(r.status === 400 ? 'bad' : 'err', r.status === 400 ? 'The sync service doesn\'t accept that code. Use 4–12 letters or digits.' : 'Couldn\'t reach the sync service.'); return false; }
+  state.sync = { ...(state.sync || {}), code, lastCode: code }; save();
+  syncAdopt(await r.json()); setSyncStatus('ok');
+  toast(`Lists loaded from code ${fmtCode(code)}`); return true;
+}
+var pendingSyncCode = null, syncSuggest = null;
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-sync]'); if (!b) return;
-  const act = b.dataset.sync;
-  if (act === 'on') {
-    const c = newSyncCode();
-    state.sync = { ...(state.sync || {}), code: c, lastCode: c, updatedAt: state.sync?.updatedAt || Date.now() }; save();
-    await syncPush(); renderSyncBox();
-  }
-  if (act === 'copy') {
-    const code = fmtCode(state.sync.code || state.sync.lastCode);
+  if (b.dataset.sync === 'copy') {
+    const code = fmtCode(state.sync.code);
     try { await navigator.clipboard.writeText(code); toast('Code copied'); } catch (_) { toast(code); }
   }
-  if (act === 'off') { state.sync.lastCode = state.sync.code; state.sync.code = null; save(); setSyncStatus('idle'); renderSyncBox(); toast('Sync is off on this device. Your lists stay here.'); }
-  if (act === 'resume') { state.sync.code = state.sync.lastCode; save(); await syncPull(); renderSyncBox(); }
+  if (b.dataset.sync === 'off') { state.sync.lastCode = state.sync.code; state.sync.code = null; save(); setSyncStatus('idle'); renderSyncBox(); toast('Sync is off on this device. Your lists stay here.'); }
 });
 
 let toastTimer = null;

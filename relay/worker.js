@@ -15,8 +15,8 @@ const ALLOWED_ORIGINS = [
 ];
 
 const allowed = o => ALLOWED_ORIGINS.includes(o) || LAN_ORIGIN.test(o);
-// Sync code: 12 characters from an unambiguous alphabet (the app shows it as XXXX-XXXX-XXXX).
-const SYNC_CODE = /^[A-HJ-NP-Z2-9]{12}$/;
+// Sync code: 4–12 uppercase letters and digits (generated ones are 4 characters without I, O, 0, 1; users may pick their own).
+const SYNC_CODE = /^[A-Z0-9]{4,12}$/;
 const MAX_STATE = 100 * 1024;
 const json = (body, status, headers) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
