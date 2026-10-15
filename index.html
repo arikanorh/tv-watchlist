@@ -49,8 +49,8 @@
   .hs { text-align: left; }
   .hs .px { font-size: 17px; font-weight: 600; white-space: nowrap; }
   .hs .chg { font-size: 14px; white-space: nowrap; }
-  .hs .d { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .sp { flex: 1; }
+  .lhead { display: none; }
   .sess { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .sess i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
   body.sess-open .sess i { background: var(--up); } body.sess-pre .sess i { background: var(--pre); }
@@ -62,7 +62,10 @@
   @keyframes pulse { 0% { color: var(--text); } 100% { color: var(--muted); } }
   .hbtn { display: none; width: 34px; height: 34px; border-radius: 8px; align-items: center; justify-content: center; color: var(--muted); }
   .hbtn svg { width: 18px; height: 18px; }
+  .hbtn:hover { background: var(--bg3); color: var(--text); }
   .hver { display: none; font-size: 11px; color: var(--muted); }
+  .hr { display: contents; }   /* phones: its children sit directly in the header; desktop: a compact two-line block in the chart toolbar */
+  .hinfo { display: contents; }
   /* phones: the header follows the pane on screen */
   .hs { display: none; }
   body[data-view="chart"] .hl { display: none; }
@@ -75,11 +78,16 @@
   body[data-view="list"] .listpane, body[data-view="chart"] .chartpane { display: flex; }
 
   /* List table */
-  .cols, .row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 72px 76px; gap: 8px; align-items: center; padding: 0 14px; }
-  body.regular .cols, body.regular .row { grid-template-columns: minmax(0, 1fr) 96px 72px; }
+  .cols, .row { display: grid; grid-template-columns: minmax(0, 1fr) 88px 66px 72px; gap: 8px; align-items: center; padding: 0 14px; }
+  body.regular .cols, body.regular .row { grid-template-columns: minmax(0, 1fr) 88px 66px; }
   body.regular .cols .x, body.regular .row .ext { display: none; }
+  .cols .sortcol.x { text-align: right; }
   .cols { flex-shrink: 0; height: 30px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
-  .cols span:not(:first-child) { text-align: right; }
+  .cols span:not(:first-child), .cols .sortcol { text-align: right; }
+  .cols .sortcol { color: var(--muted); font-size: inherit; height: 100%; }
+  .cols .sortcol::after { content: ' ▾'; opacity: 0; }
+  .cols .sortcol.on { color: var(--accent); }
+  .cols .sortcol.on::after { opacity: 1; }
   .rows { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
   .row { position: relative; height: 48px; border-bottom: 1px solid rgba(42, 46, 57, .55); cursor: pointer; font-variant-numeric: tabular-nums;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; background: var(--bg); transition: transform .12s, box-shadow .12s; }
@@ -94,7 +102,9 @@
   .earn { flex-shrink: 0; font-style: normal; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 5px; border-radius: 4px;
     color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
   .earn.soon { background: var(--pre); color: var(--bg); }
-  .row .more { display: none; }
+  .row .rt { display: none; }   /* row tools: desktop hover only */
+  .opt svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted); }
+  .opt.danger svg { color: inherit; }
   .row.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); transform: scale(1.015); z-index: 3; }
   .row.dragging { opacity: .55; }
   .row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
@@ -133,7 +143,7 @@
   .cbar { position: relative; flex-shrink: 0; display: flex; gap: 8px; padding: 8px 10px; background: var(--bg2); }
   .sbtn { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 12px; background: var(--bg3); color: var(--muted); }
   .sbtn svg { width: 18px; height: 18px; flex-shrink: 0; }
-  .sbtn b { color: var(--text); font-weight: 600; }
+  .sbtn .q { display: none; }
   /* Interval: segmented control. Phones: under the chart (thumb side). Desktop: on top of the chart. */
   .ctools { order: 2; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg2); border-top: 1px solid var(--line); }
   .seg { display: flex; gap: 4px; padding: 8px 10px 0; }
@@ -219,20 +229,16 @@
   .toast button { color: var(--accent); font-weight: 600; flex-shrink: 0; }
   /* Sentiment chart (desktop): the active list's sentiment % over time, above the table */
   .sent { display: none; }
-  .sent-h { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
-  .sent-h b { font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-  .sent-h .rng { margin-left: auto; height: 22px; padding: 0 8px; border-radius: 6px; background: var(--bg3); font-size: 11px; font-weight: 600; color: var(--text); }
-  .sent-c { position: relative; margin-top: 4px; }
-  .sent svg { width: 100%; height: 58px; overflow: visible; }
-  .sent .zero { stroke: var(--muted); stroke-opacity: .45; stroke-dasharray: 3 3; }
-  .sent .line { fill: none; stroke-width: 1.6; }
-  .sent .area { opacity: .16; }
-  .sent .up { stroke: var(--up); fill: var(--up); } .sent .down { stroke: var(--down); fill: var(--down); }
-  .sent .lbl { font-size: 10px; fill: var(--muted); }
-  .sent .dot { fill: var(--text); stroke: var(--bg); stroke-width: 1.5; }
-  .sent .tip { position: absolute; top: -4px; transform: translate(-50%, -100%); padding: 3px 7px; border-radius: 5px; background: var(--bg3);
+  .sent-c { position: relative; }
+  .sent svg { display: block; width: 100%; height: 88px; overflow: visible; }
+  .sent .line { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
+  .sent .up { stroke: var(--up); } .sent .down { stroke: var(--down); }
+  .sent .lbl { font-size: 10px; fill: var(--muted); paint-order: stroke; stroke: var(--bg2); stroke-width: 3px; stroke-linejoin: round; }
+  .sent .dot { fill: var(--text); stroke: var(--bg); stroke-width: 1.5; display: none; }
+  .sent .dot.show { display: block; }
+  .sent .tip { position: absolute; top: 30px; transform: translate(-50%, 0); padding: 3px 7px; border-radius: 5px; background: var(--bg3);
     font-size: 11px; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
-  .sent .none { height: 58px; display: flex; align-items: center; font-size: 12px; color: var(--muted); }
+  .sent .none { height: 40px; padding-top: 30px; display: flex; align-items: center; font-size: 12px; color: var(--muted); }
   /* Details: a bottom sheet on phones (rendered into the sheet), a column between list and chart on desktop */
   .detailspane { display: none; }
   .dt-head { padding: 2px 16px 12px; }
@@ -260,40 +266,96 @@
   @media (min-width: 768px) {
     html, body { font-size: 14px; }
     .top { height: 50px; gap: 16px; }
-    .hl, .hs, body[data-view] .hl, body[data-view] .hs { display: flex; }
-    .hs { padding-left: 16px; border-left: 1px solid var(--line); cursor: pointer; }
+    body { display: grid; grid-template-columns: 380px auto 1fr; grid-template-rows: minmax(0, 1fr); }
+    .main { display: contents; }
+    .top { display: none; }
+    .listpane { grid-column: 1; grid-row: 1; }
+    .detailspane { grid-column: 2; grid-row: 1; }
+    .chartpane { grid-column: 3; grid-row: 1; }
+    body.chart-hidden { grid-template-columns: 1fr auto 0; grid-template-rows: 50px minmax(0, 1fr); }
+    body.chart-hidden .top { display: flex; grid-column: 1 / 4; grid-row: 1; }
+    body.chart-hidden .listpane, body.chart-hidden .detailspane { grid-row: 2; }
+    .hr { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .hinfo { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 11px; line-height: 14px; }
+    .hinfo .sess { font-size: 11px; }
+    .hinfo .tick { height: auto; padding: 0; font-size: 11px; gap: 5px; }
+    .hinfo .tick .dot { width: 6px; height: 6px; }
+    .hinfo .hver { margin-left: 4px; }
+    .ctools { order: 0; }
+    body.sess-open .ctools { background: #18302e; }  body.sess-pre .ctools { background: #2e2a24; }
+    body.sess-post .ctools { background: #1d2740; } body.sess-night .ctools { background: #272140; }
+    .lblock { position: relative; flex-shrink: 0; }
+    .lhead { position: absolute; top: 0; left: 0; right: 0; z-index: 1; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; pointer-events: none; font-variant-numeric: tabular-nums; }
+    .lhead b, .lhead .v { text-shadow: 0 0 4px var(--bg2), 0 0 4px var(--bg2); }
+    .sent-c { cursor: pointer; }
+    .sent .rng { font-size: 11px; font-weight: 600; fill: var(--muted); }
+    .sent-c:hover .rng { fill: var(--text); }
+    .lhead b { font-size: 16px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lhead .v { font-size: 14px; font-weight: 600; }
+    .hl, body[data-view] .hl { display: none; }
+    .hs, body[data-view] .hs { display: flex; }
+    .hl, .hs { gap: 7px; }
+    .hl b, .hs b { font-size: 15px; }
+    .hl .v, .hs .px { font-size: 14px; }
+    .hs .chg { font-size: 13px; }
+    .hs { cursor: pointer; }
     .hbtn, .hver { display: flex; }
     .nav { display: none; }
     body[data-view] .pane { display: flex; }
-    .listpane { flex: none; width: 420px; border-right: 1px solid var(--line); }
+    .listpane { width: auto; border-right: 1px solid var(--line); }
     body.chart-hidden .chartpane { display: none; }
     body[data-view] .detailspane { display: none; }
-    .sent { display: block; flex-shrink: 0; padding: 8px 14px 6px; border-bottom: 1px solid var(--line); background: var(--bg); }
-    body.details-open[data-view] .detailspane { display: flex; flex: none; width: 300px; border-right: 1px solid var(--line); background: var(--bg); }
+    .sent { display: block; padding: 0 14px 6px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+    body.details-open[data-view] .detailspane { display: flex; width: 300px; border-right: 1px solid var(--line); background: var(--bg); }
     .detailspane .dt-top { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 4px 16px; font-size: 12px; font-weight: 600; color: var(--muted); }
     .detailspane .dt-top button { width: 28px; height: 28px; border-radius: 6px; color: var(--muted); }
     .detailspane .dt-top button:hover { background: var(--bg3); color: var(--text); }
     .detailspane #dbody { flex: 1; min-height: 0; overflow-y: auto; }
     .kv { font-size: 13px; padding: 3px 0; }
     .dt-px b { font-size: 24px; }
-    body.chart-hidden .listpane { flex: 1; width: auto; border-right: 0; }
+    body.chart-hidden .listpane { border-right: 0; }
     .row { height: 36px; font-size: 14px; }
-    .row .more { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border-radius: 6px; background: var(--bg3);
-      color: var(--muted); display: flex; align-items: center; justify-content: center; opacity: 0; }
-    .row .more svg { width: 16px; height: 16px; }
-    .row:hover .more { opacity: 1; }
+    .row .rt { position: absolute; right: 0; top: 0; bottom: 0; display: none; align-items: center; gap: 2px; padding: 0 6px 0 10px;
+      background: linear-gradient(90deg, transparent, var(--bg2) 10px); }
+    .row:hover .rt { display: flex; }
+    .row .rt button { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+    .row .rt button:hover { background: var(--bg3); color: var(--text); }
+    .row .rt button.danger:hover { color: var(--down); }
+    .row .rt button[disabled] { opacity: .3; pointer-events: none; }
+    body.sorted .row .rt button[data-act="row-up"], body.sorted .row .rt button[data-act="row-down"] { display: none; }
+    .row .rt svg { width: 15px; height: 15px; }
     .row:hover { background: var(--bg2); }
     .row.on:hover { background: var(--accent-bg); }
-    .chip { padding: 5px 10px; min-width: 60px; }
+    /* Dock as a tab bar: name + sentiment % on one line, the active list underlined */
+    .dock { padding: 0 10px 0 4px; gap: 10px; }
+    .chips { gap: 0; align-self: stretch; }
+    .chip { flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; height: 46px; padding: 0 12px; border-radius: 0; background: none; border: 0;
+      border-bottom: 2px solid transparent; color: var(--muted); }
+    .chip b { font-size: 13px; font-weight: 600; color: var(--muted); }
+    .chip small { font-size: 11px; }
+    .chip:hover { background: var(--bg3); }
+    .chip:hover b { color: var(--text); }
+    .chip.on { background: none; border-bottom-color: var(--accent); }
+    .chip.on b { color: var(--text); }
+    .acts { padding: 6px 0 6px 10px; }
     .ib { width: 38px; height: 38px; border-radius: 10px; }
     .sbtn, .infobtn { height: 38px; border-radius: 10px; }
     .infobtn { width: 38px; }
-    .ctools { order: 0; flex-direction: row; align-items: center; gap: 12px; padding: 6px 10px; border-top: 0; border-bottom: 1px solid var(--line); }
-    .seg { flex: 1; min-width: 0; align-items: center; gap: 2px; padding: 0; overflow-x: auto; scrollbar-width: none; }
-    .cbar { order: -1; flex: none; padding: 0; background: none; gap: 6px; }   /* search + details on the left, intervals after */
-    .cbar .sbtn { width: 240px; flex: none; height: 32px; }
-    .cbar .infobtn { width: 32px; height: 32px; }
-    .seg button { flex: none; height: 28px; min-width: 40px; padding: 0 10px; border-radius: 6px; font-size: 13px; background: none; }
+    .ctools { order: 0; flex-direction: row; align-items: stretch; gap: 6px; height: 50px; padding: 0 8px 0 0; border-top: 0; border-bottom: 1px solid var(--line); }
+    .seg { order: -1; flex: 0 1 auto; min-width: 0; align-items: stretch; gap: 0; padding: 0; overflow-x: auto; scrollbar-width: none; }
+    .cbar { display: contents; }   /* search box (with the symbol), intervals, details; the session/tick block at the far right */
+    .cbar .sbtn { order: -2; flex: none; height: auto; align-self: stretch; border-radius: 0; gap: 8px; padding: 0 14px; }
+    .cbar .sbtn:hover { color: var(--text); }
+    .sbtn .q { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+    .sbtn .q b { color: var(--text); font-size: 14px; }
+    .sbtn .q .px { color: var(--text); font-size: 13px; }
+    .sbtn .q .chg { font-size: 12px; font-weight: 600; }
+    .sbtn.has .ph { display: none; }
+    .cbar .infobtn { width: 40px; height: auto; border-radius: 0; background: none; color: var(--muted); }
+    .cbar .infobtn:hover { background: var(--bg3); color: var(--text); }
+    body.details-open .cbar .infobtn { color: var(--accent); }
+    .ctools .hbtn { width: 40px; height: auto; align-self: stretch; border-radius: 0; }
+    .seg button { flex: none; height: auto; min-width: 40px; padding: 0 10px; border-radius: 0; font-size: 13px; background: none; }
     .seg button:hover { color: var(--text); background: var(--bg3); }
     .seg button.on { color: #fff; background: var(--accent); }
     .sheet { left: 50%; right: auto; top: 10vh; bottom: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); max-height: 78vh;
@@ -311,24 +373,29 @@
 <body data-view="list">
 <header class="top">
   <div class="hl"><b id="hlName"></b><span class="v" id="hlPct"></span></div>
-  <button class="hs" data-act="search" title="Search symbol"><b id="hsSym"></b><span class="px" id="hsPx"></span><span class="chg" id="hsChg"></span><span class="d" id="hsDesc"></span></button>
+  <button class="hs" data-act="search" title="Search symbol"><b id="hsSym"></b><span class="px" id="hsPx"></span><span class="chg" id="hsChg"></span></button>
   <span class="sp"></span>
-  <span class="sess"><i></i><span id="sessLabel"></span></span>
-  <button class="tick" id="tick" data-act="reconnect" title="Last update. Tap to reconnect."><i class="dot off" id="dot"></i><span id="tickTime">–</span></button>
-  <button class="hbtn" data-act="toggle-chart" id="chartToggle" title="Hide chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg></button>
-  <span class="hver" id="hver"></span>
+  <div class="hr" id="hr">
+    <div class="hinfo">
+      <span class="sess"><i></i><span id="sessLabel"></span></span>
+      <button class="tick" id="tick" data-act="reconnect" title="Last update. Tap to reconnect."><i class="dot off" id="dot"></i><span id="tickTime">–</span><span class="hver" id="hver"></span></button>
+    </div>
+    <button class="hbtn" data-act="toggle-chart" id="chartToggle" title="Hide chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg></button>
+  </div>
 </header>
 
 <main class="main">
   <section class="pane listpane" aria-label="Watchlist">
-    <div class="sent" id="sent"></div>
-    <div class="cols"><span>Symbol</span><span>Last</span><span>Chg%</span><span class="x" title="Pre-market · post-market · overnight">Ext</span></div>
+    <div class="lblock">
+      <div class="lhead"><b id="lhName"></b><span class="v" id="lhPct"></span></div>
+      <div class="sent" id="sent"></div>
+    </div>
+    <div class="cols"><span>Symbol</span><span>Last</span><button class="sortcol" data-act="sort" data-by="chg" title="Sort by change (indices stay on top); tap again for your order">Chg%</button><button class="sortcol x" data-act="sort" data-by="ext" title="Sort by extended-hours change; tap again for your order">Ext</button></div>
     <div class="rows" id="rows"></div>
     <div class="dock">
       <div class="chips" id="chips"></div>
       <div class="acts">
         <button class="ib primary" data-act="add" aria-label="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-        <button class="ib" data-act="sort" id="sortBtn" aria-label="Sort by change"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg></button>
         <button class="ib" data-act="lists" aria-label="Manage lists"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
       </div>
     </div>
@@ -342,7 +409,7 @@
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <div class="cbar">
-      <button class="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><b id="cbSym"></b><span>Search</span></button>
+      <button class="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="q"><b id="cbSym"></b><span class="px" id="cbPx"></span><span class="chg" id="cbChg"></span></span><span class="ph">Search</span></button>
       <button class="infobtn" data-act="details" aria-label="Details" title="Details"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button>
     </div>
     </div>
@@ -365,7 +432,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '1.8';  // bump on every push to main
+const APP_VERSION = '1.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -544,7 +611,7 @@ function syncAdopt(remote, notify = true) {
   syncLast = syncJson();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
   if (typeof render === 'function' && document.getElementById('rows')) {
-    if (['row', 'move', 'copy'].includes(sheetKind)) closeSheet();
+    if (sheetKind === 'row') closeSheet();
     render(); wsSync();
     if (sheetKind === 'lists') renderListManager();
     if (changes.length) showSyncNote(changes);
@@ -682,32 +749,36 @@ let spark = { pts: [], x: null, y: null, hover: -1 };
 function renderSentiment() {
   const el = $('sent'); if (!el || isPhone()) return;
   const l = activeList();
-  const head = `<div class="sent-h"><b>Sentiment</b><span>${esc(l.name)}</span><button class="rng" data-act="hist-range" title="Change range">${rangeLabel()}</button></div>`;
-  if (!l.summary) { el.innerHTML = head + '<div class="none">Sentiment is off for this list (⋯ → Σ).</div>'; return; }
+  const head = '';
+  if (!l.summary) { el.innerHTML = '<div class="none">Sentiment is off for this list (⋯ → Σ).</div>'; return; }
   const pts = (hist[l.id] || []).filter(p => p[0] >= histSince());
-  if (pts.length < 2) { el.innerHTML = head + '<div class="none">Collecting… the chart fills while the app is open.</div>'; return; }
-  const W = Math.max(120, el.clientWidth - 28), H = 58, T = 4, B = 14, ih = H - T - B;
-  const vals = pts.map(p => p[1]), lim = Math.max(0.25, ...vals.map(Math.abs));
+  if (pts.length < 2) { el.innerHTML = '<div class="none">Collecting… the sentiment chart fills while the app is open.</div>'; return; }
+  const W = Math.max(120, el.clientWidth - 28), H = 88, T = 30, B = 15, ih = H - T - B;
+  const vals = pts.map(p => p[1]);
+  let lo = Math.min(...vals), hi = Math.max(...vals), pad = Math.max(0.05, (hi - lo) * 0.08);
+  const loAt = vals.indexOf(lo), hiAt = vals.indexOf(hi), lblX = i => i < vals.length / 2 ? W : 0;
+  lo -= pad; hi += pad;
   const t0 = pts[0][0], t1 = pts[pts.length - 1][0];
-  const x = t => ((t - t0) / Math.max(1, t1 - t0) * W), y = v => T + ih / 2 - v / lim * (ih / 2 - 1);
+  const x = t => ((t - t0) / Math.max(1, t1 - t0) * W), y = v => T + (hi - v) / (hi - lo) * ih;
   const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ');
-  const last = vals[vals.length - 1], cls = last >= 0 ? 'up' : 'down', zy = y(0).toFixed(1);
+  const last = vals[vals.length - 1], cls = last >= 0 ? 'up' : 'down';
   const hm = t => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   spark = { pts, x, y, hover: spark.hover };
-  el.innerHTML = head + `<div class="sent-c"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" id="sentSvg">
-      <line class="zero" x1="0" x2="${W}" y1="${zy}" y2="${zy}"/>
-      <path class="area ${cls}" d="${path} L${x(t1).toFixed(1)} ${zy} L0 ${zy} Z" stroke="none"/><path class="line ${cls}" d="${path}"/>
-      <text class="lbl" x="0" y="${H - 2}">${hm(t0)}</text><text class="lbl" x="${W}" y="${H - 2}" text-anchor="end">${hm(t1)}</text>
-      <text class="lbl" x="${W}" y="10" text-anchor="end">±${lim.toFixed(2)}%</text>
+  el.innerHTML = head + `<div class="sent-c" data-act="hist-range" title="Click to change the range: Today → 1h → 4h → 24h"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" id="sentSvg">
+      <text class="lbl rng" x="${W}" y="20" text-anchor="end">${rangeLabel()}</text>
+      <!-- min/max labels sit on the side away from the extreme, off the line -->
+      <text class="lbl" x="${lblX(hiAt)}" y="${T + 9}" text-anchor="${lblX(hiAt) ? 'end' : 'start'}">${pct(hi - pad)}</text><text class="lbl" x="${lblX(loAt)}" y="${T + ih - 2}" text-anchor="${lblX(loAt) ? 'end' : 'start'}">${pct(lo + pad)}</text>
+      <path class="line ${cls}" d="${path}"/>
+      <text class="lbl" x="0" y="${H - 3}">${hm(t0)}</text><text class="lbl" x="${W}" y="${H - 3}" text-anchor="end">${hm(t1)}</text>
       <circle class="dot" r="3" cx="-10" cy="-10" id="sentDot"/></svg><div class="tip" id="sentTip" hidden></div></div>`;
   showSparkTip();
 }
 function showSparkTip() {
   const dot = $('sentDot'), tip = $('sentTip'); if (!dot || !tip) return;
   const i = spark.hover;
-  if (i < 0 || i >= spark.pts.length) { tip.hidden = true; dot.setAttribute('cx', -10); return; }
+  if (i < 0 || i >= spark.pts.length) { tip.hidden = true; dot.classList.remove('show'); return; }
   const [t, v] = spark.pts[i], cx = spark.x(t), cy = spark.y(v);
-  dot.setAttribute('cx', cx.toFixed(1)); dot.setAttribute('cy', cy.toFixed(1));
+  dot.setAttribute('cx', cx.toFixed(1)); dot.setAttribute('cy', cy.toFixed(1)); dot.classList.add('show');
   const svg = $('sentSvg'), k = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
   tip.innerHTML = `${new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · <span class="${dir(v)}">${pct(v)}</span>`;
   tip.style.left = Math.max(30, Math.min(svg.clientWidth - 30, cx * k)) + 'px';
@@ -918,7 +989,7 @@ const showSymbol = () => send('set-symbol', { symbol: chartSymbol(state.symbol) 
 function setChartInterval(v) { state.interval = v; save(); send('set-interval', { interval: v }); renderHeader(); }
 
 // ================= Rendering =================
-function render() { renderChips(); renderRows(); renderHeader(); renderSentiment(); $('sortBtn').classList.toggle('on', state.sort === 'chg'); }
+function render() { renderChips(); renderRows(); renderHeader(); renderSentiment(); for (const b of document.querySelectorAll('.sortcol')) b.classList.toggle('on', state.sort === b.dataset.by); document.body.classList.toggle('sorted', !!state.sort); }
 function renderChips() {
   const el = $('chips'), x = el.scrollLeft;
   el.innerHTML = state.lists.map(l => `<button class="chip${l.id === state.activeListId ? ' on' : ''}" data-act="list" data-id="${esc(l.id)}"><b>${esc(l.name)}</b><small data-lv="${esc(l.id)}"></small></button>`).join('');
@@ -928,7 +999,7 @@ function renderChips() {
   patchChips();
 }
 function patchChips() {
-  for (const s of $('chips').querySelectorAll('small[data-lv]')) {
+  for (const s of document.querySelectorAll('small[data-lv]')) {
     const l = state.lists.find(x => x.id === s.dataset.lv); if (!l) continue;
     const v = listValue(l);
     const t = v != null ? pct(v) : l.summary ? '…' : flatSymbols(l).length + ' sym';
@@ -936,29 +1007,36 @@ function patchChips() {
     s.className = v != null ? dir(v) : '';
   }
 }
+const ICON = {
+  details: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>',
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  rm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+};
 const ghHtml = (name, n, gi, collapsed, isStatic) =>
   `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span><span class="gc">${n}</span></div>`;
-const rowHtml = (sym, gi) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}" data-sym="${esc(sym)}" data-g="${gi}">
+// i / n: position in the group (up/down hidden at the ends and in sorted view)
+const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}" data-sym="${esc(sym)}" data-g="${gi}">
     <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
-    <button class="more" data-act="row-menu" aria-label="Actions"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div>`;
+    <span class="rt"><button data-act="row-details" title="Details">${ICON.details}</button><button data-act="row-up" title="Move up"${i > 0 ? '' : ' disabled'}>${ICON.up}</button><button data-act="row-down" title="Move down"${i >= 0 && i < n - 1 ? '' : ' disabled'}>${ICON.down}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
 let lastSortRender = 0;
 function renderRows() {
   const l = activeList(), all = flatSymbols(l);
   let html = '';
   if (!all.length) html = '<div class="empty">This list is empty. Tap + to add a symbol.</div>';
-  else if (state.sort === 'chg') {
-    // Indices and other non-equities keep their order on top; everything else is one group, biggest Chg% first.
-    const giOf = sy => l.groups.findIndex(g => g.symbols.includes(sy));
+  else if (state.sort) {
+    // Indices and other non-equities keep their order on top; everything else is one group, biggest Chg% (or Ext) first.
+    const giOf = sy => l.groups.findIndex(g => g.symbols.includes(sy)), key = state.sort === 'ext' ? 'e' : 'c';
     const fixed = all.filter(sy => NON_EQUITY.has(raw[sy]?.type) || noChart(sy));
-    const rest = all.filter(sy => !fixed.includes(sy)).sort((a, b) => (quotes[b]?.c ?? -Infinity) - (quotes[a]?.c ?? -Infinity));   // by the Chg% column
+    const rest = all.filter(sy => !fixed.includes(sy)).sort((a, b) => (quotes[b]?.[key] ?? -Infinity) - (quotes[a]?.[key] ?? -Infinity));
     if (fixed.length) html += ghHtml('Index', fixed.length, null, false, true) + fixed.map(sy => rowHtml(sy, giOf(sy))).join('');
-    html += ghHtml('By change', rest.length, null, false, true) + rest.map(sy => rowHtml(sy, giOf(sy))).join('');
+    html += ghHtml(state.sort === 'ext' ? 'By ext' : 'By change', rest.length, null, false, true) + rest.map(sy => rowHtml(sy, giOf(sy))).join('');
     lastSortRender = Date.now();
   } else {
     const single = l.groups.length === 1;
     l.groups.forEach((g, gi) => {
       if (!single) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false);
-      if (single || !g.collapsed) html += g.symbols.map(sy => rowHtml(sy, gi)).join('');
+      if (single || !g.collapsed) html += g.symbols.map((sy, i) => rowHtml(sy, gi, i, g.symbols.length)).join('');
     });
   }
   $('rows').innerHTML = html;
@@ -998,18 +1076,22 @@ function patchRows(withFlash = true) {
 }
 function renderHeader() {
   const l = activeList(), v = listValue(l);
-  $('hlName').textContent = l.name;
-  $('hlPct').textContent = v == null ? '' : pct(v);
-  $('hlPct').className = 'v ' + (v == null ? '' : dir(v));
+  for (const [n, p] of [['hlName', 'hlPct'], ['lhName', 'lhPct']]) {
+    $(n).textContent = l.name;
+    $(p).textContent = v == null ? '' : pct(v);
+    $(p).className = 'v ' + (v == null ? '' : dir(v));
+  }
   const sym = state.symbol || '', q = quotes[sym], r = raw[sym] || {};
   $('hsSym').textContent = short(sym);
-  $('cbSym').textContent = short(sym);
   const last = q ? (!regular && q.ep != null ? q.ep : q.p) : null;
   $('hsPx').textContent = fmtPrice(last);
   $('hsChg').textContent = q ? pct(q.c) : '';
   $('hsChg').className = 'chg ' + (q ? dir(q.c) : '');
-  const desc = r.description || '';
-  $('hsDesc').textContent = desc.toUpperCase() === short(sym) ? '' : desc;
+  $('cbSym').textContent = short(sym);
+  $('cbPx').textContent = fmtPrice(last);
+  $('cbChg').textContent = q ? pct(q.c) : '';
+  $('cbChg').className = 'chg ' + (q ? dir(q.c) : '');
+  document.querySelector('.sbtn').classList.toggle('has', !!sym);
   const seg = $('seg');
   if (seg.dataset.iv !== state.interval) {
     seg.dataset.iv = state.interval;
@@ -1023,7 +1105,7 @@ function renderQuotes() {
   if (Date.now() - lastSpark > 5000) { lastSpark = Date.now(); renderSentiment(); }
   document.body.classList.toggle('regular', regular);
   // In sorted view, re-order at most every 3 s and never under a finger or an open sheet.
-  if (state.sort === 'chg' && Date.now() - lastSortRender > 3000 && !press && $('sheet').hidden) renderRows();
+  if (state.sort && Date.now() - lastSortRender > 3000 && !press && $('sheet').hidden) renderRows();
   else patchRows(true);
   patchChips();
   renderHeader();
@@ -1100,9 +1182,14 @@ function setView(v) {
     else window.dispatchEvent(new Event('resize'));
   }
 }
+function placeTools() {   // desktop with the chart showing: session/tick/toggle live in the chart toolbar, otherwise in the header
+  const hr = $('hr'), dest = document.querySelector(!isPhone() && !state.chartHidden ? '.ctools' : '.top');
+  if (hr.parentElement !== dest) dest.appendChild(hr);
+}
 function applyChartHidden() {
   document.body.classList.toggle('chart-hidden', !!state.chartHidden);
   $('chartToggle').title = state.chartHidden ? 'Show chart' : 'Hide chart';
+  placeTools();
   if (!state.chartHidden && chart.hiddenAtMount && !isPhone()) mountChart();
 }
 function selectSymbol(sym, openChart = true) {
@@ -1180,43 +1267,18 @@ document.addEventListener('keydown', e => {
 
 function openRowMenu(sym, gi) {
   const l = activeList(), g = l.groups[gi];
-  const opts = [];
-  if (!noChart(sym)) opts.push(`<button class="opt" data-o="chart">Show on chart</button>`);
-  opts.push(`<button class="opt" data-o="details">Details</button>`);
-  if (l.groups.length > 1) opts.push(`<button class="opt" data-o="move">Move to group<span class="c">${esc(g?.name || '')}</span></button>`);
-  if (state.lists.length > 1) opts.push(`<button class="opt" data-o="copy">Copy to list</button>`);
-  if (g && g.symbols.indexOf(sym) > 0) opts.push(`<button class="opt" data-o="top">Move to top of group</button>`);
-  opts.push(`<button class="opt danger" data-o="rm">Remove from ${esc(l.name)}</button>`);
+  const i = g ? g.symbols.indexOf(sym) : -1, ordered = g && !state.sort;   // up/down only in the user's own order
+  const opts = [`<button class="opt" data-o="details">${ICON.details}Details</button>`];
+  if (ordered && i > 0) opts.push(`<button class="opt" data-o="up">${ICON.up}Move up</button>`);
+  if (ordered && i >= 0 && i < g.symbols.length - 1) opts.push(`<button class="opt" data-o="down">${ICON.down}Move down</button>`);
+  opts.push(`<button class="opt danger" data-o="rm">${ICON.rm}Remove from ${esc(l.name)}</button>`);
   openSheet('row', `${short(sym)} · ${sym.split(':')[0]}`, opts.join(''));
   $('shBody').onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
-    if (o === 'chart') { closeSheet(); selectSymbol(sym); }
     if (o === 'details') { if (isPhone()) toggleDetails(sym); else { closeSheet(); if (sym !== state.symbol) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); } }
-    if (o === 'move') openMoveSheet(sym, gi);
-    if (o === 'copy') openCopySheet(sym);
-    if (o === 'top') { closeSheet(); moveSymbol(sym, gi, gi, 0); }
+    if (o === 'up') { closeSheet(); moveSymbol(sym, gi, gi, i - 1); }
+    if (o === 'down') { closeSheet(); moveSymbol(sym, gi, gi, i + 1); }
     if (o === 'rm') { closeSheet(); removeSymbol(sym, gi); }
-  };
-}
-function openMoveSheet(sym, from) {
-  const l = activeList();
-  openSheet('move', `Move ${short(sym)} to`, l.groups.map((g, i) => `<button class="opt${i === from ? ' on' : ''}" data-g="${i}">${esc(g.name)}<span class="c">${g.symbols.length}</span></button>`).join(''));
-  $('shBody').onclick = e => {
-    const b = e.target.closest('[data-g]'); if (!b) return;
-    closeSheet();
-    if (+b.dataset.g !== from) moveSymbol(sym, from, +b.dataset.g);
-  };
-}
-function openCopySheet(sym) {
-  const others = state.lists.filter(x => x.id !== state.activeListId);
-  openSheet('copy', `Copy ${short(sym)} to`, others.map(x => `<button class="opt" data-l="${esc(x.id)}">${esc(x.name)}<span class="c">${flatSymbols(x).includes(sym) ? 'already there' : flatSymbols(x).length}</span></button>`).join(''));
-  $('shBody').onclick = e => {
-    const b = e.target.closest('[data-l]'); if (!b) return;
-    const x = state.lists.find(y => y.id === b.dataset.l); closeSheet();
-    if (!x || flatSymbols(x).includes(sym)) { toast(`${short(sym)} is already in ${x?.name}`); return; }
-    if (!x.groups.length) x.groups.push({ name: 'Main', collapsed: false, symbols: [] });
-    x.groups[x.groups.length - 1].symbols.push(sym); save(); patchChips(); wsSync();
-    toast(`${short(sym)} copied to ${x.name}`);
   };
 }
 
@@ -1439,7 +1501,7 @@ document.addEventListener('click', e => {
     case 'view': setView(el.dataset.view); break;
     case 'search': openSearch(false); break;
     case 'add': openSearch(true); break;
-    case 'sort': state.sort = state.sort === 'chg' ? null : 'chg'; save(); render(); break;
+    case 'sort': state.sort = state.sort === el.dataset.by ? null : el.dataset.by; save(); render(); break;
     case 'lists': openListManager(); break;
     case 'reconnect': refreshQuotes(); break;
     case 'details': toggleDetails(); break;
@@ -1447,7 +1509,15 @@ document.addEventListener('click', e => {
     case 'toggle-chart': state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
     case 'sheet-close': closeSheet(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
-    case 'row-menu': { e.stopPropagation(); const r = el.closest('.row'); openRowMenu(r.dataset.sym, +r.dataset.g); break; }
+    case 'row-details': case 'row-up': case 'row-down': case 'row-rm': {
+      e.stopPropagation();
+      const act = el.dataset.act, r = el.closest('.row'), sym = r.dataset.sym, gi = +r.dataset.g, g = activeList().groups[gi], i = g ? g.symbols.indexOf(sym) : -1;
+      if (act === 'row-details') { if (sym !== state.symbol && !noChart(sym)) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); }
+      if (act === 'row-up' && i > 0) moveSymbol(sym, gi, gi, i - 1);
+      if (act === 'row-down' && i >= 0) moveSymbol(sym, gi, gi, i + 1);
+      if (act === 'row-rm') removeSymbol(sym, gi);
+      break;
+    }
   }
 });
 
@@ -1457,7 +1527,7 @@ document.addEventListener('click', e => {
 const rowsEl = $('rows');
 let press = null, suppressClick = false;
 rowsEl.addEventListener('pointerdown', e => {
-  if (e.button > 0 || e.target.closest('.more')) return;
+  if (e.button > 0 || e.target.closest('.rt')) return;
   const row = e.target.closest('.row'); if (!row) return;
   press = { row, id: e.pointerId, type: e.pointerType, x: e.clientX, y: e.clientY, armed: false, drag: false, pos: null,
     timer: setTimeout(() => { if (!press) return; press.armed = true; press.row.classList.add('lift'); navigator.vibrate?.(8); }, 420) };
@@ -1557,6 +1627,7 @@ render();
 applyChartHidden();
 applyDetails();
 window.addEventListener('resize', () => { if (document.body.classList.contains('details-open') !== (!!state.detailsOpen && !isPhone())) applyDetails(); });
+window.addEventListener('resize', placeTools);
 setView(isPhone() ? state.view : 'list');
 mountChart();
 wsConnect();
