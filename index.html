@@ -168,6 +168,7 @@
   .opt.on { color: var(--accent); } .opt.danger { color: var(--down); }
   /* search */
   .sres { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .sr.on { background: var(--bg3); box-shadow: inset 3px 0 0 var(--accent); }
   .sr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 9px 12px 9px 16px; border-top: 1px solid var(--line); cursor: pointer; }
   .sr .s { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
   .sr .s b { font-weight: 600; }
@@ -204,6 +205,14 @@
   .sync .code { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; background: var(--bg);
     font: 600 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; user-select: all; -webkit-user-select: all; }
   .sync .msg { font-size: 12px; color: var(--down); }
+  .snote { position: fixed; left: 50%; top: calc(var(--safe-t) + 60px); z-index: 45; transform: translate(-50%, -8px); opacity: 0; transition: opacity .2s, transform .2s;
+    display: flex; align-items: flex-start; gap: 8px; max-width: min(460px, calc(100vw - 24px)); padding: 9px 14px; border-radius: 10px;
+    background: var(--bg3); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); font-size: 13px; cursor: pointer; }
+  .snote.show { opacity: 1; transform: translate(-50%, 0); }
+  .snote svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; color: var(--accent); }
+  .snote div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .snote b { font-weight: 600; }
+  .snote .add { color: var(--up); } .snote .rm { color: var(--down); }
   .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 80px + var(--safe-b)); z-index: 60; display: flex; align-items: center; gap: 14px;
     max-width: calc(100vw - 24px); padding: 11px 16px; border-radius: 10px; background: var(--bg3); font-size: 14px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
   .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -318,7 +327,7 @@
     <div class="dock">
       <div class="chips" id="chips"></div>
       <div class="acts">
-        <button class="ib primary" data-act="search" aria-label="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="ib primary" data-act="add" aria-label="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         <button class="ib" data-act="sort" id="sortBtn" aria-label="Sort by change"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg></button>
         <button class="ib" data-act="lists" aria-label="Manage lists"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
       </div>
@@ -356,7 +365,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '1.6';  // bump on every push to main
+const APP_VERSION = '1.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -495,8 +504,9 @@ async function syncPull() {
     return true;
   } catch (e) { setSyncStatus('err', 'Couldn\'t reach the sync service.'); return false; }
 }
-function syncAdopt(remote) {
+function syncAdopt(remote, notify = true) {
   if (!remote || !Array.isArray(remote.lists) || !remote.lists.length) return;
+  const changes = notify ? syncDiff(state.lists, remote.lists) : [];
   const collapsed = new Set(state.lists.flatMap(l => l.groups.filter(g => g.collapsed).map(g => l.id + '|' + g.name)));
   state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.map(g => ({ name: g.name, symbols: g.symbols, collapsed: collapsed.has(l.id + '|' + g.name) })) }));
   if (!state.lists.some(l => l.id === state.activeListId)) state.activeListId = state.lists[0].id;
@@ -507,7 +517,37 @@ function syncAdopt(remote) {
     if (['row', 'move', 'copy'].includes(sheetKind)) closeSheet();
     render(); wsSync();
     if (sheetKind === 'lists') renderListManager();
+    if (changes.length) showSyncNote(changes);
   }
+}
+// What another device changed: per list, symbols added / removed; whole lists added / removed.
+function syncDiff(before, after) {
+  const out = [], byId = new Map(before.map(l => [l.id, l]));
+  for (const l of after) {
+    const old = byId.get(l.id);
+    if (!old) { out.push({ list: l.name, newList: true }); continue; }
+    const a = new Set(old.groups.flatMap(g => g.symbols)), b = new Set(l.groups.flatMap(g => g.symbols));
+    const added = [...b].filter(x => !a.has(x)), removed = [...a].filter(x => !b.has(x));
+    if (added.length || removed.length) out.push({ list: l.name, added, removed });
+  }
+  const ids = new Set(after.map(l => l.id));
+  for (const l of before) if (!ids.has(l.id)) out.push({ list: l.name, gone: true });
+  return out;
+}
+let syncNoteTimer = null;
+function showSyncNote(changes) {
+  document.querySelector('.snote')?.remove();
+  const sy = (arr, cls, sign) => arr.slice(0, 5).map(x => `<span class="${cls}">${sign}${esc(short(x))}</span>`).join(' ') + (arr.length > 5 ? ` <span>+${arr.length - 5} more</span>` : '');
+  const lines = changes.slice(0, 4).map(c => c.newList ? `<span><b>${esc(c.list)}</b> list added</span>`
+    : c.gone ? `<span><b>${esc(c.list)}</b> list removed</span>`
+    : `<span><b>${esc(c.list)}</b> ${sy(c.added, 'add', '+')} ${sy(c.removed, 'rm', '−')}</span>`).join('');
+  const n = document.createElement('div'); n.className = 'snote'; n.setAttribute('role', 'status');
+  n.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 0-14.3-4.9L4 9M4 4v5h5M4 12a8 8 0 0 0 14.3 4.9L20 15M20 20v-5h-5"/></svg><div>${lines}${changes.length > 4 ? `<span>and ${changes.length - 4} more lists</span>` : ''}</div>`;
+  n.addEventListener('click', () => n.remove());
+  document.body.appendChild(n);
+  requestAnimationFrame(() => n.classList.add('show'));
+  clearTimeout(syncNoteTimer);
+  syncNoteTimer = setTimeout(() => { n.classList.remove('show'); setTimeout(() => n.remove(), 250); }, 6000);
 }
 try { localStorage.removeItem('tvwl.eod.v1'); } catch (_) {}
 const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
@@ -1173,40 +1213,71 @@ async function searchSymbols(text) {
     return ((await r.json()).data || []).map(row => ({ sym: row.s, desc: row.d[2], ex: row.d[1], type: row.d[3] }));
   } catch (_) { return []; }
 }
-const search = { items: [], seq: 0, timer: null, pending: false };
+const search = { items: [], seq: 0, timer: null, pending: false, index: 0, enterQueued: false };
 const PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg>';
-function openSearch() {
-  openSheet('search', `Search · add to ${activeList().name}`,
+// Two modes. From the list (+): Enter or a tap adds the result to the active list and selects it, staying on the list.
+// From the chart (Search, header symbol): Enter or a tap only opens the result on the chart. The row's + adds in both.
+function openSearch(addMode = false) {
+  search.addMode = addMode;
+  openSheet('search', addMode ? `Add to ${activeList().name}` : 'Search',
     `<div class="sres" id="sres"><div class="shint">Type a ticker or a company name.</div></div>
      <form class="sform" id="sform"><input class="field" id="sq" type="search" placeholder="Search symbol" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search"></form>`);
-  search.items = []; search.pending = false;
+  search.items = []; search.pending = false; search.index = 0; search.enterQueued = false;
   const q = $('sq');
   q.addEventListener('input', () => {
     const text = q.value.trim();
-    clearTimeout(search.timer); search.items = []; search.pending = !!text; refreshSearch();
+    clearTimeout(search.timer); search.items = []; search.index = 0; search.enterQueued = false; search.pending = !!text; refreshSearch();
     if (!text) return;
     search.timer = setTimeout(async () => {
       const seq = ++search.seq, items = await searchSymbols(text);
       if (seq !== search.seq) return;
-      search.items = items; search.pending = false; refreshSearch();
+      search.items = items; search.pending = false;
+      search.index = firstChartable();
+      refreshSearch();
+      if (search.enterQueued) { search.enterQueued = false; pickSearch(); }   // Enter pressed while results were loading
     }, 220);
   });
-  $('sform').addEventListener('submit', e => { e.preventDefault(); const it = search.items[0]; if (it) { closeSheet(); selectSymbol(it.sym); } });
+  // ↑ / ↓ move the highlight (wrapping), Enter opens the highlighted result on the chart.
+  q.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const n = search.items.length; if (!n) return;
+    e.preventDefault();
+    search.index = (search.index + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+    refreshSearch();
+    $('sres').querySelector('.sr.on')?.scrollIntoView({ block: 'nearest' });
+  });
+  $('sform').addEventListener('submit', e => {
+    e.preventDefault();
+    if (search.pending) { search.enterQueued = true; return; }
+    pickSearch();
+  });
   $('shBody').onclick = e => {
     const add = e.target.closest('[data-add]');
     if (add) { addSymbol(add.dataset.add); refreshSearch(); return; }
     const r = e.target.closest('[data-pick]');
-    if (r) { closeSheet(); selectSymbol(r.dataset.pick); }
+    if (r) pickSearch(r.dataset.pick);
   };
   setTimeout(() => q.focus(), 30);
+}
+// First result the free widget can chart (quote-only symbols like BIST or plain indices are skipped).
+const firstChartable = () => Math.max(0, search.items.findIndex(it => !noChart(it.sym)));
+function pickSearch(sym) {
+  const it = sym ? { sym } : search.items[search.index] || search.items[firstChartable()];
+  if (!it) return;
+  closeSheet();
+  if (search.addMode) {
+    if (!flatSymbols(activeList()).includes(it.sym)) addSymbol(it.sym);
+    if (!noChart(it.sym)) selectSymbol(it.sym, false);
+    $('rows').querySelector(`.row[data-sym="${CSS.escape(it.sym)}"]`)?.scrollIntoView({ block: 'nearest' });
+  } else selectSymbol(it.sym);
 }
 function refreshSearch() {
   const box = $('sres'); if (!box || sheetKind !== 'search') return;
   const inList = new Set(flatSymbols(activeList())), text = $('sq').value.trim();
   if (!text) { box.innerHTML = '<div class="shint">Type a ticker or a company name.</div>'; return; }
   if (!search.items.length) { box.innerHTML = `<div class="shint">${search.pending ? 'Searching…' : 'No matches'}</div>`; return; }
-  box.innerHTML = search.items.map(it => `<div class="sr" data-pick="${esc(it.sym)}">
+  box.innerHTML = search.items.map((it, i) => `<div class="sr${i === search.index ? ' on' : ''}" data-pick="${esc(it.sym)}">
       <span class="s"><b>${esc(short(it.sym))}</b><small>${esc(it.ex || it.sym.split(':')[0])}</small></span>
       <button class="add${inList.has(it.sym) ? ' in' : ''}" ${inList.has(it.sym) ? 'disabled aria-label="In list"' : `data-add="${esc(it.sym)}" aria-label="Add to list"`}>${inList.has(it.sym) ? CHECK : PLUS}</button>
       <span class="d">${esc(it.desc || '')}</span></div>`).join('');
@@ -1307,7 +1378,7 @@ async function useSyncCode(code) {
   }
   if (!r.ok) { setSyncStatus(r.status === 400 ? 'bad' : 'err', r.status === 400 ? 'The sync service doesn\'t accept that code. Use 4–12 letters or digits.' : 'Couldn\'t reach the sync service.'); return false; }
   state.sync = { ...(state.sync || {}), code, lastCode: code }; save();
-  syncAdopt(await r.json()); setSyncStatus('ok');
+  syncAdopt(await r.json(), false); setSyncStatus('ok');
   toast(`Lists loaded from code ${fmtCode(code)}`); return true;
 }
 var pendingSyncCode = null, syncSuggest = null;
@@ -1336,7 +1407,8 @@ document.addEventListener('click', e => {
   switch (el.dataset.act) {
     case 'list': state.activeListId = el.dataset.id; save(); render(); $('rows').scrollTop = 0; break;
     case 'view': setView(el.dataset.view); break;
-    case 'search': openSearch(); break;
+    case 'search': openSearch(false); break;
+    case 'add': openSearch(true); break;
     case 'sort': state.sort = state.sort === 'chg' ? null : 'chg'; save(); render(); break;
     case 'lists': openListManager(); break;
     case 'reconnect': refreshQuotes(); break;
