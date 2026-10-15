@@ -64,7 +64,10 @@ export class SyncRoom extends DurableObject {
       if (!body || !Array.isArray(body.lists) || !body.lists.length || typeof body.updatedAt !== 'number') return json({ error: 'bad state' }, 400, cors);
       const cur = await this.doc(code);
       if (cur && cur.updatedAt > body.updatedAt) return json(cur, 409, cors);
-      const d = { updatedAt: body.updatedAt, lists: body.lists };
+      // Extra fields (flags, and whatever later versions add) ride along; a client that doesn't know a field keeps what's stored.
+      const extra = {};
+      for (const src of [cur || {}, body]) for (const [k, v] of Object.entries(src)) if (!['updatedAt', 'lists'].includes(k) && v !== undefined) extra[k] = v;
+      const d = { ...extra, updatedAt: body.updatedAt, lists: body.lists };
       await this.ctx.storage.put('doc', d);
       const from = request.headers.get('X-Client-Id') || '', msg = JSON.stringify({ type: 'state', doc: d });
       for (const ws of this.ctx.getWebSockets()) if (this.ctx.getTags(ws)[0] !== from) { try { ws.send(msg); } catch (_) {} }

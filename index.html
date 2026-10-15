@@ -91,7 +91,8 @@
   .rows { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
   .row { position: relative; height: 48px; border-bottom: 1px solid rgba(42, 46, 57, .55); cursor: pointer; font-variant-numeric: tabular-nums;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; background: var(--bg); transition: transform .12s, box-shadow .12s; }
-  .row.on { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }
+  .row.on { background: var(--accent-bg); }
+  .row.flagged { box-shadow: inset 8px 0 0 var(--c); }   /* the flag is the row's left border */
   .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .row .sym b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row.nochart .sym b { color: var(--muted); font-weight: 500; }
@@ -99,6 +100,13 @@
   .row .ext { display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 13px; }
   .ss { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
   .ss.pre { background: var(--pre); } .ss.post { background: var(--post); } .ss.night { background: var(--night); }
+  /* Flag strip = the border itself (desktop): hover shows it on unflagged rows, each click cycles the color */
+  .fl { display: none; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; padding: 0; }
+  .opt .fsw { width: 4px; height: 18px; border-radius: 2px; background: var(--c); margin: 0 7px; flex-shrink: 0; }
+  .fpick { display: flex; align-items: center; gap: 14px; padding: 16px; }
+  .fdot { width: 30px; height: 30px; border-radius: 50%; background: var(--c); border: 3px solid transparent; box-shadow: 0 0 0 2px transparent; }
+  .fdot.on { box-shadow: 0 0 0 2px var(--text); }
+  .fnone { margin-left: auto; height: 30px; padding: 0 12px; border-radius: 8px; background: var(--bg3); color: var(--muted); font-size: 13px; }
   .earn { flex-shrink: 0; font-style: normal; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 5px; border-radius: 4px;
     color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
   .earn.soon { background: var(--pre); color: var(--bg); }
@@ -121,10 +129,11 @@
   .f-up { --fl: rgba(8, 153, 129, .45); } .f-down { --fl: rgba(242, 54, 69, .45); } .f-same { --fl: rgba(41, 98, 255, .35); }
   @keyframes flash { 0% { background: var(--fl); } 100% { background: transparent; } }
   .empty { padding: 32px 20px; color: var(--muted); text-align: center; }
-  .addrow { padding: 10px 14px 14px; }
-  .addrow button { width: 100%; height: 40px; border-radius: 10px; border: 1px dashed var(--muted); color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; opacity: .75; }
+  .addrow { display: flex; gap: 8px; padding: 10px 14px 14px; }
+  .addrow button { flex: 1; min-width: 0; height: 40px; border-radius: 10px; border: 1px dashed var(--muted); color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; opacity: .75; }
   .addrow button svg { width: 16px; height: 16px; }
   .addrow button:hover { color: var(--text); background: var(--bg3); border-style: solid; opacity: 1; }
+  .addrow .sec { flex: none; padding: 0 14px; font-weight: 500; }
 
   /* Dock: every list with its sentiment %, then add / sort / lists */
   .dock { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg2); border-top: 1px solid var(--line); }
@@ -331,6 +340,14 @@
     .row .rt button[disabled] { opacity: .3; pointer-events: none; }
     body.sorted .row .rt button[data-act="row-up"], body.sorted .row .rt button[data-act="row-down"] { display: none; }
     .row .rt svg { width: 15px; height: 15px; }
+    .fl { display: block; }
+    .row:hover:not(.flagged) .fl { background: var(--muted); opacity: .35; }
+    .row:hover:not(.flagged) .fl:hover { opacity: .6; }
+    .row.flagged .fl:hover { box-shadow: inset 0 0 0 8px rgba(255, 255, 255, .12); }
+    .row .rt .ud { display: flex; flex-direction: column; }
+    .row .rt .ud button { width: 24px; height: 15px; border-radius: 4px; }
+    .row .rt .ud svg { width: 12px; height: 12px; }
+    body.sorted .row .rt .ud, .row.auto .rt .ud { display: none; }
     .row:hover { background: var(--bg2); }
     .row.on:hover { background: var(--accent-bg); }
     /* Dock as a tab bar: name + sentiment % on one line, the active list underlined */
@@ -438,7 +455,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '2.0';  // bump on every push to main
+const APP_VERSION = '2.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -523,11 +540,12 @@ function load() {
       // Leftovers from the previous design (pinned tape, details panel, history chart, edit mode).
       for (const k of ['pinned', 'hudHidden', 'histRange', 'panelWidth', 'mview']) delete s[k];
       if (!['list', 'chart'].includes(s.view)) s.view = 'list';
+      if (!s.flags || typeof s.flags !== 'object') s.flags = {};
       ensureEarnings(s);
       return s;
     }
   } catch (_) {}
-  const s = seed(); ensureEarnings(s); return s;
+  const s = seed(); s.flags = {}; ensureEarnings(s); return s;
 }
 let state = load();
 function save() {
@@ -544,7 +562,7 @@ const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
 const syncShape = lists => lists.map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
   groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols })) }));
-const syncJson = () => JSON.stringify(syncShape(state.lists));
+const syncJson = () => JSON.stringify({ lists: syncShape(state.lists), flags: state.flags || {} });
 const fmtCode = c => c.length === 12 ? c.replace(/(.{4})(?=.)/g, '$1-') : c;   // 12-character codes from v1.3–1.5 read in groups
 function newSyncCode() { const b = crypto.getRandomValues(new Uint8Array(4)); return [...b].map(x => SYNC_ALPHA[x & 31]).join(''); }
 // A free code: one nobody has stored lists under yet.
@@ -570,7 +588,7 @@ async function syncPush() {
   setSyncStatus('busy');
   try {
     const r = await fetch(syncApi() + code, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client-Id': SYNC_CLIENT },
-      body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists) }) });
+      body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists), flags: state.flags || {} }) });
     if (r.status === 409) { syncAdopt(await r.json()); return setSyncStatus('ok'); }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     setSyncStatus('ok');
@@ -627,12 +645,13 @@ function syncAdopt(remote, notify = true) {
   const upcoming = state.lists.find(l => l.auto === 'earnings')?.groups.find(g => g.auto);
   state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols, collapsed: collapsed.has(l.id + '|' + g.name) })) }));
   const el = ensureEarnings(state); if (upcoming) el.groups[0].symbols = upcoming.symbols;
+  if (remote.flags && typeof remote.flags === 'object') state.flags = remote.flags;
   if (!state.lists.some(l => l.id === state.activeListId)) state.activeListId = state.lists[0].id;
   state.sync.updatedAt = remote.updatedAt;
   syncLast = syncJson();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
   if (typeof render === 'function' && document.getElementById('rows')) {
-    if (['row', 'copy'].includes(sheetKind)) closeSheet();
+    if (['row', 'copy', 'flag'].includes(sheetKind)) closeSheet();
     render(); wsSync();
     if (sheetKind === 'lists') renderListManager();
     if (changes.length) showSyncNote(changes);
@@ -1028,6 +1047,21 @@ function patchChips() {
     s.className = v != null ? dir(v) : '';
   }
 }
+// Flags like TradingView's: one color per symbol, shared by every list and synced (state.flags[sym] = color name).
+const FLAGS = [['red', '#f23645'], ['orange', '#ff9800'], ['yellow', '#fbc02d'], ['green', '#089981'], ['blue', '#2962ff'], ['purple', '#9c27b0']];
+const flagColor = sym => FLAGS.find(f => f[0] === state.flags?.[sym])?.[1] || '';
+function setFlag(sym, color) {
+  state.flags = state.flags || {};
+  if (color) state.flags[sym] = color; else delete state.flags[sym];
+  save(); renderRows();
+}
+const cycleFlag = sym => { const i = FLAGS.findIndex(f => f[0] === state.flags?.[sym]); setFlag(sym, FLAGS[i + 1]?.[0] || null); };   // none → red → … → purple → none
+function openFlagSheet(sym) {
+  const cur = state.flags?.[sym];
+  openSheet('flag', `Flag ${short(sym)}`, `<div class="fpick">${FLAGS.map(([n, c]) =>
+    `<button class="fdot${n === cur ? ' on' : ''}" data-f="${n}" style="--c:${c}" title="${n}"></button>`).join('')}<button class="fnone" data-f="">None</button></div>`);
+  $('shBody').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; setFlag(sym, b.dataset.f || null); closeSheet(); };
+}
 const ICON = {
   details: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>',
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
@@ -1038,9 +1072,10 @@ const ICON = {
 const ghHtml = (name, n, gi, collapsed, isStatic) =>
   `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span><span class="gc">${n}</span></div>`;
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
-const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}" data-sym="${esc(sym)}" data-g="${gi}">
+const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
+<button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
     <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
-    <span class="rt"><button data-act="row-details" title="Details">${ICON.details}</button><button data-act="row-add" title="Add to another list">${ICON.add}</button><button data-act="row-up" title="Move up"${i > 0 ? '' : ' disabled'}>${ICON.up}</button><button data-act="row-down" title="Move down"${i >= 0 && i < n - 1 ? '' : ' disabled'}>${ICON.down}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
+    <span class="rt"><button data-act="row-add" title="Add to another list">${ICON.add}</button><span class="ud"><button data-act="row-up" title="Move up"${i > 0 ? '' : ' disabled'}>${ICON.up}</button><button data-act="row-down" title="Move down"${i >= 0 && i < n - 1 ? '' : ' disabled'}>${ICON.down}</button></span><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
 let lastSortRender = 0;
 function renderRows() {
   const l = activeList(), all = flatSymbols(l);
@@ -1063,7 +1098,7 @@ function renderRows() {
     });
   }
   // every list ends with its add row (symbols go to the last group; Earnings → Manual)
-  html += `<div class="addrow"><button data-act="add" title="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button></div>`;
+  html += `<div class="addrow"><button data-act="add" title="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button>${l.auto ? '' : `<button class="sec" data-act="add-section" title="New section">Section</button>`}</div>`;
   $('rows').innerHTML = html;
   patchRows(false);
 }
@@ -1280,9 +1315,28 @@ function closeSheet() {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   unshift();
 }
+// Desktop: digits 1–8 pick an interval (the picker opens on the first digit); any letter opens search with it typed.
+function openIntervalPicker() {
+  openSheet('interval', 'Interval · press 1–8', INTERVALS.map(([lbl, v], i) =>
+    `<button class="opt${v === state.interval ? ' on' : ''}" data-iv="${v}"><span class="c" style="margin:0;min-width:14px">${i + 1}</span>${lbl}</button>`).join(''));
+  $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { setChartInterval(b.dataset.iv); closeSheet(); } };
+}
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeSheet(); return; }
-  if (!e.key.startsWith('Arrow') || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  if (!isPhone() && /^[1-8]$/.test(e.key) && ($('sheet').hidden || sheetKind === 'interval')) {
+    e.preventDefault();
+    if ($('sheet').hidden) openIntervalPicker();
+    else { setChartInterval(INTERVALS[+e.key - 1][1]); closeSheet(); }
+    return;
+  }
+  if (!isPhone() && /^[a-z]$/i.test(e.key) && $('sheet').hidden) {
+    e.preventDefault();
+    openSearch(false);
+    const q = $('sq'); q.value = e.key.toUpperCase(); q.dispatchEvent(new Event('input'));
+    return;
+  }
+  if (!e.key.startsWith('Arrow')) return;
   if (!$('sheet').hidden || e.target.closest?.('input, textarea')) return;
   // ← / → switch watchlists (wrapping around).
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -1306,7 +1360,8 @@ document.addEventListener('keydown', e => {
 function openRowMenu(sym, gi) {
   const l = activeList(), g = l.groups[gi];
   const i = g ? g.symbols.indexOf(sym) : -1, ordered = g && !g.auto && !state.sort;   // up/down only in the user's own order
-  const opts = [`<button class="opt" data-o="details">${ICON.details}Details</button>`];
+  const opts = [`<button class="opt" data-o="details">${ICON.details}Details</button>`,
+    `<button class="opt" data-o="flag"><i class="fsw" style="--c:${flagColor(sym) || 'var(--muted)'}"></i>Flag</button>`];
   if (state.lists.length > 1) opts.push(`<button class="opt" data-o="add">${ICON.add}Add to list</button>`);
   if (ordered && i > 0) opts.push(`<button class="opt" data-o="up">${ICON.up}Move up</button>`);
   if (ordered && i >= 0 && i < g.symbols.length - 1) opts.push(`<button class="opt" data-o="down">${ICON.down}Move down</button>`);
@@ -1315,6 +1370,7 @@ function openRowMenu(sym, gi) {
   $('shBody').onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
     if (o === 'details') { if (isPhone()) toggleDetails(sym); else { closeSheet(); if (sym !== state.symbol) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); } }
+    if (o === 'flag') openFlagSheet(sym);
     if (o === 'add') openCopySheet(sym);
     if (o === 'up') { closeSheet(); moveSymbol(sym, gi, gi, i - 1); }
     if (o === 'down') { closeSheet(); moveSymbol(sym, gi, gi, i + 1); }
@@ -1322,6 +1378,17 @@ function openRowMenu(sym, gi) {
   };
 }
 
+function openSectionSheet() {   // a new group at the end of the active list
+  openSheet('section', `New section in ${activeList().name}`, `<form class="lmnew" id="secform"><input class="field" id="secname" placeholder="Section name" autocomplete="off"><button>Add</button></form>`);
+  $('secform').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('secname').value.trim(), l = activeList(); if (!name) return;
+    if (l.groups.some(g => g.name.toLowerCase() === name.toLowerCase())) { toast(`${name} already exists`); return; }
+    l.groups.push({ name, collapsed: false, symbols: [] }); save(); renderRows(); wsSync(); closeSheet();
+    toast(`${name} added`);
+  });
+  setTimeout(() => $('secname').focus(), 30);
+}
 function openCopySheet(sym) {   // add the symbol to another list (it stays in this one)
   const others = state.lists.filter(x => x.id !== state.activeListId);
   const own = x => x.groups.filter(g => !g.auto).flatMap(g => g.symbols);   // the Earnings list's auto group doesn't count as "there"
@@ -1563,11 +1630,13 @@ document.addEventListener('click', e => {
     case 'hist-range': state.histRange = HIST_RANGES[(HIST_RANGES.indexOf(histRange()) + 1) % HIST_RANGES.length]; save(); renderSentiment(); break;
     case 'toggle-chart': state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
     case 'sheet-close': closeSheet(); break;
+    case 'add-section': openSectionSheet(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
-    case 'row-details': case 'row-add': case 'row-up': case 'row-down': case 'row-rm': {
+    case 'row-flag': case 'row-details': case 'row-add': case 'row-up': case 'row-down': case 'row-rm': {
       e.stopPropagation();
       const act = el.dataset.act, r = el.closest('.row'), sym = r.dataset.sym, gi = +r.dataset.g, g = activeList().groups[gi], i = g ? g.symbols.indexOf(sym) : -1;
       if (act === 'row-details') { if (sym !== state.symbol && !noChart(sym)) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); }
+      if (act === 'row-flag') cycleFlag(sym);
       if (act === 'row-add') openCopySheet(sym);
       if (act === 'row-up' && i > 0) moveSymbol(sym, gi, gi, i - 1);
       if (act === 'row-down' && i >= 0) moveSymbol(sym, gi, gi, i + 1);
