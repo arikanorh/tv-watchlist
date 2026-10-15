@@ -189,6 +189,21 @@
   .lm .ib:disabled { opacity: .35; }
   .lmnew { display: flex; gap: 8px; padding: 10px 12px 2px; border-top: 1px solid var(--line); flex-shrink: 0; }
   .lmnew button { flex: none; padding: 0 16px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; }
+  /* Sync across devices (inside the list manager) */
+  .sync { flex-shrink: 0; margin-top: 10px; padding: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .sync h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+  .sync h4 i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .sync h4 i.ok { background: var(--up); } .sync h4 i.err { background: var(--down); } .sync h4 i.busy { background: var(--pre); }
+  .sync h4 span { margin-left: auto; font-weight: 400; font-size: 12px; color: var(--muted); }
+  .sync p { margin: 0; font-size: 13px; color: var(--muted); }
+  .sync .row2 { display: flex; gap: 8px; }
+  .sync .row2 .field { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .08em; }
+  .sync .btn { flex: none; height: 44px; padding: 0 16px; border-radius: 10px; background: var(--bg3); font-weight: 600; }
+  .sync .btn.primary { background: var(--accent); color: #fff; }
+  .sync .btn.link { height: auto; padding: 0; background: none; color: var(--muted); font-weight: 400; font-size: 13px; text-align: left; }
+  .sync .code { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; padding: 0 12px; border-radius: 10px; background: var(--bg);
+    font: 600 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; user-select: all; -webkit-user-select: all; }
+  .sync .msg { font-size: 12px; color: var(--down); }
   .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 80px + var(--safe-b)); z-index: 60; display: flex; align-items: center; gap: 14px;
     max-width: calc(100vw - 24px); padding: 11px 16px; border-radius: 10px; background: var(--bg3); font-size: 14px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
   .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -341,7 +356,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '1.2';  // bump on every push to main
+const APP_VERSION = '1.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -421,7 +436,75 @@ function load() {
   return seed();
 }
 let state = load();
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {} }
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
+  syncNoteChange();
+}
+
+// ================= Sync across devices =================
+// The lists (names, groups, symbols, sentiment flag, order) live under a 12-character sync code in the relay worker's KV
+// (GET/PUT /state/<code>). Per-device things stay local: active list, symbol, view, interval, collapsed groups.
+// Last edit wins: every local edit stamps state.sync.updatedAt; the worker refuses a PUT older than what it holds (409).
+var syncTimer = null, syncStatus = { st: 'idle', at: 0, msg: '' }, syncLast = null;
+const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
+const syncShape = lists => lists.map(l => ({ id: l.id, name: l.name, summary: l.summary, groups: l.groups.map(g => ({ name: g.name, symbols: g.symbols })) }));
+const syncJson = () => JSON.stringify(syncShape(state.lists));
+const fmtCode = c => c.replace(/(.{4})(?=.)/g, '$1-');
+function newSyncCode() { const b = crypto.getRandomValues(new Uint8Array(12)); return [...b].map(x => SYNC_ALPHA[x & 31]).join(''); }
+function parseSyncCode(t) { const c = String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length === 12 && [...c].every(ch => SYNC_ALPHA.includes(ch)) ? c : null; }
+function setSyncStatus(st, msg = '') { syncStatus = { st, at: st === 'ok' ? Date.now() : syncStatus.at, msg }; if (typeof sheetKind !== 'undefined' && sheetKind === 'lists') renderSyncBox(); }
+// Called from save(): a change in the synced shape stamps the edit time and schedules a push.
+function syncNoteChange() {
+  const j = syncJson();
+  if (syncLast === null) { syncLast = j; return; }
+  if (j === syncLast) return;
+  syncLast = j;
+  state.sync = state.sync || {};
+  state.sync.updatedAt = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
+  if (state.sync.code) { clearTimeout(syncTimer); syncTimer = setTimeout(syncPush, 1500); }
+}
+async function syncPush() {
+  const code = state.sync?.code; if (!code) return;
+  setSyncStatus('busy');
+  try {
+    const r = await fetch(syncApi() + code, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists) }) });
+    if (r.status === 409) { syncAdopt(await r.json()); return setSyncStatus('ok'); }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    setSyncStatus('ok');
+  } catch (e) { setSyncStatus('err', 'Couldn\'t reach the sync service. Retrying on the next change.'); }
+}
+// join: the synced copy replaces this device's lists whatever their age.
+async function syncPull(join = false) {
+  const code = state.sync?.code; if (!code || (!join && (press || document.hidden))) return;
+  setSyncStatus('busy');
+  try {
+    const r = await fetch(syncApi() + code, { cache: 'no-store' });
+    if (r.status === 404) { if (join) { setSyncStatus('err', 'No lists are stored under this code yet.'); return false; } return syncPush(); }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const remote = await r.json(), local = state.sync.updatedAt || 0;
+    if (join || remote.updatedAt > local) syncAdopt(remote);
+    else if (remote.updatedAt < local) return syncPush();
+    setSyncStatus('ok');
+    return true;
+  } catch (e) { setSyncStatus('err', 'Couldn\'t reach the sync service.'); return false; }
+}
+function syncAdopt(remote) {
+  if (!remote || !Array.isArray(remote.lists) || !remote.lists.length) return;
+  const collapsed = new Set(state.lists.flatMap(l => l.groups.filter(g => g.collapsed).map(g => l.id + '|' + g.name)));
+  state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.map(g => ({ name: g.name, symbols: g.symbols, collapsed: collapsed.has(l.id + '|' + g.name) })) }));
+  if (!state.lists.some(l => l.id === state.activeListId)) state.activeListId = state.lists[0].id;
+  state.sync.updatedAt = remote.updatedAt;
+  syncLast = syncJson();
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
+  if (typeof render === 'function' && document.getElementById('rows')) {
+    if (['row', 'move', 'copy'].includes(sheetKind)) closeSheet();
+    render(); wsSync();
+    if (sheetKind === 'lists') renderListManager();
+  }
+}
 try { localStorage.removeItem('tvwl.eod.v1'); } catch (_) {}
 const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
 const flatSymbols = list => list.groups.flatMap(g => g.symbols);
@@ -1160,7 +1243,9 @@ function renderListManager() {
       <button class="ib" data-lm="up" title="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
       <button class="ib" data-lm="down" title="Move down" ${i === state.lists.length - 1 ? 'disabled' : ''}>↓</button>
       <button class="ib del" data-lm="del" title="Delete list">✕</button></div>`).join('')
-    + `<form class="lmnew" id="lmnew"><input class="field" id="lmname" placeholder="New list name" autocomplete="off"><button>Add</button></form>`;
+    + `<form class="lmnew" id="lmnew"><input class="field" id="lmname" placeholder="New list name" autocomplete="off"><button>Add</button></form>`
+    + `<div class="sync" id="syncBox"></div>`;
+  renderSyncBox();
   $('shBody').querySelectorAll('input[data-name]').forEach(inp => {
     const commit = () => { const l = state.lists.find(x => x.id === inp.closest('.lm').dataset.id), v = inp.value.trim(); if (l && v && v !== l.name) { l.name = v; save(); renderChips(); renderHeader(); } };
     inp.addEventListener('change', commit);
@@ -1174,6 +1259,48 @@ function renderListManager() {
     toast(`${name} created`);
   });
 }
+
+function renderSyncBox() {
+  const box = $('syncBox'); if (!box) return;
+  const code = state.sync?.code, st = syncStatus;
+  const when = st.at ? new Date(st.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+  const stTxt = { busy: 'Syncing…', ok: when ? 'Synced ' + when : 'On', err: 'Offline', idle: 'On' }[st.st];
+  box.innerHTML = code
+    ? `<h4><i class="${st.st === 'ok' ? 'ok' : st.st === 'err' ? 'err' : st.st === 'busy' ? 'busy' : ''}"></i>Sync across devices<span>${stTxt}</span></h4>
+       <p>Enter this code on your other devices to keep the same lists.</p>
+       <div class="row2"><span class="code">${fmtCode(code)}</span><button class="btn" data-sync="copy">Copy</button></div>
+       ${st.st === 'err' && st.msg ? `<div class="msg">${esc(st.msg)}</div>` : ''}
+       <button class="btn link" data-sync="off">Stop syncing on this device</button>`
+    : `<h4><i></i>Sync across devices<span>Off</span></h4>
+       <p>Keep the same lists on your phone and computer.</p>
+       <div class="row2"><button class="btn primary" data-sync="on" style="flex:1">Turn on sync</button></div>
+       <p>Already on another device? Enter its code. Its lists replace the ones here.</p>
+       <form class="row2" id="syncJoin"><input class="field" id="syncCode" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(pendingSyncCode || '')}"><button class="btn">Join</button></form>
+       ${st.st === 'err' && st.msg ? `<div class="msg">${esc(st.msg)}</div>` : ''}`;
+  $('syncJoin')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const c = parseSyncCode($('syncCode').value);
+    if (!c) { setSyncStatus('err', 'A code is 12 letters and digits, like ABCD-EFGH-JK23.'); return; }
+    state.sync = { ...(state.sync || {}), code: c }; save();
+    const ok = await syncPull(true);
+    if (ok) { pendingSyncCode = null; toast('Sync on. Lists loaded from your other device.'); }
+    else { state.sync.code = null; save(); renderSyncBox(); }
+  });
+}
+var pendingSyncCode = null;
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-sync]'); if (!b) return;
+  const act = b.dataset.sync;
+  if (act === 'on') {
+    state.sync = { ...(state.sync || {}), code: newSyncCode(), updatedAt: state.sync?.updatedAt || Date.now() }; save();
+    await syncPush(); renderSyncBox();
+  }
+  if (act === 'copy') {
+    const code = fmtCode(state.sync.code);
+    try { await navigator.clipboard.writeText(code); toast('Code copied'); } catch (_) { toast(code); }
+  }
+  if (act === 'off') { state.sync.code = null; save(); setSyncStatus('idle'); renderSyncBox(); toast('Sync is off on this device. Your lists stay here.'); }
+});
 
 let toastTimer = null;
 function toast(text, action, fn) {
@@ -1313,6 +1440,13 @@ window.addEventListener('resize', () => { if (document.body.classList.contains('
 setView(isPhone() ? state.view : 'list');
 mountChart();
 wsConnect();
+syncLast = syncJson();
+{ const m = location.hash.match(/sync=([A-Za-z0-9-]+)/); const c = m && parseSyncCode(m[1]);
+  if (c) { history.replaceState(null, '', location.pathname + location.search);
+    if (state.sync?.code !== c) { pendingSyncCode = fmtCode(c); setTimeout(openListManager, 300); } } }
+syncPull();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncPull(); });
+setInterval(() => { if (!document.hidden) syncPull(); }, 60000);
 
 // Prod: GitHub Pages caches for 10 min and the PWA holds on to old pages; reload when a newer version is live.
 const IS_LAN = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);

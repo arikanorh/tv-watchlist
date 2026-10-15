@@ -10,9 +10,9 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 |---|---|
 | `index.html` | The whole app: CSS, markup, JS (~1100 lines). Only deliverable. |
 | `manifest.webmanifest`, `icons/` | PWA (iOS home screen, standalone). `background_color` = nav color. |
-| `relay/worker.js` | Cloudflare Worker: relays the TradingView quote websocket for non-localhost origins and proxies `/search`. |
+| `relay/worker.js` | Cloudflare Worker: relays the TradingView quote websocket for non-localhost origins, proxies `/search`, stores synced lists (`/state/<code>`, KV `tv-watchlist-sync`). |
 | `relay/wrangler.toml`, `relay/README.md` | Worker config + deploy notes. |
-| `.github/workflows/deploy-relay.yml` | Deploys the worker on push to `main` when `relay/**` changes (secret `CLOUDFLARE_API_TOKEN`). |
+| `.github/workflows/deploy-relay.yml` | Deploys the worker on push to `main` when `relay/**` changes (secret `CLOUDFLARE_API_TOKEN`); creates and binds the sync KV namespace. |
 | `DATA-SOURCES.md` | Reverse-engineered TradingView endpoints and their quirks. |
 | `reference/` | Git-ignored. Field catalog dump and the user's real TradingView watchlist snapshot. |
 
@@ -37,6 +37,8 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 2. Overnight (20:00–04:00 ET): `wsSync()` also subscribes each US stock's `BOATS:<ticker>` twin; `onQuote` takes the overnight price from it and computes the change against the regular close. Dropped when the phase ends (`renderSession`).
 3. If the socket never opens → `quoteSource = 'poll'`: scanner REST every 10 s, hidden mini widgets (`syncFeeders`, max 4) for symbols the scanner lacks. `?quotes=poll` forces it.
 `renderQuotes()` (throttled 250 ms) patches cells in place with flash, refreshes chips and header; in sorted view it re-orders at most every 3 s and never under a finger or an open sheet. Outside regular hours Last shows the extended price and Ext the extended change with a colored dot (amber pre, blue post, purple overnight). Prices: 2 decimals ≥ 1, T/B above a billion, 4 significant digits below 1 (`fmtPrice`). Earnings within 7 days show a tag next to the ticker.
+
+**Sync across devices** — the lists (`syncShape`: id, name, summary, groups with name and symbols) live in the relay worker's KV under a 12-character code (`GET/PUT /state/<code>`). Per-device things stay local: active list, symbol, view, interval, collapsed groups, history. `save()` → `syncNoteChange()` stamps `state.sync.updatedAt` when the synced shape changed and pushes 1.5 s later; `syncPull()` runs on load, on resume and every 60 s while visible (newer side wins; the worker answers 409 to an older PUT). Joining with a code (list manager → Sync) replaces this device's lists. `#sync=CODE` in the URL opens the list manager with the code filled in. iOS home-screen apps have their own storage, so enter the code inside the app. `?sync_api=http://localhost:8788` points the client at a local `wrangler dev` for testing.
 
 **PWA / iOS** — `fitStandalone()` drops the nav's home-indicator padding when iOS stops the web view short of the screen (`body.ios-gap`); `unshift()` snaps the document back after keyboard use (otherwise taps land off target); `trackKeyboard()` keeps bottom sheets above the keyboard (`--kb`).
 

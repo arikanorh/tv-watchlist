@@ -14,6 +14,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Watchlist sync storage: find the KV namespace "tv-watchlist-sync", create it on the first run, and bind it as SYNC.
+      # The id is added to wrangler.toml only inside this job, so nothing account-specific lives in the repo.
+      - name: Bind sync KV namespace
+        working-directory: relay
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          find_id() {
+            npx --yes wrangler@4 kv namespace list | node -e '
+              let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+                const a = JSON.parse(s.slice(s.indexOf("[")));
+                const n = a.find(x => x.title === "tv-watchlist-sync");
+                process.stdout.write(n ? n.id : "");
+              });'
+          }
+          id=$(find_id)
+          if [ -z "$id" ]; then
+            npx --yes wrangler@4 kv namespace create tv-watchlist-sync
+            id=$(find_id)
+          fi
+          test -n "$id"
+          printf '\n[[kv_namespaces]]\nbinding = "SYNC"\nid = "%s"\n' "$id" >> wrangler.toml
+          cat wrangler.toml
       - name: Deploy worker
         working-directory: relay
         run: npx --yes wrangler@4 deploy
