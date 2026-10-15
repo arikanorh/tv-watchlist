@@ -39,23 +39,23 @@
   .up { color: var(--up); } .down { color: var(--down); }
 
   /* ---------- Header: list status (list pane) / symbol status (chart pane), session tint, feed status ---------- */
-  .top { flex-shrink: 0; display: flex; align-items: center; gap: 12px; height: 54px; padding: 0 14px; min-width: 0;
+  .top { flex-shrink: 0; display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 14px; min-width: 0;
     background: var(--bg2); border-bottom: 1px solid var(--line); }
   body.sess-open .top { background: #18302e; }  body.sess-pre .top { background: #2e2a24; }
   body.sess-post .top { background: #1d2740; } body.sess-night .top { background: #272140; }
   .hl, .hs { display: flex; align-items: baseline; gap: 10px; min-width: 0; font-variant-numeric: tabular-nums; }
-  .hl b, .hs b { font-size: 20px; font-weight: 700; white-space: nowrap; }
-  .hl .v { font-size: 17px; font-weight: 600; }
+  .hl b, .hs b { font-size: 17px; font-weight: 700; white-space: nowrap; }
+  .hl .v { font-size: 15px; font-weight: 600; }
   .hs { text-align: left; }
-  .hs .px { font-size: 17px; font-weight: 600; white-space: nowrap; }
-  .hs .chg { font-size: 14px; white-space: nowrap; }
+  .hs .px { font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .hs .chg { font-size: 13px; white-space: nowrap; }
   .sp { flex: 1; }
   .lhead { display: none; }
   .sess { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .sess i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
   body.sess-open .sess i { background: var(--up); } body.sess-pre .sess i { background: var(--pre); }
   body.sess-post .sess i { background: var(--post); } body.sess-night .sess i { background: var(--night); }
-  .tick { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 2px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tick { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 2px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .tick .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
   .tick .dot.live { background: var(--up); } .tick .dot.off { background: var(--down); } .tick .dot.poll { background: var(--pre); }
   .tick.pulse span { animation: pulse .6s ease-out; }
@@ -103,6 +103,7 @@
     color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
   .earn.soon { background: var(--pre); color: var(--bg); }
   .row .rt { display: none; }   /* row tools: desktop hover only */
+  .row.auto .rt [data-act="row-up"], .row.auto .rt [data-act="row-down"], .row.auto .rt [data-act="row-rm"] { display: none; }   /* auto-filled rows (Earnings › Upcoming) */
   .opt svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted); }
   .opt.danger svg { color: inherit; }
   .row.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); transform: scale(1.015); z-index: 3; }
@@ -120,6 +121,10 @@
   .f-up { --fl: rgba(8, 153, 129, .45); } .f-down { --fl: rgba(242, 54, 69, .45); } .f-same { --fl: rgba(41, 98, 255, .35); }
   @keyframes flash { 0% { background: var(--fl); } 100% { background: transparent; } }
   .empty { padding: 32px 20px; color: var(--muted); text-align: center; }
+  .addrow { padding: 10px 14px 14px; }
+  .addrow button { width: 100%; height: 40px; border-radius: 10px; border: 1px dashed var(--muted); color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; opacity: .75; }
+  .addrow button svg { width: 16px; height: 16px; }
+  .addrow button:hover { color: var(--text); background: var(--bg3); border-style: solid; opacity: 1; }
 
   /* Dock: every list with its sentiment %, then add / sort / lists */
   .dock { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg2); border-top: 1px solid var(--line); }
@@ -315,6 +320,8 @@
     .dt-px b { font-size: 24px; }
     body.chart-hidden .listpane { border-right: 0; }
     .row { height: 36px; font-size: 14px; }
+    .addrow { padding: 8px 14px 12px; }
+    .addrow button { height: 32px; font-size: 13px; }
     .row .rt { position: absolute; right: 0; top: 0; bottom: 0; display: none; align-items: center; gap: 2px; padding: 0 6px 0 10px;
       background: linear-gradient(90deg, transparent, var(--bg2) 10px); }
     .row:hover .rt { display: flex; }
@@ -395,7 +402,6 @@
     <div class="dock">
       <div class="chips" id="chips"></div>
       <div class="acts">
-        <button class="ib primary" data-act="add" aria-label="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         <button class="ib" data-act="lists" aria-label="Manage lists"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
       </div>
     </div>
@@ -432,7 +438,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '1.9';  // bump on every push to main
+const APP_VERSION = '2.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -488,6 +494,17 @@ const noChart = sym => /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|BIST:)/.test(sym);
 // TVC:US10Y (US 10Y yield) spins forever in the embed; PYTH:US10Y carries the same yield and charts.
 const CHART_ALIAS = { 'TVC:US10Y': 'PYTH:US10Y' };
 const chartSymbol = sym => CHART_ALIAS[sym] || sym;
+// The Earnings list (auto: 'earnings') stays last; its "Upcoming" group (auto) is rebuilt from the other lists' earnings dates
+// (updateEarnings) and never synced; the "Manual" group is the user's own. A list already named "Earnings" is adopted.
+function ensureEarnings(s) {
+  let l = s.lists.find(x => x.auto === 'earnings') || s.lists.find(x => /^earnings$/i.test(x.name));
+  if (!l) { l = { id: 'earnings', name: 'Earnings', summary: true, groups: [] }; s.lists.push(l); }
+  l.auto = 'earnings';
+  if (!l.groups.some(g => g.auto)) l.groups.unshift({ name: 'Upcoming', auto: true, collapsed: false, symbols: [] });
+  if (!l.groups.some(g => !g.auto)) l.groups.push({ name: 'Manual', collapsed: false, symbols: [] });
+  s.lists = [...s.lists.filter(x => x !== l), l];
+  return l;
+}
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
@@ -506,10 +523,11 @@ function load() {
       // Leftovers from the previous design (pinned tape, details panel, history chart, edit mode).
       for (const k of ['pinned', 'hudHidden', 'histRange', 'panelWidth', 'mview']) delete s[k];
       if (!['list', 'chart'].includes(s.view)) s.view = 'list';
+      ensureEarnings(s);
       return s;
     }
   } catch (_) {}
-  return seed();
+  const s = seed(); ensureEarnings(s); return s;
 }
 let state = load();
 function save() {
@@ -524,7 +542,8 @@ function save() {
 var syncTimer = null, syncStatus = { st: 'idle', at: 0, msg: '' }, syncLast = null;
 const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
-const syncShape = lists => lists.map(l => ({ id: l.id, name: l.name, summary: l.summary, groups: l.groups.map(g => ({ name: g.name, symbols: g.symbols })) }));
+const syncShape = lists => lists.map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
+  groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols })) }));
 const syncJson = () => JSON.stringify(syncShape(state.lists));
 const fmtCode = c => c.length === 12 ? c.replace(/(.{4})(?=.)/g, '$1-') : c;   // 12-character codes from v1.3–1.5 read in groups
 function newSyncCode() { const b = crypto.getRandomValues(new Uint8Array(4)); return [...b].map(x => SYNC_ALPHA[x & 31]).join(''); }
@@ -603,15 +622,17 @@ function syncReceive(doc) {
 const syncLive = () => syncWs && syncWs.readyState === 1;
 function syncAdopt(remote, notify = true) {
   if (!remote || !Array.isArray(remote.lists) || !remote.lists.length) return;
-  const changes = notify ? syncDiff(state.lists, remote.lists) : [];
+  const changes = notify ? syncDiff(syncShape(state.lists), remote.lists) : [];
   const collapsed = new Set(state.lists.flatMap(l => l.groups.filter(g => g.collapsed).map(g => l.id + '|' + g.name)));
-  state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.map(g => ({ name: g.name, symbols: g.symbols, collapsed: collapsed.has(l.id + '|' + g.name) })) }));
+  const upcoming = state.lists.find(l => l.auto === 'earnings')?.groups.find(g => g.auto);
+  state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols, collapsed: collapsed.has(l.id + '|' + g.name) })) }));
+  const el = ensureEarnings(state); if (upcoming) el.groups[0].symbols = upcoming.symbols;
   if (!state.lists.some(l => l.id === state.activeListId)) state.activeListId = state.lists[0].id;
   state.sync.updatedAt = remote.updatedAt;
   syncLast = syncJson();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
   if (typeof render === 'function' && document.getElementById('rows')) {
-    if (sheetKind === 'row') closeSheet();
+    if (['row', 'copy'].includes(sheetKind)) closeSheet();
     render(); wsSync();
     if (sheetKind === 'lists') renderListManager();
     if (changes.length) showSyncNote(changes);
@@ -1012,18 +1033,19 @@ const ICON = {
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
   rm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M4 12h10M4 18h6M17 13v8M13 17h8"/></svg>',
 };
 const ghHtml = (name, n, gi, collapsed, isStatic) =>
   `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span><span class="gc">${n}</span></div>`;
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
-const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}" data-sym="${esc(sym)}" data-g="${gi}">
+const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}" data-sym="${esc(sym)}" data-g="${gi}">
     <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
-    <span class="rt"><button data-act="row-details" title="Details">${ICON.details}</button><button data-act="row-up" title="Move up"${i > 0 ? '' : ' disabled'}>${ICON.up}</button><button data-act="row-down" title="Move down"${i >= 0 && i < n - 1 ? '' : ' disabled'}>${ICON.down}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
+    <span class="rt"><button data-act="row-details" title="Details">${ICON.details}</button><button data-act="row-add" title="Add to another list">${ICON.add}</button><button data-act="row-up" title="Move up"${i > 0 ? '' : ' disabled'}>${ICON.up}</button><button data-act="row-down" title="Move down"${i >= 0 && i < n - 1 ? '' : ' disabled'}>${ICON.down}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
 let lastSortRender = 0;
 function renderRows() {
   const l = activeList(), all = flatSymbols(l);
   let html = '';
-  if (!all.length) html = '<div class="empty">This list is empty. Tap + to add a symbol.</div>';
+  if (!all.length && !l.auto) html = '<div class="empty">This list is empty.</div>';
   else if (state.sort) {
     // Indices and other non-equities keep their order on top; everything else is one group, biggest Chg% (or Ext) first.
     const giOf = sy => l.groups.findIndex(g => g.symbols.includes(sy)), key = state.sort === 'ext' ? 'e' : 'c';
@@ -1037,8 +1059,11 @@ function renderRows() {
     l.groups.forEach((g, gi) => {
       if (!single) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false);
       if (single || !g.collapsed) html += g.symbols.map((sy, i) => rowHtml(sy, gi, i, g.symbols.length)).join('');
+      if (g.auto && !g.symbols.length && !g.collapsed) html += '<div class="empty">No earnings within 7 days in your lists.</div>';
     });
   }
+  // every list ends with its add row (symbols go to the last group; Earnings → Manual)
+  html += `<div class="addrow"><button data-act="add" title="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button></div>`;
   $('rows').innerHTML = html;
   patchRows(false);
 }
@@ -1067,12 +1092,24 @@ function patchRows(withFlash = true) {
     if (ext.innerHTML !== c.ext) { ext.innerHTML = c.ext; if (withFlash && c.ext) flash(ext, 'f-same'); }
     ext.classList.toggle('up', c.extCls === 'up'); ext.classList.toggle('down', c.extCls === 'down');
     // Earnings within a week: "3d" tag next to the ticker (filled on the day before and the day itself).
-    const t = raw[sym]?.earnings_release_next_date, days = t ? Math.round((t * 1000 - now) / 864e5) : null, tag = row.querySelector('.earn');
+    const t = raw[sym]?.earnings_release_next_date, days = earningsDays(sym), tag = row.querySelector('.earn');
     const show = days != null && days >= 0 && days <= 7;
     tag.hidden = !show;
     if (show) { tag.textContent = days === 0 ? 'today' : days + 'd'; tag.classList.toggle('soon', days <= 1);
       tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
   }
+}
+const earningsDays = sym => { const t = raw[sym]?.earnings_release_next_date; return t ? Math.round((t * 1000 - Date.now()) / 864e5) : null; };
+function updateEarnings() {
+  const l = state.lists.find(x => x.auto === 'earnings'), g = l?.groups.find(x => x.auto); if (!g) return;
+  const manual = new Set(l.groups.filter(x => !x.auto).flatMap(x => x.symbols));
+  const next = [...new Set(state.lists.filter(x => x !== l).flatMap(flatSymbols))]
+    .filter(sy => !manual.has(sy) && (d => d != null && d >= 0 && d <= 7)(earningsDays(sy)))
+    .sort((a, b) => earningsDays(a) - earningsDays(b));
+  if (next.join() === g.symbols.join()) return;
+  g.symbols = next; save();
+  if (activeList() === l) renderRows();
+  patchChips();
 }
 function renderHeader() {
   const l = activeList(), v = listValue(l);
@@ -1107,6 +1144,7 @@ function renderQuotes() {
   // In sorted view, re-order at most every 3 s and never under a finger or an open sheet.
   if (state.sort && Date.now() - lastSortRender > 3000 && !press && $('sheet').hidden) renderRows();
   else patchRows(true);
+  if (!press) updateEarnings();
   patchChips();
   renderHeader();
   renderDetails();
@@ -1267,21 +1305,37 @@ document.addEventListener('keydown', e => {
 
 function openRowMenu(sym, gi) {
   const l = activeList(), g = l.groups[gi];
-  const i = g ? g.symbols.indexOf(sym) : -1, ordered = g && !state.sort;   // up/down only in the user's own order
+  const i = g ? g.symbols.indexOf(sym) : -1, ordered = g && !g.auto && !state.sort;   // up/down only in the user's own order
   const opts = [`<button class="opt" data-o="details">${ICON.details}Details</button>`];
+  if (state.lists.length > 1) opts.push(`<button class="opt" data-o="add">${ICON.add}Add to list</button>`);
   if (ordered && i > 0) opts.push(`<button class="opt" data-o="up">${ICON.up}Move up</button>`);
   if (ordered && i >= 0 && i < g.symbols.length - 1) opts.push(`<button class="opt" data-o="down">${ICON.down}Move down</button>`);
-  opts.push(`<button class="opt danger" data-o="rm">${ICON.rm}Remove from ${esc(l.name)}</button>`);
+  if (!g?.auto) opts.push(`<button class="opt danger" data-o="rm">${ICON.rm}Remove from ${esc(l.name)}</button>`);
   openSheet('row', `${short(sym)} · ${sym.split(':')[0]}`, opts.join(''));
   $('shBody').onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
     if (o === 'details') { if (isPhone()) toggleDetails(sym); else { closeSheet(); if (sym !== state.symbol) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); } }
+    if (o === 'add') openCopySheet(sym);
     if (o === 'up') { closeSheet(); moveSymbol(sym, gi, gi, i - 1); }
     if (o === 'down') { closeSheet(); moveSymbol(sym, gi, gi, i + 1); }
     if (o === 'rm') { closeSheet(); removeSymbol(sym, gi); }
   };
 }
 
+function openCopySheet(sym) {   // add the symbol to another list (it stays in this one)
+  const others = state.lists.filter(x => x.id !== state.activeListId);
+  const own = x => x.groups.filter(g => !g.auto).flatMap(g => g.symbols);   // the Earnings list's auto group doesn't count as "there"
+  openSheet('copy', `Add ${short(sym)} to`, others.map(x => `<button class="opt" data-l="${esc(x.id)}">${esc(x.name)}<span class="c">${own(x).includes(sym) ? 'already there' : own(x).length}</span></button>`).join(''));
+  $('shBody').onclick = e => {
+    const b = e.target.closest('[data-l]'); if (!b) return;
+    const x = state.lists.find(y => y.id === b.dataset.l); closeSheet();
+    if (!x || own(x).includes(sym)) { toast(`${short(sym)} is already in ${x?.name}`); return; }
+    if (!x.groups.length) x.groups.push({ name: 'Main', collapsed: false, symbols: [] });
+    x.groups[x.groups.length - 1].symbols.push(sym); save(); updateEarnings(); patchChips(); wsSync();
+    if (activeList() === x) renderRows();
+    toast(`${short(sym)} added to ${x.name}`);
+  };
+}
 $('seg').addEventListener('click', e => { const b = e.target.closest('[data-iv]'); if (b) setChartInterval(b.dataset.iv); });
 
 // Search: TradingView symbol search through the relay (scanner fallback). Tap a result → chart; + → add to the active list.
@@ -1384,7 +1438,7 @@ function openListManager() {
     const row = b.closest('.lm'), l = row && state.lists.find(x => x.id === row.dataset.id); if (!l) return;
     if (b.dataset.lm === 'up' || b.dataset.lm === 'down') {
       const i = state.lists.indexOf(l), j = i + (b.dataset.lm === 'up' ? -1 : 1);
-      if (j < 0 || j >= state.lists.length) return;
+      if (j < 0 || j >= state.lists.length || l.auto || state.lists[j].auto) return;
       [state.lists[i], state.lists[j]] = [state.lists[j], state.lists[i]];
       save(); renderChips(); renderListManager();
     }
@@ -1393,6 +1447,7 @@ function openListManager() {
       save(); patchChips(); renderHeader(); renderListManager();
     }
     if (b.dataset.lm === 'del') {
+      if (l.auto) { toast('The Earnings list fills itself and stays'); return; }
       if (state.lists.length === 1) { toast('Keep at least one list'); return; }
       if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Delete?'; return; }
       state.lists = state.lists.filter(x => x !== l);
@@ -1407,9 +1462,9 @@ function renderListManager() {
   $('shBody').innerHTML = state.lists.map((l, i) => `<div class="lm" data-id="${esc(l.id)}">
       <input class="field" value="${esc(l.name)}" aria-label="List name" data-name>
       <button class="ib sig${l.summary ? ' on' : ''}" data-lm="sig" title="Sentiment % for this list">Σ</button>
-      <button class="ib" data-lm="up" title="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
-      <button class="ib" data-lm="down" title="Move down" ${i === state.lists.length - 1 ? 'disabled' : ''}>↓</button>
-      <button class="ib del" data-lm="del" title="Delete list">✕</button></div>`).join('')
+      <button class="ib" data-lm="up" title="Move up" ${i === 0 || l.auto ? 'disabled' : ''}>↑</button>
+      <button class="ib" data-lm="down" title="Move down" ${i >= state.lists.length - 1 || state.lists[i + 1].auto || l.auto ? 'disabled' : ''}>↓</button>
+      <button class="ib del" data-lm="del" title="${l.auto ? 'Fills itself from the other lists' : 'Delete list'}" ${l.auto ? 'disabled' : ''}>✕</button></div>`).join('')
     + `<form class="lmnew" id="lmnew"><input class="field" id="lmname" placeholder="New list name" autocomplete="off"><button>Add</button></form>`
     + `<div class="sync" id="syncBox"></div>`;
   renderSyncBox();
@@ -1422,7 +1477,7 @@ function renderListManager() {
     e.preventDefault();
     const name = $('lmname').value.trim(); if (!name) return;
     const l = { id: 'l' + uid(), name, summary: true, groups: [{ name: 'Main', collapsed: false, symbols: [] }] };
-    state.lists.push(l); state.activeListId = l.id; save(); render(); renderListManager();
+    state.lists.push(l); ensureEarnings(state); state.activeListId = l.id; save(); render(); renderListManager();
     toast(`${name} created`);
   });
 }
@@ -1509,10 +1564,11 @@ document.addEventListener('click', e => {
     case 'toggle-chart': state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
     case 'sheet-close': closeSheet(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
-    case 'row-details': case 'row-up': case 'row-down': case 'row-rm': {
+    case 'row-details': case 'row-add': case 'row-up': case 'row-down': case 'row-rm': {
       e.stopPropagation();
       const act = el.dataset.act, r = el.closest('.row'), sym = r.dataset.sym, gi = +r.dataset.g, g = activeList().groups[gi], i = g ? g.symbols.indexOf(sym) : -1;
       if (act === 'row-details') { if (sym !== state.symbol && !noChart(sym)) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); }
+      if (act === 'row-add') openCopySheet(sym);
       if (act === 'row-up' && i > 0) moveSymbol(sym, gi, gi, i - 1);
       if (act === 'row-down' && i >= 0) moveSymbol(sym, gi, gi, i + 1);
       if (act === 'row-rm') removeSymbol(sym, gi);
@@ -1537,7 +1593,7 @@ rowsEl.addEventListener('pointermove', e => {
   const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
   if (!press.armed) { if (dist > 8) { clearTimeout(press.timer); press = null; } return; }
   if (!press.drag) {
-    if (dist < 6 || state.sort) return;
+    if (dist < 6 || state.sort || press.row.classList.contains('auto')) return;
     press.drag = true; press.row.classList.add('dragging');
     try { rowsEl.setPointerCapture(e.pointerId); } catch (_) {}
   }
@@ -1557,9 +1613,11 @@ function updateDrop(y) {
     target = it; after = true;
   }
   if (!target) { press.pos = null; return; }
+  const g = activeList().groups[+target.dataset.g];
+  if (g?.auto) { press.pos = null; return; }
   if (target.classList.contains('gh')) { target.classList.add('drop-into'); press.pos = { g: +target.dataset.g, index: 0 }; return; }
   target.classList.add(after ? 'drop-after' : 'drop-before');
-  const g = activeList().groups[+target.dataset.g], i = g.symbols.indexOf(target.dataset.sym);
+  const i = g.symbols.indexOf(target.dataset.sym);
   press.pos = { g: +target.dataset.g, index: i + (after ? 1 : 0) };
 }
 function endPress(cancel) {
