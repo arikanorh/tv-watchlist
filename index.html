@@ -461,7 +461,7 @@
     .mleg { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: var(--muted); font-size: 11px; }
     .mleg span { display: flex; align-items: center; gap: 5px; }
     .mleg i { width: 7px; height: 7px; }
-    .cload { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; flex-shrink: 0; }
+    .cload { position: absolute; top: 10px; right: 8px; z-index: 5; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }   /* top-right corner of the chart */
     @keyframes spin { to { transform: rotate(360deg); } }
     .ivbtn { display: none; }
     .ivbtn svg { width: 14px; height: 14px; color: var(--muted); }
@@ -551,7 +551,7 @@
     <div id="dbody"></div>
   </aside>
   <section class="pane chartpane" id="chartWrap" aria-label="Chart">
-    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button></div><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
+    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button></div><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -582,7 +582,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '4.8';  // bump on every push to main
+const APP_VERSION = '4.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1246,7 +1246,7 @@ function ownRequest(sym, iv) {
 }
 // Scrolling past the oldest bar asks the socket for 300 more (request_more_data), debounced so a long scroll sends one request.
 function ownMaybeMore(range) {
-  if (!range || !own.loaded || own.loadingMore || own.noMore || range.from > 20) return;
+  if (!range || !own.loaded || own.loadingMore || own.noMore || range.from >= 0) return;   // only once the view reaches past the oldest bar
   clearTimeout(own.moreTimer);
   own.moreTimer = setTimeout(() => {
     if (!own.ws || own.ws.readyState !== 1 || own.loadingMore || own.noMore) return;
@@ -1455,7 +1455,7 @@ function openGroupMenu(gi) {
   openSheet('group', g.name, `<form class="lmnew" id="gname"><input class="field" value="${esc(g.name)}" aria-label="Section name" autocomplete="off"><button>Rename</button></form>
     <button class="opt" data-o="up"${movable && gi > first ? '' : ' disabled'}>${ICON.up}Move up</button>
     <button class="opt" data-o="down"${movable && gi < last ? '' : ' disabled'}>${ICON.down}Move down</button>
-    <button class="opt danger" data-o="del"${own < 2 ? ' disabled' : ''}>${ICON.rm}Delete section${g.symbols.length ? '<span class="c">symbols stay in the list</span>' : ''}</button>`);
+    <button class="opt danger" data-o="del"${own < 2 && gi !== first ? ' disabled' : ''}>${ICON.rm}${gi === first ? 'Remove section header' : 'Delete section'}${g.symbols.length ? '<span class="c">symbols stay in the list</span>' : ''}</button>`);
   $('gname').addEventListener('submit', e => {
     e.preventDefault();
     const v = $('gname').querySelector('input').value.trim(); if (!v || v === g.name) { closeSheet(); return; }
@@ -1465,10 +1465,11 @@ function openGroupMenu(gi) {
   $('shBody').onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return; closeSheet();
     if (o === 'del') {
-      const snap = JSON.stringify(gs), into = gs[gi - 1] && !gs[gi - 1].auto ? gs[gi - 1] : gs.slice(gi + 1).find(x => !x.auto);
-      if (into === gs[gi - 1]) into.symbols.push(...g.symbols); else into.symbols.unshift(...g.symbols);
-      gs.splice(gi, 1); save(); renderRows();
-      undoable(`${g.name} deleted`, () => { l.groups = JSON.parse(snap); save(); renderRows(); });
+      const snap = JSON.stringify(gs), name = g.name;
+      if (gi === first) { g.name = ''; g.collapsed = false; }   // the list now starts without a section
+      else { gs[gi - 1].symbols.push(...g.symbols); gs.splice(gi, 1); }
+      save(); renderRows();
+      undoable(`${name || 'Section header'} ${gi === first ? 'removed' : 'deleted'}`, () => { l.groups = JSON.parse(snap); save(); renderRows(); });
     }
     else moveGroup(gi, gi + (o === 'up' ? -1 : 1));
   };
@@ -1492,9 +1493,9 @@ function renderRows() {
     html += ghHtml(state.sort === 'ext' ? 'By ext' : 'By change', rest.length, null, false, true) + rest.map(sy => rowHtml(sy, giOf(sy))).join('');
     lastSortRender = Date.now();
   } else {
-    const single = l.groups.length === 1;
+    const single = l.groups.length === 1, first = l.groups.findIndex(g => !g.auto);
     l.groups.forEach((g, gi) => {
-      if (!single) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false);
+      if (!single && !(gi === first && !g.name)) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false);
       if (single || !g.collapsed) html += g.symbols.map((sy, i) => rowHtml(sy, gi, i, g.symbols.length)).join('');
       if (g.auto && !g.symbols.length && !g.collapsed) html += '<div class="empty">No earnings within 7 days in your lists.</div>';
     });
@@ -1686,7 +1687,7 @@ function placeTools() {   // the session/tick/toggle block stays in the header (
   if (pins.parentElement !== pdest) pdest.insertBefore(pins, before);
   // desktop: the search box and the interval buttons float over the chart's top-left corner
   const cover = $('cover'), sb = $('sbtn'), seg = $('seg');
-  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg); } }
+  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg); } }   // order: search, market dot, intervals
   else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend(sb); document.querySelector('.ctools').prepend(seg); } }
   renderPins();
 }
