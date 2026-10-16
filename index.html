@@ -589,7 +589,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '5.5';  // bump on every push to main
+const APP_VERSION = '5.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1370,7 +1370,8 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
   paint();
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-co], [data-cs]'); if (!b) return;
-    if (b.dataset.cs) setChartOpt('session', b.dataset.cs); else setChartOpt(b.dataset.co, !chartOpts()[b.dataset.co]);
+    if (b.dataset.cs) { setChartOpt('session', b.dataset.cs); closeChartMenu(); return; }   // a session choice closes the menu; checkboxes keep it open
+    setChartOpt(b.dataset.co, !chartOpts()[b.dataset.co]);
     paint();
   });
   m.addEventListener('click', e => { const h = e.target.closest('.ci.sub'); if (h) h.parentElement.classList.toggle('open'); });   // click opens the submenu too (touchpads)
