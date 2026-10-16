@@ -534,7 +534,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '3.7';  // bump on every push to main
+const APP_VERSION = '3.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1700,6 +1700,8 @@ function openCopySheet(sym) {   // add the symbol to another list (it stays in t
   };
 }
 $('seg').addEventListener('click', e => { const b = e.target.closest('[data-iv]'); if (b) setChartInterval(b.dataset.iv); });
+// The list chips scroll sideways; a mouse wheel (vertical) scrolls them too.
+$('chips').addEventListener('wheel', e => { const el = $('chips'); if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return; el.scrollLeft += e.deltaY; e.preventDefault(); }, { passive: false });
 
 // Search: TradingView symbol search through the relay (scanner fallback). Tap a result → chart; + → add to the active list.
 const RELAY_HTTP = RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '');
