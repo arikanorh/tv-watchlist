@@ -117,8 +117,6 @@
   .earn { flex-shrink: 0; font-style: normal; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 5px; border-radius: 4px;
     color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
   .earn.soon { background: var(--pre); color: var(--bg); }
-  .row .rt { display: none; }   /* row tools: desktop hover only */
-  .row.auto .rt [data-act="row-up"], .row.auto .rt [data-act="row-down"], .row.auto .rt [data-act="row-rm"] { display: none; }   /* auto-filled rows (Earnings › Upcoming) */
   .opt svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted); }
   .opt.danger svg { color: inherit; }
   .row.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); transform: scale(1.015); z-index: 3; }
@@ -188,11 +186,15 @@
   .cmenu .ci.on i { background: var(--accent); border-color: var(--accent); }
   .cmenu .subw { position: relative; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
   .cmenu .ci.sub .cv { margin-left: auto; font-size: 12px; color: var(--muted); }
-  .cmenu .submenu { display: none; position: absolute; right: calc(100% + 6px); bottom: 0; min-width: 150px; padding: 4px; border-radius: 9px; background: var(--bg2); border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(0, 0, 0, .55); }
+  /* The flyout touches the menu (the gap is a transparent border) so the pointer can cross over without closing it */
+  .cmenu .submenu { display: none; position: absolute; right: 100%; bottom: 0; min-width: 150px; padding: 4px; border-radius: 9px; background: var(--bg2); border: 1px solid var(--line); border-right: 6px solid transparent; background-clip: padding-box; box-shadow: 0 10px 28px rgba(0, 0, 0, .55); }
   .cmenu .subw:hover .submenu, .cmenu .subw.open .submenu { display: block; }
-  .cmenu.flip .submenu { right: auto; left: calc(100% + 6px); }
+  .cmenu.flip .submenu { right: auto; left: 100%; border-right: 1px solid var(--line); border-left: 6px solid transparent; }
   .cmenu.rowctx { position: fixed; right: auto; bottom: auto; z-index: 60; min-width: 200px; }
   .cmenu.rowctx .submenu { top: 0; bottom: auto; }
+  .cmenu .cname { display: flex; gap: 6px; padding: 4px 4px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .cmenu .cname input { flex: 1; min-width: 0; height: 30px; font-size: 13px; }
+  .cmenu .cname button { height: 30px; padding: 0 10px; border-radius: 6px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; }
   .cmenu .ci svg { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
   .cmenu .ci.danger { color: var(--down); } .cmenu .ci.danger svg { color: inherit; }
   .cmenu .ci.danger.armed { background: var(--down); color: #fff; }
@@ -212,7 +214,7 @@
   .sbtn .q { display: none; }
   /* Interval: segmented control. Phones: under the chart (thumb side). Desktop: on top of the chart. */
   .ctools { order: 2; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg2); border-top: 1px solid var(--line); }
-  .ivbtn, .tver, .ltab, .tseg-top { display: none; }
+  .ivbtn, .tver, .ltab, .tseg-top, .cover { display: none; }   /* desktop-only chrome */
   /* Pinned symbols on phones: inside the header, one line between the list name and the clock (scrolls if tight) */
   .pins { flex: 1; min-width: 0; display: flex; justify-content: flex-start; gap: 0; overflow-x: auto; scrollbar-width: none; margin: 0 2px; }
   .pins::-webkit-scrollbar { display: none; }
@@ -418,16 +420,6 @@
     .row { height: 36px; font-size: 14px; }
     .addrow { padding: 8px 14px 12px; }
     .addrow button { height: 32px; font-size: 13px; }
-    .row .rt { position: absolute; right: 0; top: 0; bottom: 0; display: none; align-items: center; gap: 2px; padding: 0 6px 0 10px;
-      background: linear-gradient(90deg, transparent, var(--bg2) 10px); }
-    .row:hover .rt { display: flex; }
-    .row .rt button { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
-    .row .rt button:hover { background: var(--bg3); color: var(--text); }
-    .row .rt button.danger:hover { color: var(--down); }
-    .row .rt button.danger.armed, .row .rt button.danger.armed:hover { background: var(--down); color: #fff; }
-    .row .rt button[disabled] { opacity: .3; pointer-events: none; }
-    body.sorted .row .rt button[data-act="row-up"], body.sorted .row .rt button[data-act="row-down"] { display: none; }
-    .row .rt svg { width: 15px; height: 15px; }
     .fl { display: block; }
     .row:hover:not(.flagged) .fl { background: var(--muted); opacity: .35; }
     .row:hover:not(.flagged) .fl:hover { opacity: .6; }
@@ -597,7 +589,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '5.3';  // bump on every push to main
+const APP_VERSION = '5.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1511,6 +1503,38 @@ function openRowCtx(sym, gi, x, y) {
   if (x + w + 160 > innerWidth) m.classList.remove('flip');   // submenus fly left near the right edge
   setTimeout(() => document.addEventListener('pointerdown', closeRowCtxOutside), 0);
 }
+function openGroupCtx(gi, x, y) {
+  closeRowCtx(); closeChartMenu();
+  const l = activeList(), gs = l.groups, g = gs[gi]; if (!g || g.auto) return;
+  const first = gs.findIndex(q => !q.auto), last = gs.length - 1, movable = groupMovable(gi), own = gs.filter(q => !q.auto).length;
+  const m = document.createElement('div'); m.className = 'cmenu rowctx flip'; m.id = 'rowctx';
+  m.innerHTML = `<form class="cname" id="gname"><input class="field" value="${esc(g.name)}" placeholder="Section name" aria-label="Section name" autocomplete="off"><button>Rename</button></form>
+    ${movable && gi > first ? `<button class="ci" data-o="up">${ICON.up}Move up</button>` : ''}
+    ${movable && gi < last ? `<button class="ci" data-o="down">${ICON.down}Move down</button>` : ''}
+    <button class="ci danger" data-o="del"${own < 2 && gi !== first ? ' disabled' : ''}>${ICON.rm}${gi === first ? 'Remove section header' : 'Delete section'}</button>`;
+  m.querySelector('#gname').addEventListener('submit', e => {
+    e.preventDefault(); const v = m.querySelector('input').value.trim(); if (!v || v === g.name) { closeRowCtx(); return; }
+    if (gs.some(q => q !== g && q.name.toLowerCase() === v.toLowerCase())) { toast(`${v} already exists`); return; }
+    g.name = v; save(); renderRows(); closeRowCtx();
+  });
+  m.addEventListener('click', e => {
+    const b = e.target.closest('[data-o]'); if (!b) return;
+    const o = b.dataset.o;
+    if (o === 'del') {
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.lastChild.textContent = ` ${gi === first ? 'Remove header' : 'Delete'}? Click again`; return; }
+      const snap = JSON.stringify(gs), name = g.name;
+      if (gi === first) { g.name = ''; g.collapsed = false; } else { gs[gi - 1].symbols.push(...g.symbols); gs.splice(gi, 1); }
+      save(); renderRows(); closeRowCtx();
+      undoable(`${name || 'Section header'} ${gi === first ? 'removed' : 'deleted'}`, () => { l.groups = JSON.parse(snap); save(); renderRows(); });
+      return;
+    }
+    closeRowCtx(); moveGroup(gi, gi + (o === 'up' ? -1 : 1));
+  });
+  document.body.appendChild(m);
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(4, Math.min(x, innerWidth - w - 4)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - h - 4)) + 'px';
+  setTimeout(() => { document.addEventListener('pointerdown', closeRowCtxOutside); m.querySelector('input').select(); }, 0);
+}
 function closeRowCtx() { $('rowctx')?.remove(); document.removeEventListener('pointerdown', closeRowCtxOutside); }
 function closeRowCtxOutside(e) { if (!e.target.closest('#rowctx')) closeRowCtx(); }
 function openGroupMenu(gi) {
@@ -1542,7 +1566,7 @@ function openGroupMenu(gi) {
 const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
     <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
-    <span class="rt"><button data-act="row-details" title="Details">${ICON.details}</button><button data-act="row-add" title="Add to another list">${ICON.add}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
+</div>`;
 let lastSortRender = 0;
 function renderRows() {
   const l = activeList(), all = flatSymbols(l);
@@ -2193,20 +2217,7 @@ document.addEventListener('click', e => {
     case 'pin': selectSymbol(el.dataset.sym, false); break;
     case 'add-section': addSection(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
-    case 'row-flag': case 'row-details': case 'row-add': case 'row-up': case 'row-down': case 'row-rm': {
-      e.stopPropagation();
-      const act = el.dataset.act, r = el.closest('.row'), sym = r.dataset.sym, gi = +r.dataset.g, g = activeList().groups[gi], i = g ? g.symbols.indexOf(sym) : -1;
-      if (act === 'row-details') { if (sym !== state.symbol) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); }
-      if (act === 'row-flag') cycleFlag(sym);
-      if (act === 'row-add') openCopySheet(sym);
-      if (act === 'row-up' && i > 0) moveSymbol(sym, gi, gi, i - 1);
-      if (act === 'row-down' && i >= 0) moveSymbol(sym, gi, gi, i + 1);
-      if (act === 'row-rm') {
-        if (!el.classList.contains('armed')) { el.classList.add('armed'); el.title = 'Click again to remove'; setTimeout(() => { el.classList.remove('armed'); el.title = 'Remove from list'; }, 3000); break; }
-        removeSymbol(sym, gi);
-      }
-      break;
-    }
+    case 'row-flag': { e.stopPropagation(); cycleFlag(el.closest('.row').dataset.sym); break; }
   }
 });
 
@@ -2216,7 +2227,7 @@ document.addEventListener('click', e => {
 const rowsEl = $('rows');
 let press = null, suppressClick = false;
 rowsEl.addEventListener('pointerdown', e => {
-  if (e.button > 0 || e.target.closest('.rt, .fl')) return;
+  if (e.button > 0 || e.target.closest('.fl')) return;
   const row = e.target.closest('.row, .gh[data-g]'); if (!row) return;
   const group = row.classList.contains('gh');
   press = { row, group, id: e.pointerId, type: e.pointerType, x: e.clientX, y: e.clientY, armed: false, drag: false, pos: null,
@@ -2317,7 +2328,7 @@ rowsEl.addEventListener('click', e => {
 rowsEl.addEventListener('contextmenu', e => {
   const row = e.target.closest('.row, .gh[data-g]'); if (!row) return;
   e.preventDefault();
-  if (!press || press.type === 'mouse') { if (press) endPress(true); row.classList.contains('gh') ? openGroupMenu(+row.dataset.g) : (isPhone() ? openRowMenu(row.dataset.sym, +row.dataset.g) : openRowCtx(row.dataset.sym, +row.dataset.g, e.clientX, e.clientY)); }
+  if (!press || press.type === 'mouse') { if (press) endPress(true); row.classList.contains('gh') ? (isPhone() ? openGroupMenu(+row.dataset.g) : openGroupCtx(+row.dataset.g, e.clientX, e.clientY)) : (isPhone() ? openRowMenu(row.dataset.sym, +row.dataset.g) : openRowCtx(row.dataset.sym, +row.dataset.g, e.clientX, e.clientY)); }
 });
 
 // ================= iOS niceties =================
