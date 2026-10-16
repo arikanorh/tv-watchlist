@@ -472,6 +472,7 @@
     .ltab svg { width: 14px; height: 14px; }
     .ltab:hover { color: var(--text); background: var(--accent); }
     body.list-hidden .ltab { left: 6px; }
+    body.list-hidden .ctools { padding-left: 36px; }   /* room for the tab, so it doesn't sit on the first pin */
     body.list-hidden .ltab svg { transform: scaleX(-1); }
     body.chart-hidden .ltab { display: none; }
     .ltog { margin-left: auto; align-self: center; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--bg3); }
@@ -562,7 +563,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '4.3';  // bump on every push to main
+const APP_VERSION = '4.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1199,6 +1200,7 @@ async function showOwnChart(sym) {
     const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
     el.insertAdjacentHTML('beforeend', '<button class="copts" data-act="chart-opts" title="Chart settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>');
     own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownCountdown);
+    own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownMaybeMore);
     own.chart.subscribeCrosshairMove(ownCountdown);
     setInterval(ownCountdown, 1000);
   }
@@ -1210,7 +1212,7 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.vol?.setData([]); own.data = null; own.loaded = false;
+  own.series?.setData([]); own.vol?.setData([]); own.data = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer);
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
@@ -1219,6 +1221,17 @@ function ownRequest(sym, iv) {
   const want = chartOpts().session, session = want === '24h' && !US_EX.has(sym.split(':')[0]) ? 'extended' : want;
   f('resolve_symbol', [cs, 'sym_' + n, '={"symbol":"' + sym + '","adjustment":"splits","session":"' + session + '"}']);
   f('create_series', [cs, 'ser_' + n, 's' + n, 'sym_' + n, iv, 300, '']);
+}
+// Scrolling past the oldest bar asks the socket for 300 more (request_more_data), debounced so a long scroll sends one request.
+function ownMaybeMore(range) {
+  if (!range || !own.loaded || own.loadingMore || own.noMore || range.from > 20) return;
+  clearTimeout(own.moreTimer);
+  own.moreTimer = setTimeout(() => {
+    if (!own.ws || own.ws.readyState !== 1 || own.loadingMore || own.noMore) return;
+    own.loadingMore = true;
+    own.ws.send(frame({ m: 'request_more_data', p: [own.sid, 'ser_' + own.n, 300] }));
+    setTimeout(() => { own.loadingMore = false; }, 8000);   // give up quietly if nothing comes back
+  }, 300);
 }
 function ownConnect() {
   const w = own.ws = new WebSocket(IS_LOCAL || !RELAY_WS ? WS_DIRECT : RELAY_WS);
@@ -1231,9 +1244,18 @@ function ownConnect() {
       if (m.m === 'timescale_update' || m.m === 'du') {
         const ser = Object.values(m.p[1] || {}).find(x => x && Array.isArray(x.s)); if (!ser) continue;
         const bars = ser.s.map(b => ownBar(b.v)).filter(Boolean).sort((a, b) => a.time - b.time);
-        // The first timescale_update carries the history; later ones (a new bar opening) and du carry only the changed bars.
+        // The first timescale_update carries the history; later ones (a new bar opening, or older bars after request_more_data)
+        // and du carry only the changed bars. Older bars can't go through series.update, so they are merged and the series reset.
         if (!own.loaded) { own.loaded = true; own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; }   // all bars + 2 empty slots before the axis
-        else for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } }
+        else if (own.data && bars.length && bars[0].time < own.data[0].time) {
+          const older = bars.filter(b => b.time < own.data[0].time), n = older.length;
+          own.data = [...older, ...own.data.filter(b => b.time >= own.data[0].time)];
+          const vr = own.chart.timeScale().getVisibleLogicalRange();
+          own.series.setData(own.data); own.vol.setData(chartOpts().volume ? own.data.map(volBar) : []);
+          if (vr) own.chart.timeScale().setVisibleLogicalRange({ from: vr.from + n, to: vr.to + n });   // keep what was on screen in place
+          own.loadingMore = false; if (!n) own.noMore = true;
+        }
+        else { for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } } if (own.loadingMore && m.m === 'timescale_update') { own.loadingMore = false; own.noMore = true; } }
         if (bars.length) { own.last = bars[bars.length - 1]; ownCountdown(); }
       }
       if (m.m === 'symbol_error' || m.m === 'series_error') toast(`${short(own.want?.sym || '')}: no chart data`);

@@ -155,6 +155,7 @@ Server → client:
 - `symbol_resolved` → `series_loading` → `timescale_update` (the history: `p[1].ser_1.s = [{i, v:[time, open, high, low, close, volume]}, …]`, `time` in UTC seconds) → `series_completed`.
 - `du` = incremental update, same shape, usually just the last bar.
 - **When a new bar opens the server sends another `timescale_update` that contains only the new bar(s)** — it is not a full reload. Treat only the first `timescale_update` after `create_series` as the full series; merge every later one like `du` (bug seen as "the chart shows one giant bar").
+- `{"m":"request_more_data","p":["cs_1","ser_1",300]}` asks for 300 older bars; they arrive as another `timescale_update` holding only the older bars (empty `s` when there is nothing more).
 - Errors: `symbol_error`, `series_error`, `critical_error`.
 
 Rendering: Lightweight Charts 4.2 (`unpkg.com/lightweight-charts@4.2.0`, Apache-2.0, attribution kept in Settings). The library draws times as UTC, so intraday bar times are shifted by the local offset before `setData`; daily/weekly are not. Our own price label, session shading (phase from the bar's ET time: <04:00 night, <09:30 pre, <16:00 regular, <20:00 post, else night) and volume histogram sit on top of it.
