@@ -589,7 +589,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '5.7';  // bump on every push to main
+const APP_VERSION = '5.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1233,6 +1233,7 @@ async function showOwnChart(sym) {
     el.insertAdjacentHTML('beforeend', '<button class="copts" data-act="chart-opts" title="Chart settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>');
     own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownCountdown);
     own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownMaybeMore);
+    own.chart.timeScale().subscribeVisibleLogicalRangeChange(() => { clearTimeout(own.hiloT); own.hiloT = setTimeout(ownHiLo, 120); });
     own.chart.subscribeCrosshairMove(ownCountdown);
     setInterval(ownCountdown, 1000);
   }
@@ -1254,6 +1255,18 @@ function ownRequest(sym, iv) {
   const want = chartOpts().session, session = want === '24h' && !US_EX.has(sym.split(':')[0]) ? 'extended' : want;
   f('resolve_symbol', [cs, 'sym_' + n, '={"symbol":"' + sym + '","adjustment":"splits","session":"' + session + '"}']);
   f('create_series', [cs, 'ser_' + n, 's' + n, 'sym_' + n, iv, 300, '']);
+}
+// Highest / lowest bar of the visible range: a marker with the price above / below that bar (chart option "Visible high / low").
+function ownHiLo() {
+  if (!own.series) return;
+  const vr = own.chart.timeScale().getVisibleLogicalRange();
+  if (!chartOpts().hilo || !own.data?.length || !vr) { own.series.setMarkers([]); return; }
+  const a = Math.max(0, Math.floor(vr.from)), b = Math.min(own.data.length - 1, Math.ceil(vr.to));
+  let hi = null, lo = null;
+  for (let i = a; i <= b; i++) { const d = own.data[i]; if (!hi || d.high > hi.high) hi = d; if (!lo || d.low < lo.low) lo = d; }
+  if (!hi || !lo) { own.series.setMarkers([]); return; }
+  const ms = [{ time: hi.time, position: 'aboveBar', color: '#089981', shape: 'arrowDown', text: fmtPrice(hi.high) }, { time: lo.time, position: 'belowBar', color: '#f23645', shape: 'arrowUp', text: fmtPrice(lo.low) }];
+  own.series.setMarkers(ms.sort((x, y) => x.time - y.time));
 }
 // Scrolling past the oldest bar asks the socket for 300 more (request_more_data), debounced so a long scroll sends one request.
 function ownMaybeMore(range) {
@@ -1290,6 +1303,7 @@ function ownConnect() {
           ownMaybeMore(own.chart.timeScale().getVisibleLogicalRange());   // still short of the left edge? ask again
         }
         else { for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } } if (own.loadingMore && m.m === 'timescale_update' && !bars.length) { own.loadingMore = false; own.noMore = true; } }   // an empty answer = nothing older; a new live bar meanwhile doesn't count
+        ownHiLo();
         const newest = bars[bars.length - 1];
         if (newest && (!own.last || newest.time >= own.last.time)) { own.last = newest; ownCountdown(); }   // older batches (history) must not move the label
         ownBusy();
@@ -1301,7 +1315,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, session: '24h', ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, session: '24h', ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1346,12 +1360,14 @@ const CHART_OPTS = [
   ['countdown', 'Bar countdown', 'Time left until the current bar closes.'],
   ['sessions', 'Session shading', 'Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).'],
   ['volume', 'Volume', 'Volume bars along the bottom, colored by the candle.'],
+  ['hilo', 'Visible high / low', 'Marks the highest and lowest bar in view with their prices.'],
 ];
 const SESSION_OPTS = [['regular', 'Regular only', 'Just the main session.'], ['extended', 'Extended', 'Pre- and post-market too.'], ['24h', '24 hours', 'Extended plus overnight trading (US stocks, 20:00–04:00 ET).']];
 function setChartOpt(k, on) {
   state.chartOpts = { ...chartOpts(), [k]: on }; save();
   if (k === 'session') { if (own.active) ownRequest(state.symbol, state.interval); }
   else if (k === 'volume') own.vol?.setData(on && own.data ? own.data.map(volBar) : []);
+  else if (k === 'hilo') ownHiLo();
   else ownCountdown();
 }
 // Chart settings: a context-style menu next to the ⚙ on desktop (click toggles, stays open), a sheet on phones.
