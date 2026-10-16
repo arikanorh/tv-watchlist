@@ -532,7 +532,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '3.3';  // bump on every push to main
+const APP_VERSION = '3.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1164,7 +1164,9 @@ function ownRequest(sym, iv) {
   const f = (m, p) => own.ws.send(frame({ m, p }));
   if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
   f('chart_create_session', [cs, '']);
-  f('resolve_symbol', [cs, 'sym_' + n, '={"symbol":"' + sym + '","adjustment":"splits","session":"extended"}']);   // extended: pre/post-market bars too
+  // US stocks: the "24h" session adds the overnight (Blue Ocean) bars to pre/post; everything else gets "extended".
+  const session = US_EX.has(sym.split(':')[0]) && chartOpts().overnight ? '24h' : 'extended';
+  f('resolve_symbol', [cs, 'sym_' + n, '={"symbol":"' + sym + '","adjustment":"splits","session":"' + session + '"}']);
   f('create_series', [cs, 'ser_' + n, 's' + n, 'sym_' + n, iv, 300, '']);
 }
 function ownConnect() {
@@ -1190,7 +1192,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, overnight: true, ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1234,8 +1236,9 @@ function openChartOpts() {
   const o = chartOpts();
   openSheet('chartopts', 'Chart settings', `<label class="setrow"><span><b>Change %</b><small>Day change next to the last price.</small></span><input type="checkbox" data-co="pct"${o.pct ? ' checked' : ''}></label>
     <label class="setrow"><span><b>Bar countdown</b><small>Time left until the current bar closes.</small></span><input type="checkbox" data-co="countdown"${o.countdown ? ' checked' : ''}></label>
-    <label class="setrow"><span><b>Session shading</b><small>Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).</small></span><input type="checkbox" data-co="sessions"${o.sessions ? ' checked' : ''}></label>`);
-  $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (!k) return; state.chartOpts = { ...o, ...(state.chartOpts || {}), [k]: e.target.checked }; save(); ownCountdown(); });
+    <label class="setrow"><span><b>Session shading</b><small>Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).</small></span><input type="checkbox" data-co="sessions"${o.sessions ? ' checked' : ''}></label>
+    <label class="setrow"><span><b>Overnight bars</b><small>US stocks on the 24-hour session: overnight trading (20:00–04:00 ET) between post- and pre-market.</small></span><input type="checkbox" data-co="overnight"${o.overnight ? ' checked' : ''}></label>`);
+  $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (!k) return; state.chartOpts = { ...o, ...(state.chartOpts || {}), [k]: e.target.checked }; save(); if (k === 'overnight' && own.active) ownRequest(state.symbol, state.interval); else ownCountdown(); });
 }
 // Bars arrive in UTC seconds; intraday ones are shifted so the axis shows local time (the library draws times as UTC).
 const ownBar = v => v && v.length >= 5 ? { time: v[0] + (own.intraday ? -new Date().getTimezoneOffset() * 60 : 0), open: v[1], high: v[2], low: v[3], close: v[4] } : null;
