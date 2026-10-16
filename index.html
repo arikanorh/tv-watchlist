@@ -532,7 +532,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '3.5';  // bump on every push to main
+const APP_VERSION = '3.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1143,6 +1143,8 @@ async function showOwnChart(sym) {
       crosshair: { mode: L.CrosshairMode.Normal }, handleScale: { axisPressedMouseMove: true },
     });
     own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false });
+    own.vol = own.chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol', lastValueVisible: false, priceLineVisible: false });
+    own.chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });   // bottom fifth, no axis
     new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width && r.height) own.chart.applyOptions({ width: r.width, height: r.height }); ownCountdown(); }).observe(el);
     el.insertAdjacentHTML('afterbegin', '<div class="sessbg" id="sessbg"></div><button class="ownlogo" data-act="chart-kind" title="Switch to the TradingView chart"><img src="icons/icon-192.png" alt=""></button>');
     const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
@@ -1159,7 +1161,7 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.data = null; own.loaded = false;
+  own.series?.setData([]); own.vol?.setData([]); own.data = null; own.loaded = false;
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
@@ -1181,8 +1183,8 @@ function ownConnect() {
         const ser = Object.values(m.p[1] || {}).find(x => x && Array.isArray(x.s)); if (!ser) continue;
         const bars = ser.s.map(b => ownBar(b.v)).filter(Boolean).sort((a, b) => a.time - b.time);
         // The first timescale_update carries the history; later ones (a new bar opening) and du carry only the changed bars.
-        if (!own.loaded) { own.loaded = true; own.series.setData(bars); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; }   // all bars + 2 empty slots before the axis
-        else for (const b of bars) { try { own.series.update(b); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } }
+        if (!own.loaded) { own.loaded = true; own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; }   // all bars + 2 empty slots before the axis
+        else for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } }
         if (bars.length) { own.last = bars[bars.length - 1]; ownCountdown(); }
       }
       if (m.m === 'symbol_error' || m.m === 'series_error') toast(`${short(own.want?.sym || '')}: no chart data`);
@@ -1192,7 +1194,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, overnight: true, ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, overnight: true, volume: true, ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1237,11 +1239,13 @@ function openChartOpts() {
   openSheet('chartopts', 'Chart settings', `<label class="setrow"><span><b>Change %</b><small>Day change next to the last price.</small></span><input type="checkbox" data-co="pct"${o.pct ? ' checked' : ''}></label>
     <label class="setrow"><span><b>Bar countdown</b><small>Time left until the current bar closes.</small></span><input type="checkbox" data-co="countdown"${o.countdown ? ' checked' : ''}></label>
     <label class="setrow"><span><b>Session shading</b><small>Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).</small></span><input type="checkbox" data-co="sessions"${o.sessions ? ' checked' : ''}></label>
+    <label class="setrow"><span><b>Volume</b><small>Volume bars along the bottom, colored by the candle.</small></span><input type="checkbox" data-co="volume"${o.volume ? ' checked' : ''}></label>
     <label class="setrow"><span><b>Overnight bars</b><small>US stocks on the 24-hour session: overnight trading (20:00–04:00 ET) between post- and pre-market.</small></span><input type="checkbox" data-co="overnight"${o.overnight ? ' checked' : ''}></label>`);
-  $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (!k) return; state.chartOpts = { ...o, ...(state.chartOpts || {}), [k]: e.target.checked }; save(); if (k === 'overnight' && own.active) ownRequest(state.symbol, state.interval); else ownCountdown(); });
+  $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (!k) return; state.chartOpts = { ...o, ...(state.chartOpts || {}), [k]: e.target.checked }; save(); if (k === 'overnight' && own.active) ownRequest(state.symbol, state.interval); else if (k === 'volume') own.vol?.setData(e.target.checked && own.data ? own.data.map(volBar) : []); else ownCountdown(); });
 }
 // Bars arrive in UTC seconds; intraday ones are shifted so the axis shows local time (the library draws times as UTC).
-const ownBar = v => v && v.length >= 5 ? { time: v[0] + (own.intraday ? -new Date().getTimezoneOffset() * 60 : 0), open: v[1], high: v[2], low: v[3], close: v[4] } : null;
+const ownBar = v => v && v.length >= 5 ? { time: v[0] + (own.intraday ? -new Date().getTimezoneOffset() * 60 : 0), open: v[1], high: v[2], low: v[3], close: v[4], vol: v[5] || 0 } : null;
+const volBar = b => ({ time: b.time, value: b.vol, color: b.close >= b.open ? 'rgba(8, 153, 129, .35)' : 'rgba(242, 54, 69, .35)' });
 
 // ================= Rendering =================
 function render() { renderChips(); renderRows(); renderHeader(); renderSentiment(); for (const b of document.querySelectorAll('.sortcol')) b.classList.toggle('on', state.sort === b.dataset.by); document.body.classList.toggle('sorted', !!state.sort); }
