@@ -2,13 +2,14 @@
 
 Personal TradingView-style watchlist: one static `index.html` (vanilla JS, no build, no backend) with live quotes, a TradingView chart widget and multiple watchlists. Goal: reach several lists quickly, see how each is doing (sentiment %), open a symbol's chart when needed. Live at https://arikanorh.github.io/tv-watchlist/ and https://tv-watchlist.pages.dev (both serve `main`). Owner: arikanorh (personal GitHub, not the work GHE).
 
-Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner payloads, widget postMessage API, BOATS overnight, field catalog).
+Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner payloads, widget postMessage API, BOATS overnight, chart websocket, field catalog) and `README.md` for the feature/data-channel overview.
 
 ## Files
 
 | Path | Role |
 |---|---|
-| `index.html` | The whole app: CSS, markup, JS (~1100 lines). Only deliverable. |
+| `README.md` | Feature overview, the five TradingView data channels with "if it breaks" notes, tricks worth knowing. Keep it current when a channel or trick changes. |
+| `index.html` | The whole app: CSS, markup, JS (~2100 lines). Only deliverable. |
 | `manifest.webmanifest`, `icons/` | PWA (iOS home screen, standalone) and favicons (`icon-32`, `icon-192`). `background_color` = nav color. |
 | `relay/worker.js` | Cloudflare Worker: relays the TradingView quote websocket for non-localhost origins, proxies `/search`, keeps synced lists in a `SyncRoom` Durable Object per code (`/state/<code>` REST, `/sync/<code>` websocket push; legacy KV `tv-watchlist-sync` is read once). |
 | `relay/wrangler.toml`, `relay/README.md` | Worker config + deploy notes. |

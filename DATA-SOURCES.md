@@ -135,3 +135,27 @@ Observed 2026-10-13 00:53 ET: the primary listing (e.g. `NASDAQ:NBIS`) reports `
 - 24h Nasdaq 100 / S&P 500 proxies with quotes: `SKILLING:US100`, `SKILLING:SPX500` (CFD), `OKX:US100USDT.P`, `OKX:US500USDT.P` (perp), `CME_MINI:NQ1!`, `CME_MINI:ES1!` (futures, ~23h, 10-min delay).
 - Skilling S&P symbol is `SPX500`, not `US500`.
 - Exchange fixes applied in `SYMBOL_FIXES` (index.html): `CAPITALCOM:US100→NASDAQ:NDX`, `TVC:DJI→DJ:DJI`, `TVC:UKOIL→FX:UKOIL`, `OANDA:XAGUSD→TVC:SILVER`, `AMEX:LEU→NYSE:LEU`, `NASDAQ:EUV→CBOE:EUV`, `NASDAQ:DXYZ→NYSE:DXYZ`, `NASDAQ:NASA→AMEX:NASA`, `NASDAQ:TE→NYSE:TE`, `NYSE:QS→NASDAQ:QS`.
+
+## 6. Chart WebSocket (history + live bars for our own chart)
+
+Same socket and framing as §1 (`wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart`, `~m~len~m~`, `~h~N` heartbeats echoed back). Verified 2026-10-16 with `unauthorized_user_token`; used by `showOwnChart` / `ownRequest` in index.html, through the relay off localhost.
+
+Client → server, in order (one chart session per request; `chart_delete_session` the previous one first):
+```
+{"m":"set_auth_token","p":["unauthorized_user_token"]}
+{"m":"chart_create_session","p":["cs_1",""]}
+{"m":"resolve_symbol","p":["cs_1","sym_1","={\"symbol\":\"NASDAQ:NBIS\",\"adjustment\":\"splits\",\"session\":\"24h\"}"]}
+{"m":"create_series","p":["cs_1","ser_1","s1","sym_1","30",300,""]}
+```
+- Resolution strings: `1`, `5`, `15`, `30`, `60`, `240` (minutes), `D`, `W`. 300 bars arrive in ~400 ms.
+- `session` values: `regular`, `extended` (04:00–20:00 ET for US stocks: pre + regular + post), `24h` (US stocks only: adds the overnight Blue Ocean bars, 20:00–20:00 ET, so the stream is continuous). `24x7` and `night` resolve but return no bars for stocks. Non-US symbols only honour `regular`/`extended`. `symbol_resolved` (p[2]) lists the available `subsessions` (`night:2000-0400`, `24h:2000-2000`, `premarket`, `regular`, `postmarket`, `extended`), `session`, `timezone`.
+- BIST symbols (`BIST:XU100`, stocks) work unauthorized (delayed data) — the free embed widget refuses them, this socket doesn't.
+
+Server → client:
+- `symbol_resolved` → `series_loading` → `timescale_update` (the history: `p[1].ser_1.s = [{i, v:[time, open, high, low, close, volume]}, …]`, `time` in UTC seconds) → `series_completed`.
+- `du` = incremental update, same shape, usually just the last bar.
+- **When a new bar opens the server sends another `timescale_update` that contains only the new bar(s)** — it is not a full reload. Treat only the first `timescale_update` after `create_series` as the full series; merge every later one like `du` (bug seen as "the chart shows one giant bar").
+- Errors: `symbol_error`, `series_error`, `critical_error`.
+
+Rendering: Lightweight Charts 4.2 (`unpkg.com/lightweight-charts@4.2.0`, Apache-2.0, attribution kept in Settings). The library draws times as UTC, so intraday bar times are shifted by the local offset before `setData`; daily/weekly are not. Our own price label, session shading (phase from the bar's ET time: <04:00 night, <09:30 pre, <16:00 regular, <20:00 post, else night) and volume histogram sit on top of it.
+
