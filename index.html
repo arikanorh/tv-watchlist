@@ -9,6 +9,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Watchlist">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Watchlist</title>
 <style>
@@ -95,7 +97,6 @@
   .row.flagged { box-shadow: inset 8px 0 0 var(--c); }   /* the flag is the row's left border */
   .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .row .sym b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row.nochart .sym b { color: var(--muted); font-weight: 500; }
   .row .px, .row .chg, .row .ext { text-align: right; white-space: nowrap; }
   .row .ext { display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 13px; }
   .ss { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
@@ -159,7 +160,24 @@
 
   /* Chart pane */
   .chartpane { position: relative; }
-  #tv_chart { position: relative; flex: 1; min-height: 0; }
+  .charea { position: relative; flex: 1; min-height: 0; }
+  #tv_chart, #ownChart { position: absolute; inset: 0; }
+  #ownChart { z-index: 2; background: var(--bg); }
+  .sessbg { position: absolute; left: 0; top: 0; bottom: 27px; right: 70px; z-index: 1; pointer-events: none; overflow: hidden; }
+  .sessbg i { position: absolute; top: 0; bottom: 0; }
+  .sessbg i.pre { background: rgba(247, 166, 0, .07); } .sessbg i.post { background: rgba(41, 98, 255, .08); } .sessbg i.night { background: rgba(156, 39, 176, .09); }
+  #ownChart .tv-lightweight-charts { position: relative; z-index: 2; }   /* the library's container above the shading, below our label */
+  .plabel { position: absolute; right: 0; z-index: 3; display: flex; flex-direction: column; padding: 2px 0 2px 6px; border-radius: 4px 0 0 4px; font-size: 11px; line-height: 14px; color: #fff; background: #f23645; font-variant-numeric: tabular-nums; pointer-events: none; box-sizing: border-box; }
+  .plabel.up { background: #089981; }
+  .plabel .pr { font-weight: 600; }
+  .ownlogo { position: absolute; left: 10px; bottom: 36px; z-index: 3; width: 36px; height: 36px; padding: 3px; border-radius: 9px; background: var(--bg3); box-shadow: 0 0 0 1px rgba(255, 255, 255, .12), 0 2px 8px rgba(0, 0, 0, .5); display: block; box-sizing: border-box; }
+  .ownlogo img { width: 100%; height: 100%; border-radius: 6px; display: block; }
+  .ownlogo:hover { background: #3a3f4d; }
+  .tvsw { z-index: 3; font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: .02em; display: none; }
+  .charea.widget .tvsw { display: block; }
+  .copts { position: absolute; right: 0; bottom: 0; z-index: 3; width: 72px; height: 27px; display: flex; align-items: center; justify-content: center; color: var(--muted); }   /* the empty corner where the two axes meet */
+  .copts:hover { color: var(--text); background: var(--bg3); }
+  .copts svg { width: 15px; height: 15px; }
   .cbar { position: relative; flex-shrink: 0; display: flex; gap: 8px; padding: 8px 10px; background: var(--bg2); }
   .sbtn { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 12px; background: var(--bg3); color: var(--muted); }
   .sbtn svg { width: 18px; height: 18px; flex-shrink: 0; }
@@ -170,8 +188,9 @@
   /* Pinned symbols on phones: inside the header, one line between the list name and the clock (scrolls if tight) */
   .pins { flex: 1; min-width: 0; display: flex; justify-content: flex-start; gap: 0; overflow-x: auto; scrollbar-width: none; margin: 0 2px; }
   .pins::-webkit-scrollbar { display: none; }
-  .pin { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 38px; padding: 0 5px; border-radius: 6px; font-size: 9.5px; line-height: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
-  .pin b { font-weight: 600; color: var(--text); font-size: 10px; }
+  .pin { flex: none; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; height: 34px; padding: 0 5px; border-radius: 6px; font-size: 10px; line-height: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+  .pin .l2 { display: flex; gap: 4px; align-items: baseline; }
+  .pin b { font-weight: 600; color: var(--text); font-size: 11.5px; }
   .pin .p { color: var(--text); }
   .pin .v { font-weight: 600; }
   .pin.on { background: rgba(255, 255, 255, .08); }
@@ -181,7 +200,7 @@
   .seg { display: flex; gap: 4px; padding: 8px 10px 0; }
   .seg button { flex: 1; height: 36px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); background: var(--bg3); font-variant-numeric: tabular-nums; }
   .seg button.on { color: #fff; background: var(--accent); }
-  #tv_chart { order: 1; }
+  .charea { order: 1; }
   .infobtn { flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--bg3); display: flex; align-items: center; justify-content: center; }
   .infobtn svg { width: 20px; height: 20px; }
   body.details-open .infobtn { background: var(--accent-bg); color: var(--accent); }
@@ -234,6 +253,12 @@
   .lmnew button { flex: none; padding: 0 16px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; }
   /* Sync across devices (inside the list manager) */
   .sync { flex-shrink: 0; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .setrow { display: flex; align-items: center; gap: 12px; padding: 12px; border-top: 1px solid var(--line); cursor: pointer; }
+  .setrow span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .setrow b { font-size: 14px; font-weight: 600; }
+  .setrow small { font-size: 12px; color: var(--muted); }
+  .setrow input { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+  .about a { color: var(--muted); text-decoration: underline; }
   .about { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
   .sync h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
   .sync h4 i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
@@ -272,6 +297,7 @@
   .sent-c { position: relative; }
   .sent svg { display: block; width: 100%; height: 88px; overflow: visible; }
   .sent .line { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
+  .sent .zero { stroke: var(--muted); stroke-opacity: .5; stroke-dasharray: 3 3; }
   .sent .up { stroke: var(--up); } .sent .down { stroke: var(--down); }
   .sent .lbl { font-size: 10px; fill: var(--muted); paint-order: stroke; stroke: var(--bg2); stroke-width: 3px; stroke-linejoin: round; }
   .sent .dot { fill: var(--text); stroke: var(--bg); stroke-width: 1.5; display: none; }
@@ -388,23 +414,27 @@
     .sbtn, .infobtn { height: 38px; border-radius: 10px; }
     .infobtn { width: 38px; }
     .ctools { order: 0; flex-direction: row; align-items: stretch; gap: 6px; height: 50px; padding: 0 8px 0 0; border-top: 0; border-bottom: 1px solid var(--line); }
-    .seg { display: none; }
-    .ivbtn { order: -1; display: flex; align-items: center; gap: 4px; height: auto; align-self: stretch; padding: 0 10px 0 12px; font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+    .cover { position: absolute; left: 8px; top: 8px; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 9px; background: rgba(19, 23, 34, .82); backdrop-filter: blur(4px); }
+    .cover .sbtn { flex: none; height: 32px; padding: 0 10px; border-radius: 6px; gap: 8px; background: var(--bg3); }
+    .cover .sbtn:hover { color: var(--text); }
+    .cover .seg { display: flex; align-items: stretch; gap: 1px; padding: 0; height: 32px; }
+    .ivbtn { display: none; }
     .ivbtn svg { width: 14px; height: 14px; color: var(--muted); }
     .ivbtn:hover { background: var(--bg3); }
     .pins { order: -1; flex: 0 1 auto; justify-content: flex-start; gap: 0; margin: 0; align-items: stretch; overflow: hidden; border-left: 1px solid var(--line); }
-    .pin { height: auto; padding: 0 9px; border-radius: 0; font-size: 10.5px; line-height: 13px; }
-    .pin b { font-size: 11px; }
+    .pin { height: auto; padding: 0 12px; border-radius: 0; font-size: 12px; line-height: 15px; }
+    .pin .l2 { gap: 6px; }
+    .pin b { font-size: 14px; }
     .pin.on { background: none; }
     .top .sp { display: block; }
     .pin:hover { background: var(--bg3); }
     .cbar { display: contents; }   /* search box (with the symbol), intervals, details; the session/tick block at the far right */
     .cbar .sbtn { order: -2; flex: none; height: auto; align-self: stretch; border-radius: 0; gap: 8px; padding: 0 14px; }
     .cbar .sbtn:hover { color: var(--text); }
-    .sbtn .q { display: flex; flex-direction: column; align-items: flex-start; gap: 0; line-height: 15px; font-variant-numeric: tabular-nums; }
+    .sbtn .q { display: flex; align-items: baseline; gap: 7px; font-variant-numeric: tabular-nums; }
     .sbtn .q b { color: var(--text); font-size: 14px; }
     .sbtn .q2 { display: flex; gap: 6px; }
-    .sbtn .q .px { color: var(--text); font-size: 12px; }
+    .sbtn .q .px { color: var(--text); font-size: 13px; }
     .sbtn .q .chg { font-size: 12px; font-weight: 600; }
     .sbtn.has .ph { display: none; }
     .cbar .infobtn { display: none; }   /* desktop: details from the row's hover tools */
@@ -417,7 +447,7 @@
     body.list-hidden { grid-template-columns: 0 auto 1fr; }
     body.list-hidden .listpane { display: none; }
     body.list-hidden .lbtn { background: var(--accent); color: #fff; }
-    .seg button { flex: none; height: auto; min-width: 40px; padding: 0 10px; border-radius: 0; font-size: 13px; background: none; }
+    .seg button { flex: none; height: auto; min-width: 36px; padding: 0 9px; border-radius: 6px; font-size: 12px; background: none; }
     .seg button:hover { color: var(--text); background: var(--bg3); }
     .seg button.on { color: #fff; background: var(--accent); }
     .sheet { left: 50%; right: auto; top: 10vh; bottom: auto; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); max-height: 78vh;
@@ -467,13 +497,13 @@
     <div id="dbody"></div>
   </aside>
   <section class="pane chartpane" id="chartWrap" aria-label="Chart">
-    <div id="tv_chart"></div>
+    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"></div><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="pins" id="pins"></div>
     <div class="cbar">
-      <button class="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="q"><b id="cbSym"></b><span class="q2"><span class="px" id="cbPx"></span><span class="chg" id="cbChg"></span></span></span><span class="ph">Search</span></button>
+      <button class="sbtn" id="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="q"><b id="cbSym"></b><span class="q2"><span class="px" id="cbPx"></span><span class="chg" id="cbChg"></span></span></span><span class="ph">Search</span></button>
       <button class="infobtn" data-act="details" aria-label="Details" title="Details"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button>
     </div>
     <div class="ltog"><button class="hbtn lbtn" data-act="toggle-list" title="Hide watchlist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 4v16"/></svg></button><button class="hbtn" data-act="toggle-chart" title="Hide chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg></button></div>
@@ -497,7 +527,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '2.7';  // bump on every push to main
+const APP_VERSION = '2.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -547,7 +577,7 @@ const SYMBOL_FIXES = { 'CAPITALCOM:US100': 'SKILLING:US100', 'CAPITALCOM:SPX500'
   'OANDA:XAGUSD': 'TVC:SILVER', 'AMEX:LEU': 'NYSE:LEU', 'NASDAQ:EUV': 'CBOE:EUV', 'NASDAQ:DXYZ': 'NYSE:DXYZ',
   'NASDAQ:NASA': 'AMEX:NASA', 'NASDAQ:TE': 'NYSE:TE', 'NYSE:QS': 'NASDAQ:QS' };
 const REMOVED = new Set(['NASDAQ:NDX', 'SP:SPX']);   // no chart in the free widget
-// The free widget has no chart for plain indices and BIST; these stay quote-only.
+// Symbols the free widget won't draw (licensed exchanges, plain indices): drawn by our own chart instead (ownChart).
 const noChart = sym => !CHART_ALIAS[sym] && /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|BIST:)/.test(sym);
 // Some symbols quote fine but the free widget won't chart them; chart an equivalent feed instead.
 // TVC:US10Y (US 10Y yield) spins forever in the embed; PYTH:US10Y carries the same yield and charts.
@@ -851,14 +881,17 @@ function renderSentiment() {
   const t0 = pts[0][0], t1 = pts[pts.length - 1][0];
   const x = t => ((t - t0) / Math.max(1, t1 - t0) * W), y = v => T + (hi - v) / (hi - lo) * ih;
   const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ');
-  const last = vals[vals.length - 1], cls = last >= 0 ? 'up' : 'down';
+  // zero line when 0 is in range; the line is green above it and red below (two clipped copies of the same path)
+  const zin = lo < 0 && hi > 0, zy = zin ? y(0) : (hi <= 0 ? T : T + ih);
   const hm = t => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   spark = { pts, x, y, hover: spark.hover };
   el.innerHTML = head + `<div class="sent-c" data-act="hist-range" title="Click to change the range: Today → 1h → 4h → 24h"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" id="sentSvg">
       <text class="lbl rng" x="${W}" y="20" text-anchor="end">${rangeLabel()}</text>
       <!-- min/max labels sit on the side away from the extreme, off the line -->
       <text class="lbl" x="${lblX(hiAt)}" y="${T + 9}" text-anchor="${lblX(hiAt) ? 'end' : 'start'}">${pct(hi - pad)}</text><text class="lbl" x="${lblX(loAt)}" y="${T + ih - 2}" text-anchor="${lblX(loAt) ? 'end' : 'start'}">${pct(lo + pad)}</text>
-      <path class="line ${cls}" d="${path}"/>
+      ${zin ? `<line class="zero" x1="0" x2="${W}" y1="${zy.toFixed(1)}" y2="${zy.toFixed(1)}"/>` : ''}
+      <clipPath id="cpUp"><rect x="0" y="0" width="${W}" height="${Math.max(0, zy).toFixed(1)}"/></clipPath><clipPath id="cpDn"><rect x="0" y="${zy.toFixed(1)}" width="${W}" height="${Math.max(0, H - zy).toFixed(1)}"/></clipPath>
+      <path class="line up" d="${path}" clip-path="url(#cpUp)"/><path class="line down" d="${path}" clip-path="url(#cpDn)"/>
       <text class="lbl" x="0" y="${H - 3}">${hm(t0)}</text><text class="lbl" x="${W}" y="${H - 3}" text-anchor="end">${hm(t1)}</text>
       <circle class="dot" r="3" cx="-10" cy="-10" id="sentDot"/></svg><div class="tip" id="sentTip" hidden></div></div>`;
   showSparkTip();
@@ -1059,6 +1092,7 @@ window.addEventListener('message', e => {
   }
 });
 function mountChart() {
+  if (state.ownChart) { showOwnChart(state.symbol); return; }   // no widget while our chart draws everything
   if (typeof TradingView === 'undefined') return;
   const old = $('tv_chart'), fresh = document.createElement('div'); fresh.id = 'tv_chart'; old.replaceWith(fresh);
   chart.ready = false; chart.pending = {};
@@ -1074,9 +1108,131 @@ function mountChart() {
     disabled_features: ['header_indicators', 'header_compare', 'show_object_tree', 'legend_context_menu', 'control_bar'],
     support_host: 'https://www.tradingview.com',
   });
+  if (useOwn(state.symbol)) showOwnChart(state.symbol); else document.querySelector('.charea').classList.add('widget');
 }
-const showSymbol = () => send('set-symbol', { symbol: chartSymbol(state.symbol) });
-function setChartInterval(v) { state.interval = v; save(); send('set-interval', { interval: v }); renderHeader(); }
+const useOwn = sym => !!state.ownChart || noChart(sym);   // setting: our chart for every symbol (local, not synced)
+function showSymbol() {
+  if (useOwn(state.symbol)) showOwnChart(state.symbol);
+  else { if (own.active) hideOwnChart(); send('set-symbol', { symbol: chartSymbol(state.symbol) }); }
+}
+function setChartInterval(v) { state.interval = v; save(); if (own.active) ownRequest(state.symbol, v); else send('set-interval', { interval: v }); renderHeader(); }
+
+// ================= Own chart: symbols the free widget won't draw =================
+// History and live bars come from TradingView's chart websocket (same host and relay as the quotes, unauthorized token:
+// BIST is delayed), drawn with Lightweight Charts (loaded on first use). One chart session per (symbol, interval) request.
+const LWC_URL = 'https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
+const own = { lib: null, chart: null, series: null, ws: null, n: 0, sid: null, active: false, want: null, retry: 0, intraday: true };
+const loadLwc = () => own.lib || (own.lib = new Promise((res, rej) => {
+  if (window.LightweightCharts) return res();
+  const el = document.createElement('script'); el.src = LWC_URL; el.onload = res; el.onerror = () => { own.lib = null; rej(new Error('lwc')); }; document.head.appendChild(el);
+}));
+async function showOwnChart(sym) {
+  own.active = true; $('ownChart').hidden = false; document.querySelector('.charea').classList.remove('widget');
+  try { await loadLwc(); } catch (_) { $('ownChart').innerHTML = '<div class="empty">Chart library didn\'t load.</div>'; return; }
+  if (!own.chart) {
+    const el = $('ownChart'), L = window.LightweightCharts;
+    own.chart = L.createChart(el, {
+      layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#787b86', fontSize: 11, attributionLogo: false },   // shading sits behind; attribution is in Settings
+      grid: { vertLines: { color: 'rgba(42, 46, 57, .4)' }, horzLines: { color: 'rgba(42, 46, 57, .4)' } },
+      rightPriceScale: { borderColor: '#2a2e39' }, timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false },
+      crosshair: { mode: L.CrosshairMode.Normal }, handleScale: { axisPressedMouseMove: true },
+    });
+    own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false });
+    new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width && r.height) own.chart.applyOptions({ width: r.width, height: r.height }); ownCountdown(); }).observe(el);
+    el.insertAdjacentHTML('afterbegin', '<div class="sessbg" id="sessbg"></div><button class="ownlogo" data-act="chart-kind" title="Switch to the TradingView chart"><img src="icons/icon-192.png" alt=""></button>');
+    const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
+    el.insertAdjacentHTML('beforeend', '<button class="copts" data-act="chart-opts" title="Chart settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>');
+    own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownCountdown);
+    own.chart.subscribeCrosshairMove(ownCountdown);
+    setInterval(ownCountdown, 1000);
+  }
+  ownRequest(sym, state.interval);
+}
+function hideOwnChart() { own.active = false; own.want = null; $('ownChart').hidden = true; document.querySelector('.charea').classList.add('widget'); }
+// Ask the socket for a series; the answer is matched by session id so stale replies are ignored.
+function ownRequest(sym, iv) {
+  own.want = { sym, iv };
+  if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
+  const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
+  own.series?.setData([]);
+  own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
+  const f = (m, p) => own.ws.send(frame({ m, p }));
+  if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
+  f('chart_create_session', [cs, '']);
+  f('resolve_symbol', [cs, 'sym_' + n, '={"symbol":"' + sym + '","adjustment":"splits","session":"extended"}']);   // extended: pre/post-market bars too
+  f('create_series', [cs, 'ser_' + n, 's' + n, 'sym_' + n, iv, 300, '']);
+}
+function ownConnect() {
+  const w = own.ws = new WebSocket(IS_LOCAL || !RELAY_WS ? WS_DIRECT : RELAY_WS);
+  w.onopen = () => { own.retry = 0; w.send(frame({ m: 'set_auth_token', p: ['unauthorized_user_token'] })); if (own.want) ownRequest(own.want.sym, own.want.iv); };
+  w.onmessage = e => {
+    for (const part of String(e.data).split(/~m~\d+~m~/).filter(Boolean)) {
+      if (part.startsWith('~h~')) { w.send('~m~' + part.length + '~m~' + part); continue; }
+      let m; try { m = JSON.parse(part); } catch (_) { continue; }
+      if (!m.m || m.p?.[0] !== own.sid || !own.series) continue;
+      if (m.m === 'timescale_update' || m.m === 'du') {
+        const ser = Object.values(m.p[1] || {}).find(x => x && Array.isArray(x.s)); if (!ser) continue;
+        const bars = ser.s.map(b => ownBar(b.v)).filter(Boolean).sort((a, b) => a.time - b.time);
+        if (m.m === 'timescale_update') { own.series.setData(bars); own.chart.timeScale().fitContent(); own.data = bars; }
+        else for (const b of bars) { try { own.series.update(b); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } }
+        if (bars.length) { own.last = bars[bars.length - 1]; ownCountdown(); }
+      }
+      if (m.m === 'symbol_error' || m.m === 'series_error') toast(`${short(own.want?.sym || '')}: no chart data`);
+    }
+  };
+  w.onclose = () => { if (own.ws !== w) return; own.ws = null; if (own.active) setTimeout(ownConnect, Math.min(30000, 1000 * 2 ** own.retry++)); };
+}
+// Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
+// (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, ...(state.chartOpts || {}) });
+function ownCountdown() {
+  const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
+  const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
+  if (y == null || !b) { cd.hidden = true; return; }
+  const o = chartOpts(), res = own.want && /^\d+$/.test(own.want.iv) ? +own.want.iv : 0, q = quotes[own.want?.sym];
+  cd.querySelector('.pr').textContent = fmtPrice(b.close);
+  const pc = cd.querySelector('.pc'); pc.hidden = !(o.pct && q); if (q) pc.textContent = pct(q.c);
+  const pt = cd.querySelector('.pt'); pt.hidden = !(o.countdown && res);
+  if (res) {
+    const startUtc = b.time + new Date().getTimezoneOffset() * 60, left = Math.max(0, startUtc + res * 60 - Date.now() / 1000);
+    const h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), sec = Math.floor(left % 60), pad = n => String(n).padStart(2, '0');
+    pt.textContent = h ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+  }
+  cd.style.top = (y - 9) + 'px'; cd.style.width = own.chart.priceScale('right').width() + 'px';
+  const g = $('ownChart').querySelector('.copts'); if (g) g.style.width = cd.style.width;
+  cd.classList.toggle('up', b.close >= b.open); cd.hidden = false;
+  ownSessions();
+}
+// Session shading (US symbols, minute intervals): pre-market amber, post-market blue, overnight purple behind the bars,
+// one tinted block per run of bars in the same phase, redrawn with every reposition.
+const ET_MIN = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit' });
+const etPhase = utc => { const [h, m] = ET_MIN.format(new Date(utc * 1000)).split(':').map(Number), t = (h % 24) * 60 + m; return t < 240 ? 'night' : t < 570 ? 'pre' : t < 960 ? '' : t < 1200 ? 'post' : 'night'; };
+function ownSessions() {
+  const bg = $('sessbg'); if (!bg) return;
+  const o = chartOpts(), sym = own.want?.sym || '', res = own.want && /^\d+$/.test(own.want.iv) ? +own.want.iv : 0;
+  if (!o.sessions || !res || !own.data?.length || !US_EX.has(sym.split(':')[0])) { bg.innerHTML = ''; return; }
+  const ts = own.chart.timeScale(), vr = ts.getVisibleLogicalRange(); if (!vr) { bg.innerHTML = ''; return; }
+  const shift = new Date().getTimezoneOffset() * 60, half = ts.options().barSpacing / 2, right = own.chart.priceScale('right').width();
+  const from = Math.max(0, Math.floor(vr.from) - 1), to = Math.min(own.data.length - 1, Math.ceil(vr.to) + 1);
+  let html = '', run = null;
+  const flush = () => { if (run && run.phase) { const x1 = ts.timeToCoordinate(run.t0), x2 = ts.timeToCoordinate(run.t1); if (x1 != null && x2 != null) html += `<i class="${run.phase}" style="left:${(x1 - half).toFixed(1)}px;width:${(x2 - x1 + 2 * half).toFixed(1)}px"></i>`; } run = null; };
+  for (let i = from; i <= to; i++) {
+    const b = own.data[i], phase = etPhase(b.time + shift);
+    if (run && run.phase === phase) run.t1 = b.time; else { flush(); run = { phase, t0: b.time, t1: b.time }; }
+  }
+  flush();
+  bg.style.right = right + 'px';
+  if (bg.innerHTML !== html) bg.innerHTML = html;
+}
+function openChartOpts() {
+  const o = chartOpts();
+  openSheet('chartopts', 'Chart settings', `<label class="setrow"><span><b>Change %</b><small>Day change next to the last price.</small></span><input type="checkbox" data-co="pct"${o.pct ? ' checked' : ''}></label>
+    <label class="setrow"><span><b>Bar countdown</b><small>Time left until the current bar closes.</small></span><input type="checkbox" data-co="countdown"${o.countdown ? ' checked' : ''}></label>
+    <label class="setrow"><span><b>Session shading</b><small>Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).</small></span><input type="checkbox" data-co="sessions"${o.sessions ? ' checked' : ''}></label>`);
+  $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (!k) return; state.chartOpts = { ...o, ...(state.chartOpts || {}), [k]: e.target.checked }; save(); ownCountdown(); });
+}
+// Bars arrive in UTC seconds; intraday ones are shifted so the axis shows local time (the library draws times as UTC).
+const ownBar = v => v && v.length >= 5 ? { time: v[0] + (own.intraday ? -new Date().getTimezoneOffset() * 60 : 0), open: v[1], high: v[2], low: v[3], close: v[4] } : null;
 
 // ================= Rendering =================
 function render() { renderChips(); renderRows(); renderHeader(); renderSentiment(); for (const b of document.querySelectorAll('.sortcol')) b.classList.toggle('on', state.sort === b.dataset.by); document.body.classList.toggle('sorted', !!state.sort); }
@@ -1155,7 +1311,7 @@ function openGroupMenu(gi) {
   };
 }
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
-const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${noChart(sym) ? ' nochart' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
+const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
     <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
     <span class="rt"><button data-act="row-details" title="Details">${ICON.details}</button><button data-act="row-add" title="Add to another list">${ICON.add}</button><button class="danger" data-act="row-rm" title="Remove from list">${ICON.rm}</button></span></div>`;
@@ -1231,12 +1387,16 @@ function updateEarnings() {
 }
 function renderPins() {
   const el = $('pins'); if (!el) return;
-  if (!el.childElementCount) el.innerHTML = PINS.map(([sym, lbl]) => `<button class="pin" data-act="pin" data-sym="${esc(sym)}"><b>${lbl}</b><span class="p"></span><span class="v"></span></button>`).join('');
+  if (!el.childElementCount) el.innerHTML = PINS.map(([sym, lbl]) => `<button class="pin" data-act="pin" data-sym="${esc(sym)}"><b>${lbl}</b><span class="l2"><span class="p"></span><span class="v"></span></span></button>`).join('');
   for (const b of el.children) {
     const sym = b.dataset.sym, q = quotes[sym], last = q ? (!regular && q.ep != null ? q.ep : q.p) : null, v = b.querySelector('.v'), pr = b.querySelector('.p');
-    const t = q ? pct(q.c) : '', px = last != null ? fmtPrice(last) : '';
+    const t = q ? pct(q.c) : '', px = last == null ? '' : last >= 1000 ? Math.round(last).toLocaleString('en-US') : fmtPrice(last);   // big prices without decimals
     if (v.textContent !== t) v.textContent = t;
-    if (pr.textContent !== px) pr.textContent = px;
+    if (pr.textContent !== px) {   // flash the price on change, colored by direction
+      const prev = +b.dataset.last; if (last != null && !isNaN(prev) && pr.textContent) flash(pr, last > prev ? 'f-up' : last < prev ? 'f-down' : 'f-same');
+      pr.textContent = px;
+    }
+    if (last != null) b.dataset.last = last;
     v.className = 'v ' + (q ? dir(q.c) : '');
     b.title = sym;
     b.classList.toggle('on', sym === state.symbol);
@@ -1361,6 +1521,10 @@ function placeTools() {   // the session/tick/toggle block stays in the header (
   // pinned symbols: a strip under the header on phones, part of the chart toolbar on desktop
   const pins = $('pins'), pdest = isPhone() ? document.querySelector('.top') : document.querySelector('.ctools'), before = isPhone() ? document.querySelector('.top .sp') : document.querySelector('.cbar');
   if (pins.parentElement !== pdest) pdest.insertBefore(pins, before);
+  // desktop: the search box and the interval buttons float over the chart's top-left corner
+  const cover = $('cover'), sb = $('sbtn'), seg = $('seg');
+  if (!isPhone()) { if (sb.parentElement !== cover) cover.append(sb, seg); }
+  else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend(sb); document.querySelector('.ctools').prepend(seg); } }
   renderPins();
 }
 function applyListHidden() {
@@ -1376,7 +1540,6 @@ function applyChartHidden() {
   if (!state.chartHidden && chart.hiddenAtMount && !isPhone()) mountChart();
 }
 function selectSymbol(sym, openChart = true) {
-  if (noChart(sym)) { toast(`${short(sym)} has no chart in the free widget`); return; }
   state.symbol = sym; save();
   $('rows').querySelectorAll('.row').forEach(r => r.classList.toggle('on', r.dataset.sym === sym));
   showSymbol(); renderHeader(); renderDetails();
@@ -1456,9 +1619,9 @@ document.addEventListener('keydown', e => {
     save(); render(); $('rows').scrollTop = 0;
     return;
   }
-  // ↑ / ↓ walk the rows as shown (sort order, collapsed groups skipped); quote-only rows are passed over.
+  // ↑ / ↓ walk the rows as shown (sort order, collapsed groups skipped).
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-  const rows = [...$('rows').querySelectorAll('.row:not(.nochart)')]; if (!rows.length) return;
+  const rows = [...$('rows').querySelectorAll('.row')]; if (!rows.length) return;
   e.preventDefault();
   const i = rows.findIndex(r => r.dataset.sym === state.symbol);
   const next = rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
@@ -1586,15 +1749,14 @@ function openSearch(addMode = false) {
   };
   setTimeout(() => q.focus(), 30);
 }
-// First result the free widget can chart (quote-only symbols like BIST or plain indices are skipped).
-const firstChartable = () => Math.max(0, search.items.findIndex(it => !noChart(it.sym)));
+const firstChartable = () => 0;
 function pickSearch(sym) {
   const it = sym ? { sym } : search.items[search.index] || search.items[firstChartable()];
   if (!it) return;
   closeSheet();
   if (search.addMode) {
     if (!flatSymbols(activeList()).includes(it.sym)) addSymbol(it.sym);
-    if (!noChart(it.sym)) selectSymbol(it.sym, false);
+    selectSymbol(it.sym, false);
     $('rows').querySelector(`.row[data-sym="${CSS.escape(it.sym)}"]`)?.scrollIntoView({ block: 'nearest' });
   } else selectSymbol(it.sym);
 }
@@ -1612,8 +1774,14 @@ function refreshSearch() {
 // List manager: rename, reorder, sentiment on/off, delete (tap twice), new list.
 function openSettings() {
   openSheet('settings', 'Settings', `<div class="sync" id="syncBox"></div>
-    <div class="about"><span>tv-watchlist v${APP_VERSION}</span><button class="btn link" data-act="reconnect">Reconnect quotes</button></div>`);
+    <label class="setrow"><span><b>Own chart for all symbols</b><small>Draw every chart ourselves (TradingView data, Lightweight Charts) instead of the TradingView widget. Lighter and faster; no drawing tools or indicators.</small></span><input type="checkbox" id="ownAll"${state.ownChart ? ' checked' : ''}></label>
+    <div class="about"><span>tv-watchlist v${APP_VERSION} · charts by <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></span><button class="btn link" data-act="reconnect">Reconnect quotes</button></div>`);
   renderSyncBox();
+  $('ownAll').addEventListener('change', e => {
+    state.ownChart = e.target.checked; save();
+    if (!state.ownChart && !$('tv_chart').querySelector('iframe')) mountChart();
+    showSymbol();
+  });
 }
 function openListManager() {
   openSheet('lists', 'Lists', '');
@@ -1760,13 +1928,21 @@ document.addEventListener('click', e => {
     case 'toggle-list': state.listHidden = !state.listHidden; if (state.listHidden && state.chartHidden) state.chartHidden = false; save(); applyChartHidden(); applyListHidden(); break;
     case 'sheet-close': closeSheet(); break;
     case 'interval': openIntervalPicker(); break;
+    case 'chart-opts': openChartOpts(); break;
+    case 'chart-kind': {   // the icon at the chart's bottom left flips between our chart and the TradingView widget
+      if (!state.ownChart && !own.active) { state.ownChart = true; save(); showSymbol(); break; }
+      if (noChart(state.symbol)) { toast(`${short(state.symbol)} has no TradingView chart`); break; }
+      state.ownChart = false; save();
+      if (!$('tv_chart').querySelector('iframe')) mountChart();
+      showSymbol(); break;
+    }
     case 'pin': selectSymbol(el.dataset.sym, false); break;
     case 'add-section': addSection(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
     case 'row-flag': case 'row-details': case 'row-add': case 'row-up': case 'row-down': case 'row-rm': {
       e.stopPropagation();
       const act = el.dataset.act, r = el.closest('.row'), sym = r.dataset.sym, gi = +r.dataset.g, g = activeList().groups[gi], i = g ? g.symbols.indexOf(sym) : -1;
-      if (act === 'row-details') { if (sym !== state.symbol && !noChart(sym)) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); }
+      if (act === 'row-details') { if (sym !== state.symbol) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); }
       if (act === 'row-flag') cycleFlag(sym);
       if (act === 'row-add') openCopySheet(sym);
       if (act === 'row-up' && i > 0) moveSymbol(sym, gi, gi, i - 1);
