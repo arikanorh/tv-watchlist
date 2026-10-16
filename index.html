@@ -248,6 +248,8 @@
   .lm .ib { width: 40px; height: 40px; border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--muted); }
   .lm .ib.sig.on { color: var(--accent); background: var(--accent-bg); }
   .lm .ib.del.armed { width: auto; padding: 0 10px; background: var(--down); color: #fff; }
+  .opt.danger.armed { background: var(--down); color: #fff; }
+  .opt.danger.armed svg { color: #fff; }
   .lm .ib:disabled { opacity: .35; }
   .lmnew { display: flex; gap: 8px; padding: 10px 12px 2px; border-top: 1px solid var(--line); flex-shrink: 0; }
   .lmnew button { flex: none; padding: 0 16px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; }
@@ -389,6 +391,7 @@
     .row .rt button { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
     .row .rt button:hover { background: var(--bg3); color: var(--text); }
     .row .rt button.danger:hover { color: var(--down); }
+    .row .rt button.danger.armed, .row .rt button.danger.armed:hover { background: var(--down); color: #fff; }
     .row .rt button[disabled] { opacity: .3; pointer-events: none; }
     body.sorted .row .rt button[data-act="row-up"], body.sorted .row .rt button[data-act="row-down"] { display: none; }
     .row .rt svg { width: 15px; height: 15px; }
@@ -527,7 +530,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '2.8';  // bump on every push to main
+const APP_VERSION = '2.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1305,7 +1308,7 @@ function openGroupMenu(gi) {
       const snap = JSON.stringify(gs), into = gs[gi - 1] && !gs[gi - 1].auto ? gs[gi - 1] : gs.slice(gi + 1).find(x => !x.auto);
       if (into === gs[gi - 1]) into.symbols.push(...g.symbols); else into.symbols.unshift(...g.symbols);
       gs.splice(gi, 1); save(); renderRows();
-      toast(`${g.name} deleted`, 'Undo', () => { l.groups = JSON.parse(snap); save(); renderRows(); });
+      undoable(`${g.name} deleted`, () => { l.groups = JSON.parse(snap); save(); renderRows(); });
     }
     else moveGroup(gi, gi + (o === 'up' ? -1 : 1));
   };
@@ -1540,6 +1543,7 @@ function applyChartHidden() {
   if (!state.chartHidden && chart.hiddenAtMount && !isPhone()) mountChart();
 }
 function selectSymbol(sym, openChart = true) {
+  if (sym === state.symbol) { if (openChart && isPhone()) setView('chart'); return; }   // same row again: don't reload the chart
   state.symbol = sym; save();
   $('rows').querySelectorAll('.row').forEach(r => r.classList.toggle('on', r.dataset.sym === sym));
   showSymbol(); renderHeader(); renderDetails();
@@ -1561,7 +1565,7 @@ function removeSymbol(sym, gi) {
   const l = activeList(), g = l.groups[gi]; if (!g) return;
   const at = g.symbols.indexOf(sym); if (at < 0) return;
   g.symbols.splice(at, 1); save(); renderRows(); patchChips(); wsSync();
-  toast(`${short(sym)} removed`, 'Undo', () => { g.symbols.splice(Math.min(at, g.symbols.length), 0, sym); save(); renderRows(); patchChips(); wsSync(); });
+  undoable(`${short(sym)} removed`, () => { g.symbols.splice(Math.min(at, g.symbols.length), 0, sym); save(); renderRows(); patchChips(); wsSync(); });
 }
 function moveSymbol(sym, from, to, index) {
   const l = activeList(), src = l.groups[from], dst = l.groups[to]; if (!src || !dst) return;
@@ -1649,7 +1653,11 @@ function openRowMenu(sym, gi) {
     if (o === 'sec') addSection({ gi, i });
     if (o === 'up') { closeSheet(); moveSymbol(sym, gi, gi, i - 1); }
     if (o === 'down') { closeSheet(); moveSymbol(sym, gi, gi, i + 1); }
-    if (o === 'rm') { closeSheet(); removeSymbol(sym, gi); }
+    if (o === 'rm') {
+      const b = e.target.closest('[data-o="rm"]');
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.lastChild.textContent = `Remove ${short(sym)}? Tap again`; return; }
+      closeSheet(); removeSymbol(sym, gi);
+    }
   };
 }
 
@@ -1909,6 +1917,22 @@ function toast(text, action, fn) {
   document.body.appendChild(t);
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 4000);
 }
+// Undo stack: removals pile up ("3 removed · Undo"), each Undo takes back the latest; the toast lasts 8 s after the last one.
+const undoStack = [];
+function undoable(text, fn) {
+  undoStack.push({ text, fn });
+  showUndo();
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { undoStack.length = 0; document.querySelector('.toast')?.remove(); }, 8000);
+}
+function showUndo() {
+  document.querySelector('.toast')?.remove();
+  if (!undoStack.length) return;
+  const n = undoStack.length, last = undoStack[n - 1];
+  const t = document.createElement('div'); t.className = 'toast';
+  t.innerHTML = `<span>${esc(n > 1 ? `${last.text} (+${n - 1} more)` : last.text)}</span><button>Undo${n > 1 ? ' ' + n : ''}</button>`;
+  t.querySelector('button').addEventListener('click', () => { const u = undoStack.pop(); u?.fn(); showUndo(); });
+  document.body.appendChild(t);
+}
 
 // ================= Clicks =================
 document.addEventListener('click', e => {
@@ -1947,7 +1971,10 @@ document.addEventListener('click', e => {
       if (act === 'row-add') openCopySheet(sym);
       if (act === 'row-up' && i > 0) moveSymbol(sym, gi, gi, i - 1);
       if (act === 'row-down' && i >= 0) moveSymbol(sym, gi, gi, i + 1);
-      if (act === 'row-rm') removeSymbol(sym, gi);
+      if (act === 'row-rm') {
+        if (!el.classList.contains('armed')) { el.classList.add('armed'); el.title = 'Click again to remove'; setTimeout(() => { el.classList.remove('armed'); el.title = 'Remove from list'; }, 3000); break; }
+        removeSymbol(sym, gi);
+      }
       break;
     }
   }
