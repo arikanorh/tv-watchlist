@@ -205,6 +205,13 @@
   .cmenu .ci.r i { border-radius: 50%; }
   .cmenu .ci.r.on i::after { width: 6px; height: 6px; margin: 2.5px; border: 0; border-radius: 50%; background: #fff; transform: none; }
   .cmenu .ci.on i::after { content: ''; display: block; width: 4px; height: 8px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .hilo { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .hm { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+  .hm.hi { transform: translate(-50%, -100%); margin-top: -4px; } .hm.lo { margin-top: 4px; }
+  .hm b { padding: 1px 6px; border-radius: 4px; line-height: 15px; }
+  .hm.hi b { background: #089981; } .hm.lo b { background: #f23645; }
+  .hm i { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; }
+  .hm.hi i { border-top: 5px solid #089981; } .hm.lo i { border-bottom: 5px solid #f23645; }
   .copts { position: absolute; right: 0; bottom: 0; z-index: 3; width: 72px; height: 27px; display: flex; align-items: center; justify-content: center; color: var(--muted); }   /* the empty corner where the two axes meet */
   .copts:hover { color: var(--text); background: var(--bg3); }
   .copts svg { width: 15px; height: 15px; }
@@ -470,8 +477,9 @@
     .ivbtn { display: none; }
     .ivbtn svg { width: 14px; height: 14px; color: var(--muted); }
     .ivbtn:hover { background: var(--bg3); }
-    .pins { order: -1; flex: 0 1 auto; justify-content: flex-start; gap: 0; margin: 0; align-items: stretch; overflow: hidden; border-left: 1px solid var(--line); }
-    .pin { height: auto; padding: 0 12px; border-radius: 0; font-size: 12px; line-height: 15px; }
+    .pins { order: -1; flex: 0 1 auto; justify-content: flex-start; gap: 0; margin: 0; align-items: stretch; overflow-x: auto; scrollbar-width: none; border-left: 1px solid var(--line); }
+    .pins::-webkit-scrollbar { display: none; }
+    .pin { height: auto; padding: 0 10px; border-radius: 0; font-size: 12px; line-height: 15px; }
     .pin .l2 { gap: 6px; }
     .pin b { font-size: 14px; }
     .pin.on { background: none; }
@@ -589,7 +597,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '5.8';  // bump on every push to main
+const APP_VERSION = '5.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -830,7 +838,7 @@ function showSyncNote(changes) {
 try { localStorage.removeItem('tvwl.eod.v1'); } catch (_) {}
 const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
 const flatSymbols = list => list.groups.flatMap(g => g.symbols);
-const PINS = [['SKILLING:US100', 'US100'], ['BINANCE:BTCUSDT', 'BTC'], ['TVC:US10Y', 'US10Y'], ['TVC:VIX', 'VIX']];   // quick symbols in the desktop toolbar
+const PINS = [['SKILLING:US100', 'US100'], ['SKILLING:SPX500', 'SPX'], ['TVC:US10Y', 'US10Y'], ['TVC:VIX', 'VIX'], ['BINANCE:BTCUSDT', 'BTC'], ['BINANCE:ETHUSDT', 'ETH']];   // quick symbols in the desktop toolbar
 const allSymbols = () => [...new Set([...state.lists.flatMap(flatSymbols), ...PINS.map(p => p[0])])];
 
 // ================= Formatting =================
@@ -1256,17 +1264,22 @@ function ownRequest(sym, iv) {
   f('resolve_symbol', [cs, 'sym_' + n, '={"symbol":"' + sym + '","adjustment":"splits","session":"' + session + '"}']);
   f('create_series', [cs, 'ser_' + n, 's' + n, 'sym_' + n, iv, 300, '']);
 }
-// Highest / lowest bar of the visible range: a marker with the price above / below that bar (chart option "Visible high / low").
+// Highest / lowest bar of the visible range: a small triangle + price pill above / below that bar (chart option "Visible
+// high / low"). Drawn as our own overlays so they match the price label, repositioned whenever the chart moves.
 function ownHiLo() {
-  if (!own.series) return;
+  const el = $('ownChart'); if (!el || !own.series) return;
+  let box = el.querySelector('.hilo'); if (!box) { box = document.createElement('div'); box.className = 'hilo'; box.innerHTML = '<div class="hm hi"><b></b><i></i></div><div class="hm lo"><i></i><b></b></div>'; el.appendChild(box); }
   const vr = own.chart.timeScale().getVisibleLogicalRange();
-  if (!chartOpts().hilo || !own.data?.length || !vr) { own.series.setMarkers([]); return; }
+  if (!chartOpts().hilo || !own.data?.length || !vr || !own.active) { box.hidden = true; return; }
   const a = Math.max(0, Math.floor(vr.from)), b = Math.min(own.data.length - 1, Math.ceil(vr.to));
   let hi = null, lo = null;
   for (let i = a; i <= b; i++) { const d = own.data[i]; if (!hi || d.high > hi.high) hi = d; if (!lo || d.low < lo.low) lo = d; }
-  if (!hi || !lo) { own.series.setMarkers([]); return; }
-  const ms = [{ time: hi.time, position: 'aboveBar', color: '#089981', shape: 'arrowDown', text: fmtPrice(hi.high) }, { time: lo.time, position: 'belowBar', color: '#f23645', shape: 'arrowUp', text: fmtPrice(lo.low) }];
-  own.series.setMarkers(ms.sort((x, y) => x.time - y.time));
+  const ts = own.chart.timeScale(), place = (node, bar, price) => {
+    const x = bar && ts.timeToCoordinate(bar.time), y = bar && own.series.priceToCoordinate(price);
+    node.hidden = x == null || y == null; if (node.hidden) return;
+    node.style.left = x + 'px'; node.style.top = y + 'px'; node.querySelector('b').textContent = fmtPrice(price);
+  };
+  box.hidden = false; place(box.querySelector('.hi'), hi, hi?.high); place(box.querySelector('.lo'), lo, lo?.low);
 }
 // Scrolling past the oldest bar asks the socket for 300 more (request_more_data), debounced so a long scroll sends one request.
 function ownMaybeMore(range) {
@@ -1332,7 +1345,7 @@ function ownCountdown() {
   cd.style.top = (y - 9) + 'px'; cd.style.width = own.chart.priceScale('right').width() + 'px';
   const g = $('ownChart').querySelector('.copts'); if (g) g.style.width = cd.style.width;
   cd.classList.toggle('up', b.close >= b.open); cd.hidden = false;
-  ownSessions();
+  ownSessions(); ownHiLo();
 }
 // Session shading (US symbols, minute intervals): pre-market amber, post-market blue, overnight purple behind the bars,
 // one tinted block per run of bars in the same phase, redrawn with every reposition.
@@ -1954,8 +1967,8 @@ function openCopySheet(sym) {   // add the symbol to another list (it stays in t
   };
 }
 $('seg').addEventListener('click', e => { const b = e.target.closest('[data-iv]'); if (b) setChartInterval(b.dataset.iv); });
-// The list chips scroll sideways; a mouse wheel (vertical) scrolls them too.
-$('chips').addEventListener('wheel', e => { const el = $('chips'); if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return; el.scrollLeft += e.deltaY; e.preventDefault(); }, { passive: false });
+// The list chips and the pins scroll sideways; a mouse wheel (vertical) scrolls them too.
+for (const id of ['chips', 'pins']) $(id).addEventListener('wheel', e => { const el = e.currentTarget; if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return; el.scrollLeft += e.deltaY; e.preventDefault(); }, { passive: false });
 
 // Search: TradingView symbol search through the relay (scanner fallback). Tap a result → chart; + → add to the active list.
 const RELAY_HTTP = RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '');
