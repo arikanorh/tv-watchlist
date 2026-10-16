@@ -177,6 +177,12 @@
   .ownlogo:hover { background: #3a3f4d; }
   .tvsw { z-index: 3; font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: .02em; display: none; }
   .charea.widget .tvsw { display: block; }
+  .cmenu { position: absolute; right: 6px; bottom: 32px; z-index: 6; min-width: 180px; padding: 4px; border-radius: 9px; background: var(--bg2); border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(0, 0, 0, .55); }
+  .cmenu .ci { display: flex; align-items: center; gap: 9px; width: 100%; height: 30px; padding: 0 10px; border-radius: 6px; font-size: 13px; color: var(--text); text-align: left; }
+  .cmenu .ci:hover { background: var(--bg3); }
+  .cmenu .ci i { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--muted); flex-shrink: 0; }
+  .cmenu .ci.on i { background: var(--accent); border-color: var(--accent); }
+  .cmenu .ci.on i::after { content: ''; display: block; width: 4px; height: 8px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
   .copts { position: absolute; right: 0; bottom: 0; z-index: 3; width: 72px; height: 27px; display: flex; align-items: center; justify-content: center; color: var(--muted); }   /* the empty corner where the two axes meet */
   .copts:hover { color: var(--text); background: var(--bg3); }
   .copts svg { width: 15px; height: 15px; }
@@ -534,7 +540,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '3.8';  // bump on every push to main
+const APP_VERSION = '3.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1236,15 +1242,37 @@ function ownSessions() {
   bg.style.right = right + 'px';
   if (bg.innerHTML !== html) bg.innerHTML = html;
 }
-function openChartOpts() {
-  const o = chartOpts();
-  openSheet('chartopts', 'Chart settings', `<label class="setrow"><span><b>Change %</b><small>Day change next to the last price.</small></span><input type="checkbox" data-co="pct"${o.pct ? ' checked' : ''}></label>
-    <label class="setrow"><span><b>Bar countdown</b><small>Time left until the current bar closes.</small></span><input type="checkbox" data-co="countdown"${o.countdown ? ' checked' : ''}></label>
-    <label class="setrow"><span><b>Session shading</b><small>Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).</small></span><input type="checkbox" data-co="sessions"${o.sessions ? ' checked' : ''}></label>
-    <label class="setrow"><span><b>Volume</b><small>Volume bars along the bottom, colored by the candle.</small></span><input type="checkbox" data-co="volume"${o.volume ? ' checked' : ''}></label>
-    <label class="setrow"><span><b>Overnight bars</b><small>US stocks on the 24-hour session: overnight trading (20:00–04:00 ET) between post- and pre-market.</small></span><input type="checkbox" data-co="overnight"${o.overnight ? ' checked' : ''}></label>`);
-  $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (!k) return; state.chartOpts = { ...o, ...(state.chartOpts || {}), [k]: e.target.checked }; save(); if (k === 'overnight' && own.active) ownRequest(state.symbol, state.interval); else if (k === 'volume') own.vol?.setData(e.target.checked && own.data ? own.data.map(volBar) : []); else ownCountdown(); });
+const CHART_OPTS = [
+  ['pct', 'Change %', 'Day change next to the last price.'],
+  ['countdown', 'Bar countdown', 'Time left until the current bar closes.'],
+  ['sessions', 'Session shading', 'Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).'],
+  ['volume', 'Volume', 'Volume bars along the bottom, colored by the candle.'],
+  ['overnight', 'Overnight bars', 'US stocks on the 24-hour session: overnight trading (20:00–04:00 ET) between post- and pre-market.'],
+];
+function setChartOpt(k, on) {
+  state.chartOpts = { ...chartOpts(), [k]: on }; save();
+  if (k === 'overnight' && own.active) ownRequest(state.symbol, state.interval);
+  else if (k === 'volume') own.vol?.setData(on && own.data ? own.data.map(volBar) : []);
+  else ownCountdown();
 }
+// Chart settings: a context-style menu next to the ⚙ on desktop (click toggles, stays open), a sheet on phones.
+function openChartOpts() {
+  if (isPhone()) {
+    const o = chartOpts();
+    openSheet('chartopts', 'Chart settings', CHART_OPTS.map(([k, t, d]) => `<label class="setrow"><span><b>${t}</b><small>${d}</small></span><input type="checkbox" data-co="${k}"${o[k] ? ' checked' : ''}></label>`).join(''));
+    $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (k) setChartOpt(k, e.target.checked); });
+    return;
+  }
+  closeChartMenu();
+  const m = document.createElement('div'); m.className = 'cmenu'; m.id = 'cmenu';
+  const paint = () => { const o = chartOpts(); m.innerHTML = CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join(''); };
+  paint();
+  m.addEventListener('click', e => { const b = e.target.closest('[data-co]'); if (!b) return; setChartOpt(b.dataset.co, !chartOpts()[b.dataset.co]); paint(); });
+  $('ownChart').appendChild(m);
+  setTimeout(() => document.addEventListener('pointerdown', closeChartMenuOutside), 0);
+}
+function closeChartMenu() { $('cmenu')?.remove(); document.removeEventListener('pointerdown', closeChartMenuOutside); }
+function closeChartMenuOutside(e) { if (!e.target.closest('#cmenu, .copts')) closeChartMenu(); }
 // Bars arrive in UTC seconds; intraday ones are shifted so the axis shows local time (the library draws times as UTC).
 const ownBar = v => v && v.length >= 5 ? { time: v[0] + (own.intraday ? -new Date().getTimezoneOffset() * 60 : 0), open: v[1], high: v[2], low: v[3], close: v[4], vol: v[5] || 0 } : null;
 const volBar = b => ({ time: b.time, value: b.vol, color: b.close >= b.open ? 'rgba(8, 153, 129, .35)' : 'rgba(242, 54, 69, .35)' });
@@ -1611,7 +1639,7 @@ function openIntervalPicker() {
   $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { setChartInterval(b.dataset.iv); closeSheet(); } };
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeSheet(); return; }
+  if (e.key === 'Escape') { closeSheet(); closeChartMenu(); return; }
   if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   if (!isPhone() && /^[1-8]$/.test(e.key) && ($('sheet').hidden || sheetKind === 'interval')) {
     e.preventDefault();
@@ -1966,7 +1994,7 @@ document.addEventListener('click', e => {
     case 'toggle-list': state.listHidden = !state.listHidden; if (state.listHidden && state.chartHidden) state.chartHidden = false; save(); applyChartHidden(); applyListHidden(); break;
     case 'sheet-close': closeSheet(); break;
     case 'interval': openIntervalPicker(); break;
-    case 'chart-opts': openChartOpts(); break;
+    case 'chart-opts': $('cmenu') ? closeChartMenu() : openChartOpts(); break;
     case 'chart-kind': {   // the icon at the chart's bottom left flips between our chart and the TradingView widget
       if (!state.ownChart && !own.active) { state.ownChart = true; save(); showSymbol(); break; }
       if (noChart(state.symbol)) { toast(`${short(state.symbol)} has no TradingView chart`); break; }
