@@ -444,6 +444,8 @@
     .cover .sbtn { flex: none; height: 32px; padding: 0 10px; border-radius: 6px; gap: 8px; background: var(--bg3); }
     .cover .sbtn:hover { color: var(--text); }
     .cover .seg { display: flex; align-items: stretch; gap: 1px; padding: 0; height: 32px; }
+    .cload { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .ivbtn { display: none; }
     .ivbtn svg { width: 14px; height: 14px; color: var(--muted); }
     .ivbtn:hover { background: var(--bg3); }
@@ -532,7 +534,7 @@
     <div id="dbody"></div>
   </aside>
   <section class="pane chartpane" id="chartWrap" aria-label="Chart">
-    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"></div><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
+    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><span class="cload" id="cload" hidden title="Loading bars…"></span></div><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -563,7 +565,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '4.5';  // bump on every push to main
+const APP_VERSION = '4.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1206,13 +1208,14 @@ async function showOwnChart(sym) {
   }
   ownRequest(sym, state.interval);
 }
-function hideOwnChart() { own.active = false; own.want = null; $('ownChart').hidden = true; document.querySelector('.charea').classList.add('widget'); }
+const ownBusy = () => { const el = $('cload'); if (el) el.hidden = !(own.active && (!own.loaded || own.loadingMore)); };   // spinner by the ticker while bars load
+function hideOwnChart() { own.active = false; own.want = null; $('ownChart').hidden = true; document.querySelector('.charea').classList.add('widget'); ownBusy(); }
 // Ask the socket for a series; the answer is matched by session id so stale replies are ignored.
 function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.vol?.setData([]); own.data = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer);
+  own.series?.setData([]); own.vol?.setData([]); own.data = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy();
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
@@ -1228,9 +1231,9 @@ function ownMaybeMore(range) {
   clearTimeout(own.moreTimer);
   own.moreTimer = setTimeout(() => {
     if (!own.ws || own.ws.readyState !== 1 || own.loadingMore || own.noMore) return;
-    own.loadingMore = true;
+    own.loadingMore = true; ownBusy();
     own.ws.send(frame({ m: 'request_more_data', p: [own.sid, 'ser_' + own.n, 300] }));
-    setTimeout(() => { own.loadingMore = false; }, 8000);   // give up quietly if nothing comes back
+    setTimeout(() => { own.loadingMore = false; ownBusy(); }, 8000);   // give up quietly if nothing comes back
   }, 300);
 }
 function ownConnect() {
@@ -1258,6 +1261,7 @@ function ownConnect() {
         }
         else { for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } } if (own.loadingMore && m.m === 'timescale_update' && !bars.length) { own.loadingMore = false; own.noMore = true; } }   // an empty answer = nothing older; a new live bar meanwhile doesn't count
         if (bars.length) { own.last = bars[bars.length - 1]; ownCountdown(); }
+        ownBusy();
       }
       if (m.m === 'symbol_error' || m.m === 'series_error') toast(`${short(own.want?.sym || '')}: no chart data`);
     }
@@ -1637,7 +1641,7 @@ function placeTools() {   // the session/tick/toggle block stays in the header (
   if (pins.parentElement !== pdest) pdest.insertBefore(pins, before);
   // desktop: the search box and the interval buttons float over the chart's top-left corner
   const cover = $('cover'), sb = $('sbtn'), seg = $('seg');
-  if (!isPhone()) { if (sb.parentElement !== cover) cover.append(sb, seg); }
+  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg); } }
   else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend(sb); document.querySelector('.ctools').prepend(seg); } }
   renderPins();
 }
