@@ -182,6 +182,12 @@
   .cmenu .ci:hover { background: var(--bg3); }
   .cmenu .ci i { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--muted); flex-shrink: 0; }
   .cmenu .ci.on i { background: var(--accent); border-color: var(--accent); }
+  .cmenu .subw { position: relative; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+  .cmenu .ci.sub .cv { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .cmenu .submenu { display: none; position: absolute; right: calc(100% + 6px); bottom: 0; min-width: 150px; padding: 4px; border-radius: 9px; background: var(--bg2); border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(0, 0, 0, .55); }
+  .cmenu .subw:hover .submenu, .cmenu .subw.open .submenu { display: block; }
+  .cmenu .ci.r i { border-radius: 50%; }
+  .cmenu .ci.r.on i::after { width: 6px; height: 6px; margin: 2.5px; border: 0; border-radius: 50%; background: #fff; transform: none; }
   .cmenu .ci.on i::after { content: ''; display: block; width: 4px; height: 8px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
   .copts { position: absolute; right: 0; bottom: 0; z-index: 3; width: 72px; height: 27px; display: flex; align-items: center; justify-content: center; color: var(--muted); }   /* the empty corner where the two axes meet */
   .copts:hover { color: var(--text); background: var(--bg3); }
@@ -268,6 +274,7 @@
   .setrow b { font-size: 14px; font-weight: 600; }
   .setrow small { font-size: 12px; color: var(--muted); }
   .setrow input { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+  .setrow select { width: auto; flex: none; height: 32px; padding: 0 8px; }
   .about a { color: var(--muted); text-decoration: underline; }
   .about { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
   .sync h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
@@ -540,7 +547,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '3.9';  // bump on every push to main
+const APP_VERSION = '4.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1174,8 +1181,8 @@ function ownRequest(sym, iv) {
   const f = (m, p) => own.ws.send(frame({ m, p }));
   if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
   f('chart_create_session', [cs, '']);
-  // US stocks: the "24h" session adds the overnight (Blue Ocean) bars to pre/post; everything else gets "extended".
-  const session = US_EX.has(sym.split(':')[0]) && chartOpts().overnight ? '24h' : 'extended';
+  // Session choice: regular, extended (pre/post) or 24h (adds the overnight Blue Ocean bars; US stocks only, others fall back to extended).
+  const want = chartOpts().session, session = want === '24h' && !US_EX.has(sym.split(':')[0]) ? 'extended' : want;
   f('resolve_symbol', [cs, 'sym_' + n, '={"symbol":"' + sym + '","adjustment":"splits","session":"' + session + '"}']);
   f('create_series', [cs, 'ser_' + n, 's' + n, 'sym_' + n, iv, 300, '']);
 }
@@ -1202,7 +1209,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, overnight: true, volume: true, ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, session: '24h', ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1247,11 +1254,11 @@ const CHART_OPTS = [
   ['countdown', 'Bar countdown', 'Time left until the current bar closes.'],
   ['sessions', 'Session shading', 'Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).'],
   ['volume', 'Volume', 'Volume bars along the bottom, colored by the candle.'],
-  ['overnight', 'Overnight bars', 'US stocks on the 24-hour session: overnight trading (20:00–04:00 ET) between post- and pre-market.'],
 ];
+const SESSION_OPTS = [['regular', 'Regular only', 'Just the main session.'], ['extended', 'Extended', 'Pre- and post-market too.'], ['24h', '24 hours', 'Extended plus overnight trading (US stocks, 20:00–04:00 ET).']];
 function setChartOpt(k, on) {
   state.chartOpts = { ...chartOpts(), [k]: on }; save();
-  if (k === 'overnight' && own.active) ownRequest(state.symbol, state.interval);
+  if (k === 'session') { if (own.active) ownRequest(state.symbol, state.interval); }
   else if (k === 'volume') own.vol?.setData(on && own.data ? own.data.map(volBar) : []);
   else ownCountdown();
 }
@@ -1259,15 +1266,22 @@ function setChartOpt(k, on) {
 function openChartOpts() {
   if (isPhone()) {
     const o = chartOpts();
-    openSheet('chartopts', 'Chart settings', CHART_OPTS.map(([k, t, d]) => `<label class="setrow"><span><b>${t}</b><small>${d}</small></span><input type="checkbox" data-co="${k}"${o[k] ? ' checked' : ''}></label>`).join(''));
-    $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (k) setChartOpt(k, e.target.checked); });
+    openSheet('chartopts', 'Chart settings', CHART_OPTS.map(([k, t, d]) => `<label class="setrow"><span><b>${t}</b><small>${d}</small></span><input type="checkbox" data-co="${k}"${o[k] ? ' checked' : ''}></label>`).join('')
+      + `<div class="setrow"><span><b>Session</b><small>Which hours the bars cover.</small></span><select class="field" data-cs>${SESSION_OPTS.map(([v, t]) => `<option value="${v}"${o.session === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>`);
+    $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (k) setChartOpt(k, e.target.checked); if (e.target.dataset.cs != null) setChartOpt('session', e.target.value); });
     return;
   }
   closeChartMenu();
   const m = document.createElement('div'); m.className = 'cmenu'; m.id = 'cmenu';
-  const paint = () => { const o = chartOpts(); m.innerHTML = CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join(''); };
+  const paint = () => { const o = chartOpts(); m.innerHTML = CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join('')
+    + `<div class="subw"><button class="ci sub">◂ Session<span class="cv">${SESSION_OPTS.find(x => x[0] === o.session)?.[1] || ''}</span></button><div class="submenu">${SESSION_OPTS.map(([v, t]) => `<button class="ci r${o.session === v ? ' on' : ''}" data-cs="${v}"><i></i>${t}</button>`).join('')}</div></div>`; };
   paint();
-  m.addEventListener('click', e => { const b = e.target.closest('[data-co]'); if (!b) return; setChartOpt(b.dataset.co, !chartOpts()[b.dataset.co]); paint(); });
+  m.addEventListener('click', e => {
+    const b = e.target.closest('[data-co], [data-cs]'); if (!b) return;
+    if (b.dataset.cs) setChartOpt('session', b.dataset.cs); else setChartOpt(b.dataset.co, !chartOpts()[b.dataset.co]);
+    paint();
+  });
+  m.addEventListener('click', e => { const h = e.target.closest('.ci.sub'); if (h) h.parentElement.classList.toggle('open'); });   // click opens the submenu too (touchpads)
   $('ownChart').appendChild(m);
   setTimeout(() => document.addEventListener('pointerdown', closeChartMenuOutside), 0);
 }
