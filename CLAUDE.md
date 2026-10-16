@@ -44,7 +44,7 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 
 **Tab title** — `renderHeader` sets `document.title` to the chart symbol and its chg% (e.g. `CRWV -15.46%`).
 
-**Versioning** — `APP_VERSION` shows in the nav (phones) and header (desktop); bump it on every push to `main`. Off localhost the page re-fetches itself on load and on resume and reloads when the live version differs. On localhost/LAN it live-reloads on file change.
+**Versioning** — `APP_VERSION` shows in the nav (phones) and at the right end of the chart toolbar (desktop, `#tver`; also in the header when the chart is hidden); bump it on every push to `main`. Off localhost the page re-fetches itself on load and on resume and reloads when the live version differs. On localhost/LAN it live-reloads on file change.
 
 ## Vocabulary
 
