@@ -530,7 +530,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '3.0';  // bump on every push to main
+const APP_VERSION = '3.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1157,7 +1157,7 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]);
+  own.series?.setData([]); own.data = null; own.loaded = false;
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
@@ -1176,7 +1176,8 @@ function ownConnect() {
       if (m.m === 'timescale_update' || m.m === 'du') {
         const ser = Object.values(m.p[1] || {}).find(x => x && Array.isArray(x.s)); if (!ser) continue;
         const bars = ser.s.map(b => ownBar(b.v)).filter(Boolean).sort((a, b) => a.time - b.time);
-        if (m.m === 'timescale_update') { own.series.setData(bars); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; }   // all bars + 2 empty slots before the axis
+        // The first timescale_update carries the history; later ones (a new bar opening) and du carry only the changed bars.
+        if (!own.loaded) { own.loaded = true; own.series.setData(bars); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; }   // all bars + 2 empty slots before the axis
         else for (const b of bars) { try { own.series.update(b); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } }
         if (bars.length) { own.last = bars[bars.length - 1]; ownCountdown(); }
       }
