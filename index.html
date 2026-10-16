@@ -91,6 +91,8 @@
   .cols .sortcol.on { color: var(--accent); }
   .cols .sortcol.on::after { opacity: 1; }
   .rows { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .rows { scrollbar-width: none; }   /* scrolls, no visible bar */
+  .rows::-webkit-scrollbar { display: none; }
   .row { position: relative; height: 48px; border-bottom: 1px solid rgba(42, 46, 57, .55); cursor: pointer; font-variant-numeric: tabular-nums;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; background: var(--bg); transition: transform .12s, box-shadow .12s; }
   .row.on { background: var(--accent-bg); }
@@ -532,7 +534,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '3.6';  // bump on every push to main
+const APP_VERSION = '3.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
