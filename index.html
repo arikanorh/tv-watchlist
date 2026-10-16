@@ -465,7 +465,7 @@
     .mleg { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: var(--muted); font-size: 11px; }
     .mleg span { display: flex; align-items: center; gap: 5px; }
     .mleg i { width: 7px; height: 7px; }
-    .cload { position: absolute; top: 10px; right: 8px; z-index: 5; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }   /* top-right corner of the chart */
+    .cload { position: absolute; top: 10px; right: 78px; z-index: 5; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }   /* top-right corner of the chart */
     @keyframes spin { to { transform: rotate(360deg); } }
     .ivbtn { display: none; }
     .ivbtn svg { width: 14px; height: 14px; color: var(--muted); }
@@ -589,7 +589,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '5.4';  // bump on every push to main
+const APP_VERSION = '5.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1238,7 +1238,7 @@ async function showOwnChart(sym) {
   }
   ownRequest(sym, state.interval);
 }
-const ownBusy = () => { const el = $('cload'); if (el) el.hidden = !(own.active && (!own.loaded || own.loadingMore)); };   // spinner by the ticker while bars load
+const ownBusy = () => { const el = $('cload'); if (!el) return; el.hidden = !(own.active && (!own.loaded || own.loadingMore)); if (own.chart) el.style.right = (own.chart.priceScale('right').width() + 8) + 'px'; };   // spinner at the plot's right edge, left of the price axis
 function hideOwnChart() { own.active = false; own.want = null; $('ownChart').hidden = true; document.querySelector('.charea').classList.add('widget'); ownBusy(); }
 // Ask the socket for a series; the answer is matched by session id so stale replies are ignored.
 function ownRequest(sym, iv) {
