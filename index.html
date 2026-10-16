@@ -563,7 +563,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '4.4';  // bump on every push to main
+const APP_VERSION = '4.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1254,8 +1254,9 @@ function ownConnect() {
           own.series.setData(own.data); own.vol.setData(chartOpts().volume ? own.data.map(volBar) : []);
           if (vr) own.chart.timeScale().setVisibleLogicalRange({ from: vr.from + n, to: vr.to + n });   // keep what was on screen in place
           own.loadingMore = false; if (!n) own.noMore = true;
+          ownMaybeMore(own.chart.timeScale().getVisibleLogicalRange());   // still short of the left edge? ask again
         }
-        else { for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } } if (own.loadingMore && m.m === 'timescale_update') { own.loadingMore = false; own.noMore = true; } }
+        else { for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } } if (own.loadingMore && m.m === 'timescale_update' && !bars.length) { own.loadingMore = false; own.noMore = true; } }   // an empty answer = nothing older; a new live bar meanwhile doesn't count
         if (bars.length) { own.last = bars[bars.length - 1]; ownCountdown(); }
       }
       if (m.m === 'symbol_error' || m.m === 'series_error') toast(`${short(own.want?.sym || '')}: no chart data`);
