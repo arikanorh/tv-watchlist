@@ -444,6 +444,23 @@
     .cover .sbtn { flex: none; height: 32px; padding: 0 10px; border-radius: 6px; gap: 8px; background: var(--bg3); }
     .cover .sbtn:hover { color: var(--text); }
     .cover .seg { display: flex; align-items: stretch; gap: 1px; padding: 0; height: 32px; }
+    .mkt { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .mkt:hover { background: var(--bg3); }
+    .mkt i, .mpop i { display: block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+    .s-open > i, i.s-open { background: var(--up); } .s-pre > i, i.s-pre { background: var(--pre); } .s-post > i, i.s-post { background: var(--post); } .s-night > i, i.s-night { background: var(--night); }
+    .mkt.s-open i { box-shadow: 0 0 0 3px rgba(8, 153, 129, .25); }
+    .mpop { position: absolute; left: 8px; top: 50px; z-index: 6; width: 420px; padding: 12px 14px 10px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(0, 0, 0, .55); font-size: 12px; }
+    .mpop h4 { margin: 0 0 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+    .mbar { position: relative; height: 14px; border-radius: 4px; overflow: hidden; background: var(--bg3); }
+    .mbar i { position: absolute; top: 0; bottom: 0; border-radius: 0; opacity: .85; }
+    .mbar b { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--text); box-shadow: 0 0 0 1px var(--bg2); }
+    .mticks { position: relative; height: 30px; margin-top: 4px; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+    .mticks span { position: absolute; transform: translateX(-50%); text-align: center; line-height: 14px; }
+    .mticks em { display: block; font-style: normal; color: var(--text); }
+    .mnow { margin-top: 2px; color: var(--text); }
+    .mleg { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: var(--muted); font-size: 11px; }
+    .mleg span { display: flex; align-items: center; gap: 5px; }
+    .mleg i { width: 7px; height: 7px; }
     .cload { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .ivbtn { display: none; }
@@ -534,7 +551,7 @@
     <div id="dbody"></div>
   </aside>
   <section class="pane chartpane" id="chartWrap" aria-label="Chart">
-    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><span class="cload" id="cload" hidden title="Loading bars…"></span></div><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
+    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button></div><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -565,7 +582,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '4.6';  // bump on every push to main
+const APP_VERSION = '4.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -850,6 +867,7 @@ function renderSession() {
   }
   lastPhase = cls;
   document.body.className = document.body.className.replace(/\bsess-\w+\b/g, '').replace(/\s+/g, ' ').trim() + ' sess-' + cls;
+  const mk = $('mkt'); if (mk) { mk.className = 'mkt s-' + cls; mk.title = `US market: ${label} · click for hours`; }
   $('sessLabel').textContent = label;
   regular = isRegularSession();
   document.body.classList.toggle('regular', regular);
@@ -1178,6 +1196,7 @@ const loadLwc = () => own.lib || (own.lib = new Promise((res, rej) => {
 }));
 async function showOwnChart(sym) {
   own.active = true; $('ownChart').hidden = false; document.querySelector('.charea').classList.remove('widget');
+  if (own.want && own.want.sym !== sym) { own.last = null; ownCountdown(); }   // drop the old symbol's label before the library/socket round trip
   try { await loadLwc(); } catch (_) { $('ownChart').innerHTML = '<div class="empty">Chart library didn\'t load.</div>'; return; }
   if (!own.chart) {
     const el = $('ownChart'), L = window.LightweightCharts;
@@ -1215,7 +1234,7 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.vol?.setData([]); own.data = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy();
+  own.series?.setData([]); own.vol?.setData([]); own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
@@ -1346,6 +1365,31 @@ function openChartOpts() {
   $('ownChart').appendChild(m);
   setTimeout(() => document.addEventListener('pointerdown', closeChartMenuOutside), 0);
 }
+// Market hours popover (desktop, from the dot in the ticker bar): the US day as a bar — overnight, pre, regular, post —
+// in ET with local equivalents and a "now" marker; refreshed every minute while open.
+const SESS_SEGS = [['night', 0, 240], ['pre', 240, 570], ['open', 570, 960], ['post', 960, 1200], ['night', 1200, 1440]];
+function openMarketPop() {
+  closeMarketPop();
+  const p = document.createElement('div'); p.className = 'mpop'; p.id = 'mpop';
+  const paint = () => {
+    const { m: et, wd } = nyParts(), now = new Date(), off = ((now.getHours() * 60 + now.getMinutes() - et) % 1440 + 1440) % 1440;
+    const loc = em => { const t = (em + off) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+    const etf = em => `${String(Math.floor(em / 60)).padStart(2, '0')}:${String(em % 60).padStart(2, '0')}`;
+    const [cls, label] = sessionPhase(), weekend = cls === 'closed';
+    const next = SESS_SEGS.find(([, a]) => a > et), until = next ? next[1] - et : 1440 - et, nextName = { pre: 'pre-market', open: 'regular', post: 'post-market', night: 'overnight' }[next?.[0] || 'night'];
+    const left = `${Math.floor(until / 60) ? Math.floor(until / 60) + 'h ' : ''}${until % 60}m`;
+    p.innerHTML = `<h4><i class="s-${cls}"></i>US market · ${label}</h4>
+      <div class="mbar">${SESS_SEGS.map(([k, a, b]) => `<i class="s-${k}" style="left:${a / 14.4}%;width:${(b - a) / 14.4}%"></i>`).join('')}<b style="left:${et / 14.4}%"></b></div>
+      <div class="mticks">${[240, 570, 960, 1200].map(t => `<span style="left:${t / 14.4}%"><em>${etf(t)}</em>${loc(t)}</span>`).join('')}</div>
+      <div class="mnow">${weekend ? 'Weekend — overnight trading resumes Sunday 20:00 ET' : `Now ${etf(et)} ET · ${loc(et)} local — ${nextName} in ${left}`}</div>
+      <div class="mleg"><span><i class="s-night"></i>Overnight 20:00–04:00</span><span><i class="s-pre"></i>Pre 04:00–09:30</span><span><i class="s-open"></i>Regular 09:30–16:00</span><span><i class="s-post"></i>Post 16:00–20:00</span></div>`;
+  };
+  paint(); p._t = setInterval(paint, 60000);
+  document.querySelector('.charea').appendChild(p);
+  setTimeout(() => document.addEventListener('pointerdown', closeMarketPopOutside), 0);
+}
+function closeMarketPop() { const p = $('mpop'); if (p) { clearInterval(p._t); p.remove(); } document.removeEventListener('pointerdown', closeMarketPopOutside); }
+function closeMarketPopOutside(e) { if (!e.target.closest('#mpop, #mkt')) closeMarketPop(); }
 function closeChartMenu() { $('cmenu')?.remove(); document.removeEventListener('pointerdown', closeChartMenuOutside); }
 function closeChartMenuOutside(e) { if (!e.target.closest('#cmenu, .copts')) closeChartMenu(); }
 // Bars arrive in UTC seconds; intraday ones are shifted so the axis shows local time (the library draws times as UTC).
@@ -1714,7 +1758,7 @@ function openIntervalPicker() {
   $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { setChartInterval(b.dataset.iv); closeSheet(); } };
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeSheet(); closeChartMenu(); return; }
+  if (e.key === 'Escape') { closeSheet(); closeChartMenu(); closeMarketPop(); return; }
   if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   if (!isPhone() && /^[1-8]$/.test(e.key) && ($('sheet').hidden || sheetKind === 'interval')) {
     e.preventDefault();
@@ -2072,6 +2116,7 @@ document.addEventListener('click', e => {
     case 'sheet-close': closeSheet(); break;
     case 'interval': openIntervalPicker(); break;
     case 'chart-opts': $('cmenu') ? closeChartMenu() : openChartOpts(); break;
+    case 'market': $('mpop') ? closeMarketPop() : openMarketPop(); break;
     case 'chart-kind': {   // the icon at the chart's bottom left flips between our chart and the TradingView widget
       if (!state.ownChart && !own.active) { state.ownChart = true; save(); showSymbol(); break; }
       if (noChart(state.symbol)) { toast(`${short(state.symbol)} has no TradingView chart`); break; }
