@@ -547,7 +547,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '4.0';  // bump on every push to main
+const APP_VERSION = '4.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1155,8 +1155,16 @@ async function showOwnChart(sym) {
       layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#787b86', fontSize: 11, attributionLogo: false },   // shading sits behind; attribution is in Settings
       grid: { vertLines: { color: 'rgba(42, 46, 57, .4)' }, horzLines: { color: 'rgba(42, 46, 57, .4)' } },
       rightPriceScale: { borderColor: '#2a2e39' }, timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false, rightOffset: 2 },
-      crosshair: { mode: L.CrosshairMode.Normal }, handleScale: { axisPressedMouseMove: true },
+      crosshair: { mode: L.CrosshairMode.Normal }, handleScale: { axisPressedMouseMove: true, mouseWheel: false }, handleScroll: { mouseWheel: false },
     });
+    // Wheel like TradingView: zoom keeps the right edge (latest bar) fixed and changes how many bars show; sideways wheel pans.
+    el.addEventListener('wheel', e => {
+      const ts = own.chart.timeScale(), vr = ts.getVisibleLogicalRange(); if (!vr) return;
+      e.preventDefault();
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) { const d = e.deltaX / ts.options().barSpacing; ts.setVisibleLogicalRange({ from: vr.from + d, to: vr.to + d }); return; }
+      const width = vr.to - vr.from, factor = Math.exp(e.deltaY * 0.0015), next = Math.max(8, Math.min(5000, width * factor));
+      ts.setVisibleLogicalRange({ from: vr.to - next, to: vr.to });
+    }, { passive: false });
     own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false });
     own.vol = own.chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol', lastValueVisible: false, priceLineVisible: false });
     own.chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });   // bottom fifth, no axis
