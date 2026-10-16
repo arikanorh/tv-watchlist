@@ -190,6 +190,7 @@
   .cmenu .ci.sub .cv { margin-left: auto; font-size: 12px; color: var(--muted); }
   .cmenu .submenu { display: none; position: absolute; right: calc(100% + 6px); bottom: 0; min-width: 150px; padding: 4px; border-radius: 9px; background: var(--bg2); border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(0, 0, 0, .55); }
   .cmenu .subw:hover .submenu, .cmenu .subw.open .submenu { display: block; }
+  .cmenu.flip .submenu { right: auto; left: calc(100% + 6px); }
   .cmenu .ci.r i { border-radius: 50%; }
   .cmenu .ci.r.on i::after { width: 6px; height: 6px; margin: 2.5px; border: 0; border-radius: 50%; background: #fff; transform: none; }
   .cmenu .ci.on i::after { content: ''; display: block; width: 4px; height: 8px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
@@ -585,7 +586,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '5.1';  // bump on every push to main
+const APP_VERSION = '5.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1224,6 +1225,7 @@ async function showOwnChart(sym) {
     own.chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });   // bottom fifth, no axis
     new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width && r.height) own.chart.applyOptions({ width: r.width, height: r.height }); ownCountdown(); }).observe(el);
     el.insertAdjacentHTML('afterbegin', '<div class="sessbg" id="sessbg"></div><button class="ownlogo" data-act="chart-kind" title="Switch to the TradingView chart"><img src="icons/icon-192.png" alt=""></button>');
+    el.addEventListener('contextmenu', e => { if (isPhone()) return; e.preventDefault(); const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
     const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
     el.insertAdjacentHTML('beforeend', '<button class="copts" data-act="chart-opts" title="Chart settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>');
     own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownCountdown);
@@ -1350,7 +1352,7 @@ function setChartOpt(k, on) {
   else ownCountdown();
 }
 // Chart settings: a context-style menu next to the ⚙ on desktop (click toggles, stays open), a sheet on phones.
-function openChartOpts() {
+function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), otherwise beside the gear
   if (isPhone()) {
     const o = chartOpts();
     openSheet('chartopts', 'Chart settings', CHART_OPTS.map(([k, t, d]) => `<label class="setrow"><span><b>${t}</b><small>${d}</small></span><input type="checkbox" data-co="${k}"${o[k] ? ' checked' : ''}></label>`).join('')
@@ -1370,6 +1372,12 @@ function openChartOpts() {
   });
   m.addEventListener('click', e => { const h = e.target.closest('.ci.sub'); if (h) h.parentElement.classList.toggle('open'); });   // click opens the submenu too (touchpads)
   $('ownChart').appendChild(m);
+  if (at) {
+    const box = $('ownChart').getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+    const x = Math.min(at.x, box.width - w - 4), y = Math.min(at.y, box.height - h - 4);
+    m.style.cssText = `left:${Math.max(4, x)}px;top:${Math.max(4, y)}px;right:auto;bottom:auto`;
+    m.classList.toggle('flip', x < 170);   // submenu flies right when there's no room on the left
+  }
   setTimeout(() => document.addEventListener('pointerdown', closeChartMenuOutside), 0);
 }
 // Market hours popover (desktop, from the dot in the ticker bar): the US day as a bar — overnight, pre, regular, post —
