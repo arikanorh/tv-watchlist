@@ -191,6 +191,15 @@
   .cmenu .submenu { display: none; position: absolute; right: calc(100% + 6px); bottom: 0; min-width: 150px; padding: 4px; border-radius: 9px; background: var(--bg2); border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(0, 0, 0, .55); }
   .cmenu .subw:hover .submenu, .cmenu .subw.open .submenu { display: block; }
   .cmenu.flip .submenu { right: auto; left: calc(100% + 6px); }
+  .cmenu.rowctx { position: fixed; right: auto; bottom: auto; z-index: 60; min-width: 200px; }
+  .cmenu.rowctx .submenu { top: 0; bottom: auto; }
+  .cmenu .ci svg { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
+  .cmenu .ci.danger { color: var(--down); } .cmenu .ci.danger svg { color: inherit; }
+  .cmenu .ci.danger.armed { background: var(--down); color: #fff; }
+  .cmenu .ci .fsw { width: 4px; height: 16px; border-radius: 2px; background: var(--c); margin: 0 5px; flex-shrink: 0; border: 0; }
+  .cmenu .ci.r.on .fsw { box-shadow: 0 0 0 2px var(--text); }
+  .cmenu .ci[disabled] { opacity: .45; pointer-events: none; }
+  .cmenu .rowctx .ch, .cmenu.rowctx .ch { border-top: 0; margin-top: 0; padding-top: 4px; }
   .cmenu .ci.r i { border-radius: 50%; }
   .cmenu .ci.r.on i::after { width: 6px; height: 6px; margin: 2.5px; border: 0; border-radius: 50%; background: #fff; transform: none; }
   .cmenu .ci.on i::after { content: ''; display: block; width: 4px; height: 8px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
@@ -445,8 +454,10 @@
     .cover .sbtn { flex: none; height: 32px; padding: 0 10px; border-radius: 6px; gap: 8px; background: var(--bg3); }
     .cover .sbtn:hover { color: var(--text); }
     .cover .seg { display: flex; align-items: stretch; gap: 1px; padding: 0; height: 32px; }
-    .mkt { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .mkt:hover { background: var(--bg3); }
+    .mkt, .cinfo { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--muted); }
+    .mkt:hover, .cinfo:hover { background: var(--bg3); color: var(--text); }
+    .cinfo svg { width: 16px; height: 16px; }
+    body.details-open .cinfo { color: var(--accent); }
     .mkt i, .mpop i { display: block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
     .s-open > i, i.s-open { background: var(--up); } .s-pre > i, i.s-pre { background: var(--pre); } .s-post > i, i.s-post { background: var(--post); } .s-night > i, i.s-night { background: var(--night); }
     .mkt.s-open i { box-shadow: 0 0 0 3px rgba(8, 153, 129, .25); }
@@ -554,7 +565,7 @@
     <div id="dbody"></div>
   </aside>
   <section class="pane chartpane" id="chartWrap" aria-label="Chart">
-    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button></div><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
+    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button><button class="cinfo" data-act="details" title="Details panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button></div><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -586,7 +597,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '5.2';  // bump on every push to main
+const APP_VERSION = '5.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1446,6 +1457,7 @@ function openFlagSheet(sym) {
   $('shBody').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; setFlag(sym, b.dataset.f || null); closeSheet(); };
 }
 const ICON = {
+  flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h12l-2 4 2 4H5"/></svg>',
   details: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>',
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
@@ -1463,6 +1475,44 @@ function moveGroup(from, to) {   // reorder sections; the Earnings "Upcoming" gr
   const [g] = gs.splice(from, 1); gs.splice(to, 0, g);
   save(); renderRows();
 }
+// Desktop row context menu (right-click): same actions as the sheet, with Flag and Add to list as flyout submenus.
+function openRowCtx(sym, gi, x, y) {
+  closeRowCtx(); closeChartMenu();
+  const l = activeList(), g = l.groups[gi], i = g ? g.symbols.indexOf(sym) : -1, ordered = g && !g.auto && !state.sort;
+  const m = document.createElement('div'); m.className = 'cmenu rowctx flip'; m.id = 'rowctx';
+  const sub = (label, items) => `<div class="subw"><button class="ci sub">${label}<span class="cv">▸</span></button><div class="submenu">${items}</div></div>`;
+  const flagItems = FLAGS.map(([n, c]) => `<button class="ci r${state.flags?.[sym] === n ? ' on' : ''}" data-f="${n}" style="--c:${c}"><i class="fsw"></i>${n[0].toUpperCase() + n.slice(1)}</button>`).join('') + `<button class="ci" data-f=""><i class="fsw" style="--c:transparent"></i>None</button>`;
+  const others = state.lists.filter(x => x.id !== l.id), own = x => x.groups.filter(q => !q.auto).flatMap(q => q.symbols);
+  const listItems = others.map(x => `<button class="ci" data-l="${esc(x.id)}"${own(x).includes(sym) ? ' disabled' : ''}>${esc(x.name)}<span class="cv">${own(x).includes(sym) ? '✓' : ''}</span></button>`).join('');
+  m.innerHTML = `<div class="ch">${esc(short(sym))}</div>
+    <button class="ci" data-o="details">${ICON.details}Details</button>
+    ${sub(ICON.flag + 'Flag', flagItems)}
+    ${others.length ? sub(ICON.add + 'Add to list', listItems) : ''}
+    ${ordered ? `<button class="ci" data-o="sec">${ICON.sec}Add section above</button>` : ''}
+    ${ordered && i > 0 ? `<button class="ci" data-o="up">${ICON.up}Move up</button>` : ''}
+    ${ordered && i >= 0 && i < g.symbols.length - 1 ? `<button class="ci" data-o="down">${ICON.down}Move down</button>` : ''}
+    ${g && !g.auto ? `<button class="ci danger" data-o="rm">${ICON.rm}Remove from ${esc(l.name)}</button>` : ''}`;
+  m.addEventListener('click', e => {
+    const b = e.target.closest('[data-o], [data-f], [data-l], .ci.sub'); if (!b) return;
+    if (b.classList.contains('sub')) { b.parentElement.classList.toggle('open'); return; }
+    if (b.dataset.f != null) { setFlag(sym, b.dataset.f || null); closeRowCtx(); return; }
+    if (b.dataset.l) { const x = state.lists.find(q => q.id === b.dataset.l); if (x) { if (!x.groups.length) x.groups.push({ name: 'Main', collapsed: false, symbols: [] }); x.groups[x.groups.length - 1].symbols.push(sym); save(); updateEarnings(); patchChips(); wsSync(); toast(`${short(sym)} added to ${x.name}`); } closeRowCtx(); return; }
+    const o = b.dataset.o;
+    if (o === 'rm') { if (!b.classList.contains('armed')) { b.classList.add('armed'); b.lastChild.textContent = ` Remove ${short(sym)}? Click again`; return; } closeRowCtx(); removeSymbol(sym, gi); return; }
+    closeRowCtx();
+    if (o === 'details') { if (sym !== state.symbol) selectSymbol(sym, false); state.detailsOpen = true; save(); applyDetails(); }
+    if (o === 'sec') addSection({ gi, i });
+    if (o === 'up') moveSymbol(sym, gi, gi, i - 1);
+    if (o === 'down') moveSymbol(sym, gi, gi, i + 1);
+  });
+  document.body.appendChild(m);
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(4, Math.min(x, innerWidth - w - 4)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - h - 4)) + 'px';
+  if (x + w + 160 > innerWidth) m.classList.remove('flip');   // submenus fly left near the right edge
+  setTimeout(() => document.addEventListener('pointerdown', closeRowCtxOutside), 0);
+}
+function closeRowCtx() { $('rowctx')?.remove(); document.removeEventListener('pointerdown', closeRowCtxOutside); }
+function closeRowCtxOutside(e) { if (!e.target.closest('#rowctx')) closeRowCtx(); }
 function openGroupMenu(gi) {
   const l = activeList(), gs = l.groups, g = gs[gi]; if (!g || g.auto) return;
   const first = gs.findIndex(x => !x.auto), last = gs.length - 1, movable = groupMovable(gi), own = gs.filter(x => !x.auto).length;
@@ -1701,7 +1751,7 @@ function placeTools() {   // the session/tick/toggle block stays in the header (
   if (pins.parentElement !== pdest) pdest.insertBefore(pins, before);
   // desktop: the search box and the interval buttons float over the chart's top-left corner
   const cover = $('cover'), sb = $('sbtn'), seg = $('seg');
-  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg); } }   // order: search, market dot, intervals
+  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg); } }   // order: search, market dot, details, intervals
   else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend(sb); document.querySelector('.ctools').prepend(seg); } }
   renderPins();
 }
@@ -1774,7 +1824,7 @@ function openIntervalPicker() {
   $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { setChartInterval(b.dataset.iv); closeSheet(); } };
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeSheet(); closeChartMenu(); closeMarketPop(); return; }
+  if (e.key === 'Escape') { closeSheet(); closeChartMenu(); closeMarketPop(); closeRowCtx(); return; }
   if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   if (!isPhone() && /^[1-8]$/.test(e.key) && ($('sheet').hidden || sheetKind === 'interval')) {
     e.preventDefault();
@@ -2267,7 +2317,7 @@ rowsEl.addEventListener('click', e => {
 rowsEl.addEventListener('contextmenu', e => {
   const row = e.target.closest('.row, .gh[data-g]'); if (!row) return;
   e.preventDefault();
-  if (!press || press.type === 'mouse') { if (press) endPress(true); row.classList.contains('gh') ? openGroupMenu(+row.dataset.g) : openRowMenu(row.dataset.sym, +row.dataset.g); }
+  if (!press || press.type === 'mouse') { if (press) endPress(true); row.classList.contains('gh') ? openGroupMenu(+row.dataset.g) : (isPhone() ? openRowMenu(row.dataset.sym, +row.dataset.g) : openRowCtx(row.dataset.sym, +row.dataset.g, e.clientX, e.clientY)); }
 });
 
 // ================= iOS niceties =================
