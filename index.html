@@ -120,7 +120,9 @@
     color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
   .earn.soon { background: var(--pre); color: var(--bg); }
   .kv .earn { margin-left: 6px; vertical-align: 1px; }
-  .kv .etm { margin-left: 4px; color: var(--muted); font-size: 11px; }
+  .kv .etm { display: inline-flex; vertical-align: -2px; margin-left: 6px; width: 14px; height: 14px; }
+  .kv .etm svg { width: 14px; height: 14px; }
+  .kv .etm.amc { color: #8fa8ff; } .kv .etm.bmo { color: var(--pre); }
   .opt svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted); }
   .opt.danger svg { color: inherit; }
   .row.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); transform: scale(1.015); z-index: 3; }
@@ -649,7 +651,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '7.2';  // bump on every push to main
+const APP_VERSION = '7.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1773,7 +1775,11 @@ const TR_FLAG = '<svg class="trf" viewBox="0 0 30 20" aria-label="Borsa Istanbul
 const isBist = sym => (sym || '').startsWith('BIST:');
 // Next report timing from TradingView's earnings_release_next_time: 1 = after the close, -1 = before the open, 0 = not given.
 const earnTiming = sym => ({ 1: 'after close', '-1': 'before open' })[raw[sym]?.earnings_release_next_time] || '';
-const earnTimingIcon = sym => ({ 1: '☾', '-1': '☀' })[raw[sym]?.earnings_release_next_time] || '';
+const EARN_ICON = {
+  1: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.6A8.5 8.5 0 1 1 9.4 3.5a7 7 0 0 0 11.1 11.1z"/></svg>',
+  '-1': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.8v2.4M12 19.8v2.4M1.8 12h2.4M19.8 12h2.4M4.8 4.8l1.7 1.7M17.5 17.5l1.7 1.7M4.8 19.2l1.7-1.7M17.5 6.5l1.7-1.7"/></svg>',
+};
+const earnTimingIcon = sym => { const k = raw[sym]?.earnings_release_next_time; return EARN_ICON[k] ? `<i class="etm ${k === 1 ? 'amc' : 'bmo'}" title="${earnTiming(sym)}">${EARN_ICON[k]}</i>` : ''; };
 const ICON = {
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h12l-2 4 2 4H5"/></svg>',
   details: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>',
@@ -2059,7 +2065,7 @@ function detailsHtml(sym) {
   const co = kv('Sector', esc(r.sector || '')) + kv('Industry', esc(r.industry || '')) + kv('Country', esc(r.country || ''))
     + kv('Revenue (TTM)', fmtBig(r.total_revenue)) + kv('Net margin', r.net_margin_ttm != null ? num(r.net_margin_ttm, 1) + '%' : null)
     + kv('Next earnings', days != null && days >= 0 ? new Date(e * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-      + (earnTiming(sym) ? ` <small class="etm" title="${earnTiming(sym)}">${earnTimingIcon(sym)} ${earnTiming(sym)}</small>` : '')
+      + earnTimingIcon(sym)
       + (days <= 7 ? ` <i class="earn${days <= 1 ? ' soon' : ''}">${days === 0 ? 'today' : days + 'd'}</i>` : `, in ${days}d`) : null)   // same tag as the row within a week
     + kv('Analyst target', tgt);
   if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
