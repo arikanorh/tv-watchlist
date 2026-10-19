@@ -648,7 +648,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '7.0';  // bump on every push to main
+const APP_VERSION = '7.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1313,6 +1313,7 @@ async function showOwnChart(sym) {
       ts.setVisibleLogicalRange({ from: vr.to - next, to: vr.to });
     }, { passive: false });
     own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false });
+    own.ghost = own.chart.addLineSeries({ lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });   // whitespace only: dates on the axis past the last bar
     own.vol = own.chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol', lastValueVisible: false, priceLineVisible: false });
     own.chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });   // bottom fifth, no axis
     new ResizeObserver(() => { const r = el.getBoundingClientRect(), tb = toolW(); if (r.width && r.height) own.chart.applyOptions({ width: r.width - tb, height: r.height }); ownCountdown(); }).observe(el);
@@ -1353,7 +1354,7 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.vol?.setData([]); own.sma?.forEach(x => x.setData([])); own.hoverBar = null; own.meas = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
+  own.series?.setData([]); own.vol?.setData([]); own.ghost?.setData([]); own.futureFrom = null; own.sma?.forEach(x => x.setData([])); own.hoverBar = null; own.meas = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   // Delete only a session this socket created: deleting an unknown one is a protocol_error and TradingView drops the
@@ -1419,7 +1420,7 @@ function ownConnect() {
         const bars = ser.s.map(b => ownBar(b.v)).filter(Boolean).sort((a, b) => a.time - b.time);
         // The first timescale_update carries the history; later ones (a new bar opening, or older bars after request_more_data)
         // and du carry only the changed bars. Older bars can't go through series.update, so they are merged and the series reset.
-        if (!own.loaded) { own.loaded = true; clog('info', 'chart: loaded', { sym: own.want?.sym, iv: own.want?.iv, bars: bars.length, ms: Date.now() - own.reqAt }); own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.data = bars; ownFitView(); ownSma(true); }
+        if (!own.loaded) { own.loaded = true; clog('info', 'chart: loaded', { sym: own.want?.sym, iv: own.want?.iv, bars: bars.length, ms: Date.now() - own.reqAt }); own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.data = bars; ownFuture(); ownFitView(); ownSma(true); }
         else if (own.data && bars.length && bars[0].time < own.data[0].time) {
           const older = bars.filter(b => b.time < own.data[0].time), n = older.length;
           own.data = [...older, ...own.data.filter(b => b.time >= own.data[0].time)];
@@ -1433,6 +1434,7 @@ function ownConnect() {
         }
         else { for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } } if (own.loadingMore && m.m === 'timescale_update' && !bars.length) { own.loadingMore = false; own.noMore = true; } }   // an empty answer = nothing older; a new live bar meanwhile doesn't count
         ownHiLo(); if (own.loaded && m.m === 'du') ownSma(false);
+        if (own.data && own.data[own.data.length - 1].time !== own.futureFrom) ownFuture();   // a new bar opened: restart the future axis after it
         const newest = bars[bars.length - 1];
         if (newest && (!own.last || newest.time >= own.last.time)) { own.last = newest; ownCountdown(); }   // older batches (history) must not move the label
         ownBusy();
@@ -1478,11 +1480,34 @@ function sessionBarsUntil(fromUtc, toUtc, iv, sym) {   // bars between two times
   }
   return n;
 }
+// Future time axis: whitespace points (time only) on a hidden series after the last bar, stepped by the interval and the
+// session (weekends, and outside the chosen session for US stocks, skipped), so the axis keeps showing dates and times there.
+function futureTimes(fromUtc, count, iv, sym) {
+  const us = US_EX.has(sym.split(':')[0]), sess = chartOpts().session, out = [];
+  const step = iv === 'W' ? 604800 : iv === 'D' ? 86400 : +iv * 60;
+  for (let t = fromUtc + step, i = 0; out.length < count && i < count * 8; t += step, i++) {
+    if (iv !== 'W') {
+      const wd = ET_WD.format(new Date(t * 1000));
+      if (wd === 'Sat' || (wd === 'Sun' && !(us && sess === '24h' && iv !== 'D'))) continue;
+      if (iv !== 'D' && us) { const ph = etPhase(t); if (sess === 'regular' && ph !== '') continue; if (sess === 'extended' && ph === 'night') continue; }
+    }
+    out.push(t);
+  }
+  return out;
+}
+function ownFuture() {
+  if (!own.ghost || !own.data?.length) return;
+  const last = own.data[own.data.length - 1], shift = own.intraday ? -new Date().getTimezoneOffset() * 60 : 0, iv = own.want?.iv || state.interval;
+  own.futureFrom = last.time;
+  const n = Math.min(600, Math.max(80, Math.round(own.data.length * 0.5)));
+  own.ghost.setData(futureTimes(last.time - shift, n, iv, own.want?.sym || '').map(t => ({ time: t + shift })));
+}
 // Bar index (logical) of an earnings time: its bar if it's in the data, else counted forward from the last bar.
 function earningsLogical(t) {
   const sym = own.want?.sym, iv = own.want?.iv || state.interval, shift = own.intraday ? -new Date().getTimezoneOffset() * 60 : 0, last = own.data[own.data.length - 1], local = t + shift;
   if (local <= last.time) { let lo = 0, hi = own.data.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (own.data[m].time < local) lo = m + 1; else hi = m; } return lo; }
-  return own.data.length - 1 + Math.max(1, sessionBarsUntil(last.time - shift, t, iv, sym));
+  const fut = futureTimes(last.time - shift, 2000, iv, sym), k = fut.findIndex(x => x >= t);
+  return own.data.length - 1 + (k < 0 ? Math.max(1, sessionBarsUntil(last.time - shift, t, iv, sym)) : k + 1);
 }
 // First view of a series: all bars plus two empty slots — and, when the next earnings are within 7 days, room up to them.
 function ownFitView() {
