@@ -119,6 +119,7 @@
   .earn { flex-shrink: 0; font-style: normal; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 5px; border-radius: 4px;
     color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
   .earn.soon { background: var(--pre); color: var(--bg); }
+  .kv .earn { margin-left: 6px; vertical-align: 1px; }
   .opt svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted); }
   .opt.danger svg { color: inherit; }
   .row.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); transform: scale(1.015); z-index: 3; }
@@ -643,7 +644,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.8';  // bump on every push to main
+const APP_VERSION = '6.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1977,7 +1978,8 @@ function detailsHtml(sym) {
   const tgt = r.price_target_average ? fmtPrice(r.price_target_average) + ` <small class="${dir(r.price_target_average - r.lp)}">${pct((r.price_target_average - r.lp) / r.lp * 100)}</small>` : null;
   const co = kv('Sector', esc(r.sector || '')) + kv('Industry', esc(r.industry || '')) + kv('Country', esc(r.country || ''))
     + kv('Revenue (TTM)', fmtBig(r.total_revenue)) + kv('Net margin', r.net_margin_ttm != null ? num(r.net_margin_ttm, 1) + '%' : null)
-    + kv('Next earnings', days != null && days >= 0 ? new Date(e * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (days === 0 ? ', today' : `, in ${days}d`) : null)
+    + kv('Next earnings', days != null && days >= 0 ? new Date(e * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+      + (days <= 7 ? ` <i class="earn${days <= 1 ? ' soon' : ''}">${days === 0 ? 'today' : days + 'd'}</i>` : `, in ${days}d`) : null)   // same tag as the row within a week
     + kv('Analyst target', tgt);
   if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
   return h + newsHtml(sym);
