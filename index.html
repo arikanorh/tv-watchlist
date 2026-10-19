@@ -169,14 +169,14 @@
   .charea { position: relative; flex: 1; min-height: 0; }
   #tv_chart, #ownChart { position: absolute; inset: 0; }
   #ownChart { z-index: 2; background: var(--bg); }
-  .sessbg { position: absolute; left: 0; top: 0; bottom: 27px; right: 70px; z-index: 1; pointer-events: none; overflow: hidden; }
+  .sessbg { position: absolute; left: var(--tb, 0px); top: 0; bottom: 27px; right: 70px; z-index: 1; pointer-events: none; overflow: hidden; }
   .sessbg i { position: absolute; top: 0; bottom: 0; }
   .sessbg i.pre { background: rgba(247, 166, 0, .07); } .sessbg i.post { background: rgba(41, 98, 255, .08); } .sessbg i.night { background: rgba(156, 39, 176, .09); }
   #ownChart .tv-lightweight-charts { position: relative; z-index: 2; }   /* the library's container above the shading, below our label */
   .plabel { position: absolute; right: 0; z-index: 3; display: flex; flex-direction: column; padding: 2px 0 2px 6px; border-radius: 4px 0 0 4px; font-size: 11px; line-height: 14px; color: #fff; background: #f23645; font-variant-numeric: tabular-nums; pointer-events: none; box-sizing: border-box; }
   .plabel.up { background: #089981; }
   .plabel .pr { font-weight: 600; }
-  .ownlogo { position: absolute; left: 10px; bottom: 36px; z-index: 3; width: 36px; height: 36px; padding: 3px; border-radius: 9px; background: var(--bg3); box-shadow: 0 0 0 1px rgba(255, 255, 255, .12), 0 2px 8px rgba(0, 0, 0, .5); display: block; box-sizing: border-box; }
+  .ownlogo { position: absolute; left: calc(var(--tb, 0px) + 10px); bottom: 36px; z-index: 3; width: 36px; height: 36px; padding: 3px; border-radius: 9px; background: var(--bg3); box-shadow: 0 0 0 1px rgba(255, 255, 255, .12), 0 2px 8px rgba(0, 0, 0, .5); display: block; box-sizing: border-box; }
   .ownlogo img { width: 100%; height: 100%; border-radius: 6px; display: block; }
   .ownlogo:hover { background: #3a3f4d; }
   .tvsw { z-index: 3; font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: .02em; display: none; }
@@ -207,7 +207,7 @@
   .cmenu .ci.r i { border-radius: 50%; }
   .cmenu .ci.r.on i::after { width: 6px; height: 6px; margin: 2.5px; border: 0; border-radius: 50%; background: #fff; transform: none; }
   .cmenu .ci.on i::after { content: ''; display: block; width: 4px; height: 8px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-  .legs { position: absolute; left: 8px; top: 54px; z-index: 4; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .legs { position: absolute; left: calc(var(--tb, 0px) + 8px); top: 54px; z-index: 4; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
   .legt { order: 99; width: 22px; height: 18px; margin-left: 2px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
   .legt svg { width: 13px; height: 13px; transition: transform .15s; }
   .legt:hover { background: var(--bg3); color: var(--text); }
@@ -220,7 +220,15 @@
   .vleg:hover { background: var(--bg3); } .vleg:hover svg { opacity: 1; }
   .vleg.off { opacity: .5; } .vleg.off svg { opacity: 1; } .vleg.off b { text-decoration: line-through; }
   .vleg b .up { color: var(--up); } .vleg b .down { color: var(--down); }
-  .hilo { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .hilo { position: absolute; inset: 0 0 0 var(--tb, 0px); z-index: 3; pointer-events: none; }
+  #ownChart .tv-lightweight-charts { margin-left: var(--tb, 0px); }
+  .ctool { display: none; }
+  .meas { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .meas .mbox { position: absolute; background: rgba(41, 98, 255, .18); border: 1px solid rgba(41, 98, 255, .55); }
+  .meas .mlbl { position: absolute; padding: 6px 10px; border-radius: 6px; background: #2962ff; color: #fff; font-size: 12px; line-height: 17px; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
+  .meas.dn .mbox { background: rgba(242, 54, 69, .16); border-color: rgba(242, 54, 69, .55); }
+  .meas.dn .mlbl { background: #f23645; }
+  #ownChart.measuring .tv-lightweight-charts { cursor: crosshair; }
   .hm { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
   .hm.hi { transform: translate(-50%, -100%); margin-top: -4px; } .hm.lo { margin-top: 4px; }
   .hm b { padding: 1px 6px; border-radius: 4px; line-height: 15px; }
@@ -478,7 +486,16 @@
     .sbtn, .infobtn { height: 38px; border-radius: 10px; }
     .infobtn { width: 38px; }
     .ctools { order: 0; flex-direction: row; align-items: stretch; gap: 6px; height: 50px; padding: 0 8px 0 0; border-top: 0; border-bottom: 1px solid var(--line); }
-    .cover { position: absolute; left: 8px; top: 8px; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 9px; background: var(--cover); backdrop-filter: blur(4px); }
+    .charea:not(.widget) { --tb: 40px; }   /* own chart: tool column on the left */
+    .ctool { position: absolute; left: 0; top: 0; bottom: 0; width: 40px; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: 52px; background: var(--bg); border-right: 1px solid var(--line); }
+    .ctool button { position: relative; width: 32px; height: 32px; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+    .ctool button svg { width: 18px; height: 18px; }
+    .ctool button b { position: absolute; right: 2px; bottom: 1px; font-size: 8px; font-weight: 700; color: inherit; }
+    .ctool button:hover { background: var(--bg3); color: var(--text); }
+    .ctool button.on { color: var(--accent); }
+    .ctool button[data-tool="measure"].on { background: var(--accent); color: #fff; }
+    .ctool .sep { width: 22px; height: 1px; margin: 5px 0; background: var(--line); }
+    .cover { position: absolute; left: calc(var(--tb, 0px) + 8px); top: 8px; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 9px; background: var(--cover); backdrop-filter: blur(4px); }
     .cover .sbtn { flex: none; height: 32px; padding: 0 10px; border-radius: 6px; gap: 8px; background: var(--bg3); }
     .cover .sbtn:hover { color: var(--text); }
     .cover .seg { display: flex; align-items: stretch; gap: 1px; padding: 0; height: 32px; }
@@ -626,7 +643,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.5';  // bump on every push to main
+const APP_VERSION = '6.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1293,7 +1310,17 @@ async function showOwnChart(sym) {
     own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false });
     own.vol = own.chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol', lastValueVisible: false, priceLineVisible: false });
     own.chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });   // bottom fifth, no axis
-    new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width && r.height) own.chart.applyOptions({ width: r.width, height: r.height }); ownCountdown(); }).observe(el);
+    new ResizeObserver(() => { const r = el.getBoundingClientRect(), tb = toolW(); if (r.width && r.height) own.chart.applyOptions({ width: r.width - tb, height: r.height }); ownCountdown(); }).observe(el);
+    // Tool column (desktop): measure, the study / overlay toggles, clear. Built from CHART_TOOLS.
+    el.insertAdjacentHTML('beforeend', `<div class="ctool" id="ctool">${CHART_TOOLS.map(t => t === '|' ? '<i class="sep"></i>' : `<button data-tool="${t[0]}" title="${t[1]}">${t[2]}</button>`).join('')}</div><div class="meas" id="meas" hidden><div class="mbox"></div><div class="mlbl"></div></div>`);
+    $('ctool').addEventListener('click', e => {
+      const b = e.target.closest('[data-tool]'); if (!b) return; e.stopPropagation();
+      const k = b.dataset.tool;
+      if (k === 'measure') { own.measuring = !own.measuring; paintTools(); }
+      else if (k === 'clear') { own.meas = null; ownMeasure(); }
+      else setChartOpt(k, !chartOpts()[k]);
+    });
+    initMeasure(el); paintTools();
     el.insertAdjacentHTML('afterbegin', '<div class="sessbg" id="sessbg"></div><button class="ownlogo" data-act="chart-kind" title="Switch to the TradingView chart"><img src="icons/icon-192.png" alt=""></button>');
     // Legend under the ticker panel (TradingView style): one row per study, click toggles it.
     el.insertAdjacentHTML('beforeend', `<div class="legs${state.legsCollapsed ? ' collapsed' : ''}" id="legs"><button class="legt" data-legt title="Collapse / expand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>${LEGS.map(([k, name]) => `<button class="vleg" data-leg="${k}" title="Show / hide ${name}"><span>${name}</span><b></b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>`).join('')}</div>`);
@@ -1321,7 +1348,7 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.vol?.setData([]); own.sma?.forEach(x => x.setData([])); own.hoverBar = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
+  own.series?.setData([]); own.vol?.setData([]); own.sma?.forEach(x => x.setData([])); own.hoverBar = null; own.meas = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   // Delete only a session this socket created: deleting an unknown one is a protocol_error and TradingView drops the
@@ -1394,6 +1421,7 @@ function ownConnect() {
           const vr = own.chart.timeScale().getVisibleLogicalRange();
           own.series.setData(own.data); own.vol.setData(chartOpts().volume ? own.data.map(volBar) : []);
           ownSma(true);
+          if (own.meas) { own.meas.a.l += n; own.meas.b.l += n; }
           if (vr) own.chart.timeScale().setVisibleLogicalRange({ from: vr.from + n, to: vr.to + n });   // keep what was on screen in place
           own.loadingMore = false; if (!n) own.noMore = true;
           ownMaybeMore(own.chart.timeScale().getVisibleLogicalRange());   // still short of the left edge? ask again
@@ -1428,7 +1456,7 @@ function ownCountdown() {
   cd.style.top = (y - 9) + 'px'; cd.style.width = own.chart.priceScale('right').width() + 'px';
   const g = $('ownChart').querySelector('.copts'); if (g) g.style.width = cd.style.width;
   cd.classList.toggle('up', b.close >= b.open); cd.hidden = false;
-  ownSessions(); ownHiLo(); ownVolLegend();
+  ownSessions(); ownHiLo(); ownVolLegend(); ownMeasure();
 }
 // Legend rows: the hovered bar's values, else the latest; a row that is off is dimmed and struck through.
 const SMAS = [['sma20', 20, '#f7a600'], ['sma50', 50, '#4f8cff']];
@@ -1487,12 +1515,73 @@ const CHART_OPTS = [
 ];
 const SESSION_OPTS = [['regular', 'Regular only', 'Just the main session.'], ['extended', 'Extended', 'Pre- and post-market too.'], ['24h', '24 hours', 'Extended plus overnight trading (US stocks, 20:00–04:00 ET).']];
 function setChartOpt(k, on) {
-  state.chartOpts = { ...chartOpts(), [k]: on }; save();
+  state.chartOpts = { ...chartOpts(), [k]: on }; save(); paintTools();
   if (k === 'session') { if (own.active) ownRequest(state.symbol, state.interval); }
   else if (k === 'volume') { own.vol?.setData(on && own.data ? own.data.map(volBar) : []); ownVolLegend(); }
   else if (k === 'sma20' || k === 'sma50') { ownSma(true); ownVolLegend(); }
   else if (k === 'hilo') { ownHiLo(); ownVolLegend(); }
   else ownCountdown();
+}
+// ---- Tool column + measure tool (desktop, own chart) ----
+const toolW = () => isPhone() ? 0 : 40;
+const TI = (d, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>${extra}`;
+const CHART_TOOLS = [
+  ['measure', 'Measure (or Shift + drag) — price change, bars, time and volume between two points', TI('<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>')],
+  '|',
+  ['volume', 'Volume', TI('<path d="M5 20v-6M10 20V9M15 20v-9M20 20V5"/>')],
+  ['sma20', 'SMA 20', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#f7a600"/>', '<b>20</b>')],
+  ['sma50', 'SMA 50', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#4f8cff"/>', '<b>50</b>')],
+  ['hilo', 'Visible high / low', TI('<path d="M12 3v8M8 7l4-4 4 4M12 21v-8M8 17l4 4 4-4"/>')],
+  ['sessions', 'Session shading', TI('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1" opacity=".5"/><rect x="16" y="4" width="5" height="16" rx="1"/>')],
+  ['countdown', 'Bar countdown', TI('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>')],
+  ['pct', 'Change % on the price label', TI('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>')],
+  '|',
+  ['clear', 'Clear measurements', TI('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>')],
+];
+function paintTools() {
+  const box = $('ctool'); if (!box) return;
+  const o = chartOpts();
+  for (const b of box.querySelectorAll('[data-tool]')) { const k = b.dataset.tool; b.classList.toggle('on', k === 'measure' ? !!own.measuring : k !== 'clear' && !!o[k]); }
+  $('ownChart')?.classList.toggle('measuring', !!own.measuring);
+}
+// Measure: drag from A to B (tool on, or Shift + drag). The box sticks to the chart (stored as bar index + price) and
+// shows Δprice (Δ%), the number of bars and the time span, and the volume traded in between. Esc or the bin clears it.
+function initMeasure(el) {
+  const pane = () => el.querySelector('.tv-lightweight-charts');
+  const at = e => { const r = pane().getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; return { l: own.chart.timeScale().coordinateToLogical(x), p: own.series.coordinateToPrice(y) }; };
+  el.addEventListener('pointerdown', e => {
+    if (isPhone() || e.button !== 0 || !(own.measuring || e.shiftKey) || !e.target.closest('.tv-lightweight-charts')) return;
+    e.preventDefault(); e.stopPropagation();
+    const a = at(e); if (a.l == null || a.p == null) return;
+    own.meas = { a, b: a, live: true }; ownMeasure();
+    const move = ev => { const b = at(ev); if (b.l != null && b.p != null) { own.meas.b = b; ownMeasure(); } };
+    const up = () => { removeEventListener('pointermove', move, true); removeEventListener('pointerup', up, true); if (own.meas) own.meas.live = false; own.measuring = false; paintTools(); ownMeasure(); };
+    addEventListener('pointermove', move, true); addEventListener('pointerup', up, true);
+  }, true);
+  for (const t of ['mousedown', 'touchstart']) el.addEventListener(t, e => { if (!isPhone() && (own.measuring || e.shiftKey) && e.target.closest('.tv-lightweight-charts')) e.stopPropagation(); }, true);   // keep the chart from panning
+}
+const spanText = (bars, iv) => {
+  const min = /^\d+$/.test(iv) ? bars * +iv : iv === 'D' ? bars * 1440 : iv === 'W' ? bars * 10080 : 0;
+  const d = Math.floor(min / 1440), h = Math.floor(min % 1440 / 60), m = min % 60;
+  return [d && d + 'd', h && h + 'h', m && m + 'm'].filter(Boolean).join(' ') || '0m';
+};
+function ownMeasure() {
+  const box = $('meas'); if (!box) return;
+  const M = own.meas; if (!M || !own.data?.length || !own.active) { box.hidden = true; return; }
+  const ts = own.chart.timeScale(), sp = ts.options().barSpacing / 2;
+  const xa = ts.logicalToCoordinate(Math.round(M.a.l)), xb = ts.logicalToCoordinate(Math.round(M.b.l)), ya = own.series.priceToCoordinate(M.a.p), yb = own.series.priceToCoordinate(M.b.p);
+  if ([xa, xb, ya, yb].some(v => v == null)) { box.hidden = true; return; }
+  const tb = toolW(), up = M.b.p >= M.a.p, ia = Math.round(M.a.l), ib = Math.round(M.b.l);
+  const left = Math.min(xa, xb) - sp, right = Math.max(xa, xb) + sp, top = Math.min(ya, yb), bot = Math.max(ya, yb);
+  const mb = box.querySelector('.mbox'); box.hidden = false; box.classList.toggle('dn', !up);
+  Object.assign(mb.style, { left: tb + left + 'px', top: top + 'px', width: Math.max(1, right - left) + 'px', height: Math.max(1, bot - top) + 'px' });
+  const d = M.b.p - M.a.p, pc = d / M.a.p * 100, bars = ib - ia;
+  const lo = Math.max(0, Math.min(ia, ib)), hi = Math.min(own.data.length - 1, Math.max(ia, ib));
+  let vol = 0; for (let i = lo; i <= hi; i++) vol += own.data[i]?.vol || 0;
+  const lb = box.querySelector('.mlbl');
+  lb.innerHTML = `<div>${d >= 0 ? '' : '−'}${fmtPrice(Math.abs(d))} (${pc >= 0 ? '' : '−'}${Math.abs(pc).toFixed(2)}%)</div><div>${bars} bars, ${spanText(Math.abs(bars), own.want?.iv || state.interval)}</div><div>Vol ${fmtVol(vol)}</div>`;
+  const lx = tb + (left + right) / 2, ly = up ? top - 8 : bot + 8;
+  Object.assign(lb.style, { left: lx + 'px', top: ly + 'px', transform: up ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' });
 }
 // Chart settings: a context-style menu next to the ⚙ on desktop (click toggles, stays open), a sheet on phones.
 function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), otherwise beside the gear
@@ -2030,7 +2119,7 @@ function openIntervalPicker() {
   $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { setChartInterval(b.dataset.iv); closeSheet(); } };
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeSheet(); closeChartMenu(); closeMarketPop(); closeRowCtx(); return; }
+  if (e.key === 'Escape') { closeSheet(); closeChartMenu(); closeMarketPop(); closeRowCtx(); if (own.meas || own.measuring) { own.meas = null; own.measuring = false; paintTools(); ownMeasure(); } return; }
   if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   if (!isPhone() && /^[1-8]$/.test(e.key) && ($('sheet').hidden || sheetKind === 'interval')) {
     e.preventDefault();
