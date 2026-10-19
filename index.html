@@ -121,8 +121,9 @@
   .earn.soon { background: var(--pre); color: var(--bg); }
   .kv .earn { margin-left: 6px; vertical-align: 1px; }
   .kv .etm { display: inline-flex; vertical-align: -2px; margin-left: 6px; width: 14px; height: 14px; }
-  .kv .etm svg { width: 14px; height: 14px; }
-  .kv .etm.amc { color: #8fa8ff; } .kv .etm.bmo { color: var(--pre); }
+  .etm svg { width: 14px; height: 14px; }
+  .etm.amc { color: #8fa8ff; } .etm.bmo { color: var(--pre); }
+  .row .etw { display: contents; } .row .etm { display: inline-flex; flex-shrink: 0; width: 13px; height: 13px; } .row .etm svg { width: 13px; height: 13px; }
   .opt svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted); }
   .opt.danger svg { color: inherit; }
   .row.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); transform: scale(1.015); z-index: 3; }
@@ -651,7 +652,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '7.3';  // bump on every push to main
+const APP_VERSION = '7.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1897,7 +1898,7 @@ function openGroupMenu(gi) {
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
 const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
-    <span class="sym"><b>${esc(short(sym))}</b>${isBist(sym) ? TR_FLAG : ''}<i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
+    <span class="sym"><b>${esc(short(sym))}</b>${isBist(sym) ? TR_FLAG : ''}<i class="earn" hidden></i><span class="etw"></span></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
 </div>`;
 let lastSortRender = 0;
 function renderRows() {
@@ -1955,6 +1956,8 @@ function patchRows(withFlash = true) {
     tag.hidden = !show;
     if (show) { tag.textContent = days === 0 ? 'today' : days + 'd'; tag.classList.toggle('soon', days <= 1);
       tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (earnTiming(sym) ? ', ' + earnTiming(sym) : ''); }
+    const etw = row.querySelector('.etw'), icon = show ? earnTimingIcon(sym) : '';   // moon / sun next to the tag
+    if (etw && etw.innerHTML !== icon) etw.innerHTML = icon;
   }
 }
 const earningsDays = sym => { const t = raw[sym]?.earnings_release_next_date; return t ? Math.round((t * 1000 - Date.now()) / 864e5) : null; };
