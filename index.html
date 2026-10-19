@@ -206,11 +206,18 @@
   .cmenu .ci.r.on i::after { width: 6px; height: 6px; margin: 2.5px; border: 0; border-radius: 50%; background: #fff; transform: none; }
   .cmenu .ci.on i::after { content: ''; display: block; width: 4px; height: 8px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
   .legs { position: absolute; left: 8px; top: 54px; z-index: 4; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .legt { order: 99; width: 22px; height: 18px; margin-left: 2px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .legt svg { width: 13px; height: 13px; transition: transform .15s; }
+  .legt:hover { background: var(--bg3); color: var(--text); }
+  .legs.collapsed .vleg { display: none; }
+  .legs.collapsed .legt { order: 0; } .legs.collapsed .legt svg { transform: rotate(180deg); }
   .vleg { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 6px; border-radius: 5px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .vleg b { font-weight: 500; } .vleg b.up { color: var(--up); } .vleg b.down { color: var(--down); }
   .vleg svg { width: 14px; height: 14px; opacity: 0; }
+  .vleg { background: var(--cover); }   /* readable over bars and the high/low pills */
   .vleg:hover { background: var(--bg3); } .vleg:hover svg { opacity: 1; }
   .vleg.off { opacity: .5; } .vleg.off svg { opacity: 1; } .vleg.off b { text-decoration: line-through; }
+  .vleg b .up { color: var(--up); } .vleg b .down { color: var(--down); }
   .hilo { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
   .hm { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
   .hm.hi { transform: translate(-50%, -100%); margin-top: -4px; } .hm.lo { margin-top: 4px; }
@@ -607,7 +614,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.1';  // bump on every push to main
+const APP_VERSION = '6.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1257,8 +1264,11 @@ async function showOwnChart(sym) {
     new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width && r.height) own.chart.applyOptions({ width: r.width, height: r.height }); ownCountdown(); }).observe(el);
     el.insertAdjacentHTML('afterbegin', '<div class="sessbg" id="sessbg"></div><button class="ownlogo" data-act="chart-kind" title="Switch to the TradingView chart"><img src="icons/icon-192.png" alt=""></button>');
     // Legend under the ticker panel (TradingView style): one row per study, click toggles it.
-    el.insertAdjacentHTML('beforeend', `<div class="legs" id="legs">${LEGS.map(([k, name]) => `<button class="vleg" data-leg="${k}" title="Show / hide ${name}"><span>${name}</span><b></b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>`).join('')}</div>`);
-    $('legs').addEventListener('click', e => { const b = e.target.closest('[data-leg]'); if (!b) return; e.stopPropagation(); setChartOpt(b.dataset.leg, !chartOpts()[b.dataset.leg]); });
+    el.insertAdjacentHTML('beforeend', `<div class="legs${state.legsCollapsed ? ' collapsed' : ''}" id="legs"><button class="legt" data-legt title="Collapse / expand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>${LEGS.map(([k, name]) => `<button class="vleg" data-leg="${k}" title="Show / hide ${name}"><span>${name}</span><b></b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>`).join('')}</div>`);
+    $('legs').addEventListener('click', e => {
+      if (e.target.closest('[data-legt]')) { e.stopPropagation(); state.legsCollapsed = !state.legsCollapsed; save(); $('legs').classList.toggle('collapsed', !!state.legsCollapsed); return; }
+      const b = e.target.closest('[data-leg]'); if (!b) return; e.stopPropagation(); setChartOpt(b.dataset.leg, !chartOpts()[b.dataset.leg]);
+    });
     own.sma = SMAS.map(([, , color]) => own.chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
     own.chart.subscribeCrosshairMove(p => { own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); });
     el.addEventListener('contextmenu', e => { if (isPhone()) return; e.preventDefault(); const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
@@ -1295,10 +1305,12 @@ function ownHiLo() {
   const el = $('ownChart'); if (!el || !own.series) return;
   let box = el.querySelector('.hilo'); if (!box) { box = document.createElement('div'); box.className = 'hilo'; box.innerHTML = '<div class="hm hi"><b></b><i></i></div><div class="hm lo"><i></i><b></b></div>'; el.appendChild(box); }
   const vr = own.chart.timeScale().getVisibleLogicalRange();
-  if (!chartOpts().hilo || !own.data?.length || !vr || !own.active) { box.hidden = true; return; }
+  if (!own.data?.length || !vr || !own.active) { box.hidden = true; return; }
   const a = Math.max(0, Math.floor(vr.from)), b = Math.min(own.data.length - 1, Math.ceil(vr.to));
   let hi = null, lo = null;
   for (let i = a; i <= b; i++) { const d = own.data[i]; if (!hi || d.high > hi.high) hi = d; if (!lo || d.low < lo.low) lo = d; }
+  own.hiloVals = hi && lo ? [hi.high, lo.low] : null;   // the legend shows these even when the markers are off
+  if (!chartOpts().hilo) { box.hidden = true; return; }
   const ts = own.chart.timeScale(), place = (node, bar, price) => {
     const x = bar && ts.timeToCoordinate(bar.time), y = bar && own.series.priceToCoordinate(price);
     node.hidden = x == null || y == null; if (node.hidden) return;
@@ -1375,7 +1387,7 @@ function ownCountdown() {
 }
 // Legend rows: the hovered bar's values, else the latest; a row that is off is dimmed and struck through.
 const SMAS = [['sma20', 20, '#f7a600'], ['sma50', 50, '#4f8cff']];
-const LEGS = [['volume', 'Vol'], ['sma20', 'SMA 20'], ['sma50', 'SMA 50']];
+const LEGS = [['volume', 'Vol'], ['sma20', 'SMA 20'], ['sma50', 'SMA 50'], ['hilo', 'High / Low']];
 const fmtVol = v => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(2) + 'K' : String(Math.round(v || 0));
 const smaAt = (n, i) => { if (!own.data || i < n - 1) return null; let t = 0; for (let k = i - n + 1; k <= i; k++) t += own.data[k].close; return t / n; };
 function ownSma(full) {   // full: recompute the whole line; otherwise just the newest point
@@ -1391,9 +1403,10 @@ function ownVolLegend() {
   const b = own.hoverBar || own.last;
   box.hidden = !own.active || !b; if (box.hidden) return;
   const i = own.data ? own.data.indexOf(b) : -1, o = chartOpts();
-  for (const row of box.children) {
+  for (const row of box.querySelectorAll('[data-leg]')) {
     const k = row.dataset.leg, v = row.querySelector('b'); row.classList.toggle('off', !o[k]);
     if (k === 'volume') { v.textContent = fmtVol(b.vol); v.className = b.close >= b.open ? 'up' : 'down'; }
+    else if (k === 'hilo') { const h = own.hiloVals; v.innerHTML = h ? `<span class="up">${fmtPrice(h[0])}</span> <span class="down">${fmtPrice(h[1])}</span>` : '–'; v.className = ''; v.style.color = ''; }
     else { const s = SMAS.find(x => x[0] === k), val = smaAt(s[1], i < 0 ? (own.data?.length || 0) - 1 : i); v.textContent = val == null ? '–' : fmtPrice(val); v.className = ''; v.style.color = s[2]; }
   }
 }
@@ -1433,7 +1446,7 @@ function setChartOpt(k, on) {
   if (k === 'session') { if (own.active) ownRequest(state.symbol, state.interval); }
   else if (k === 'volume') { own.vol?.setData(on && own.data ? own.data.map(volBar) : []); ownVolLegend(); }
   else if (k === 'sma20' || k === 'sma50') { ownSma(true); ownVolLegend(); }
-  else if (k === 'hilo') ownHiLo();
+  else if (k === 'hilo') { ownHiLo(); ownVolLegend(); }
   else ownCountdown();
 }
 // Chart settings: a context-style menu next to the ⚙ on desktop (click toggles, stays open), a sheet on phones.
