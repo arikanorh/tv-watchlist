@@ -222,6 +222,10 @@
   .vleg.off { opacity: .5; } .vleg.off svg { opacity: 1; } .vleg.off b { text-decoration: line-through; }
   .vleg b .up { color: var(--up); } .vleg b .down { color: var(--down); }
   .hilo { position: absolute; inset: 0 0 0 var(--tb, 0px); z-index: 3; pointer-events: none; }
+  .emk { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .emk i { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+    font-style: normal; font-size: 10px; font-weight: 700; color: var(--bg); background: var(--pre); box-shadow: 0 0 0 2px var(--bg); pointer-events: auto; cursor: default; }
+  .emk i.next { background: var(--bg); color: var(--pre); border: 1.5px solid var(--pre); }
   #ownChart .tv-lightweight-charts { margin-left: var(--tb, 0px); }
   .ctool { display: none; }
   .meas { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
@@ -644,7 +648,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.9';  // bump on every push to main
+const APP_VERSION = '7.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1062,7 +1066,7 @@ $('sent').addEventListener('mousemove', e => {
 $('sent').addEventListener('mouseleave', () => { spark.hover = -1; showSparkTip(); });
 
 // ================= Quotes: websocket (relay off localhost), scanner polling fallback =================
-const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date',
+const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date', 'earnings_release_date',
   // details panel
   'open_price', 'high_price', 'low_price', 'prev_close_price', 'volume', 'average_volume', 'price_52_week_high', 'price_52_week_low', 'all_time_high',
   'price_percent_change_1_week', 'price_percent_change_52_week', 'market_cap_basic', 'price_earnings_ttm', 'price_earnings_fy', 'earnings_per_share_diluted_ttm',
@@ -1415,7 +1419,7 @@ function ownConnect() {
         const bars = ser.s.map(b => ownBar(b.v)).filter(Boolean).sort((a, b) => a.time - b.time);
         // The first timescale_update carries the history; later ones (a new bar opening, or older bars after request_more_data)
         // and du carry only the changed bars. Older bars can't go through series.update, so they are merged and the series reset.
-        if (!own.loaded) { own.loaded = true; clog('info', 'chart: loaded', { sym: own.want?.sym, iv: own.want?.iv, bars: bars.length, ms: Date.now() - own.reqAt }); own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; ownSma(true); }   // all bars + 2 empty slots before the axis
+        if (!own.loaded) { own.loaded = true; clog('info', 'chart: loaded', { sym: own.want?.sym, iv: own.want?.iv, bars: bars.length, ms: Date.now() - own.reqAt }); own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.data = bars; ownFitView(); ownSma(true); }
         else if (own.data && bars.length && bars[0].time < own.data[0].time) {
           const older = bars.filter(b => b.time < own.data[0].time), n = older.length;
           own.data = [...older, ...own.data.filter(b => b.time >= own.data[0].time)];
@@ -1440,7 +1444,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, sma20: false, sma50: false, session: '24h', ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, session: '24h', ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1457,7 +1461,50 @@ function ownCountdown() {
   cd.style.top = (y - 9) + 'px'; cd.style.width = own.chart.priceScale('right').width() + 'px';
   const g = $('ownChart').querySelector('.copts'); if (g) g.style.width = cd.style.width;
   cd.classList.toggle('up', b.close >= b.open); cd.hidden = false;
-  ownSessions(); ownHiLo(); ownVolLegend(); ownMeasure();
+  ownSessions(); ownHiLo(); ownVolLegend(); ownMeasure(); ownEarnings();
+}
+// Earnings "E" on the time line: the last report (on its bar) and the next one (in the empty space after the last bar,
+// counted in bars of this interval and session). Hover shows the date.
+const ET_WD = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' });
+function sessionBarsUntil(fromUtc, toUtc, iv, sym) {   // bars between two times for this interval and session (approximate, capped)
+  if (iv === 'W') return Math.round((toUtc - fromUtc) / 604800);
+  const us = US_EX.has(sym.split(':')[0]), sess = chartOpts().session;
+  const step = iv === 'D' ? 86400 : +iv * 60; let n = 0;
+  for (let t = fromUtc + step, i = 0; t <= toUtc && i < 20000; t += step, i++) {
+    const wd = ET_WD.format(new Date(t * 1000));
+    if (wd === 'Sat' || (wd === 'Sun' && !(us && sess === '24h'))) continue;
+    if (iv !== 'D' && us) { const ph = etPhase(t); if (sess === 'regular' && ph !== '') continue; if (sess === 'extended' && ph === 'night') continue; }
+    n++;
+  }
+  return n;
+}
+// Bar index (logical) of an earnings time: its bar if it's in the data, else counted forward from the last bar.
+function earningsLogical(t) {
+  const sym = own.want?.sym, iv = own.want?.iv || state.interval, shift = own.intraday ? -new Date().getTimezoneOffset() * 60 : 0, last = own.data[own.data.length - 1], local = t + shift;
+  if (local <= last.time) { let lo = 0, hi = own.data.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (own.data[m].time < local) lo = m + 1; else hi = m; } return lo; }
+  return own.data.length - 1 + Math.max(1, sessionBarsUntil(last.time - shift, t, iv, sym));
+}
+// First view of a series: all bars plus two empty slots — and, when the next earnings are within 7 days, room up to them.
+function ownFitView() {
+  const n = own.data.length, t = raw[own.want?.sym]?.earnings_release_next_date, days = t ? (t * 1000 - Date.now()) / 864e5 : null;
+  let to = n + 1;
+  if (chartOpts().earnings && days != null && days >= 0 && days <= 7) { const L = earningsLogical(t); to = Math.max(to, Math.min(n + 400, L + Math.max(3, Math.round(L * 0.04)))); }
+  own.chart.timeScale().setVisibleLogicalRange({ from: 0, to });
+}
+function ownEarnings() {
+  const el = $('ownChart'); if (!el || !own.series) return;
+  let box = el.querySelector('.emk'); if (!box) { box = document.createElement('div'); box.className = 'emk'; el.appendChild(box); }
+  const sym = own.want?.sym, r = raw[sym] || {}, iv = own.want?.iv || state.interval;
+  if (!chartOpts().earnings || !own.data?.length || !own.active || !sym) { box.innerHTML = ''; return; }
+  const ts = own.chart.timeScale(), y = el.clientHeight - ts.height() - 11, tb = toolW(), marks = [];
+  for (const [t, next] of [[r.earnings_release_date, false], [r.earnings_release_next_date, true]]) {
+    if (!t || (!next && Date.now() - t * 1000 > 864e5)) continue;   // the last report only for a day after it
+    const x = ts.logicalToCoordinate(earningsLogical(t));
+    if (x == null || x < 0 || x > ts.width()) continue;   // inside the plot (left of the price axis)
+    const d = Math.round((t * 1000 - Date.now()) / 864e5), date = new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    marks.push(`<i class="${next ? 'next' : ''}" style="left:${(tb + x).toFixed(1)}px;top:${y}px" title="Earnings ${date}${next ? (d <= 0 ? ' (today)' : ` (in ${d}d)`) : ''}">E</i>`);
+  }
+  const html = marks.join(''); if (box.innerHTML !== html) box.innerHTML = html;
 }
 // Legend rows: the hovered bar's values, else the latest; a row that is off is dimmed and struck through.
 const SMAS = [['sma20', 20, '#f7a600'], ['sma50', 50, '#4f8cff']];
@@ -1511,6 +1558,7 @@ const CHART_OPTS = [
   ['sessions', 'Session shading', 'Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).'],
   ['volume', 'Volume', 'Volume bars along the bottom, colored by the candle.'],
   ['hilo', 'Visible high / low', 'Marks the highest and lowest bar in view with their prices.'],
+  ['earnings', 'Earnings', 'An "E" on the time line at the last and the next earnings date.'],
   ['sma20', 'SMA 20', '20-bar simple moving average (amber).'],
   ['sma50', 'SMA 50', '50-bar simple moving average (blue).'],
 ];
@@ -1521,6 +1569,7 @@ function setChartOpt(k, on) {
   else if (k === 'volume') { own.vol?.setData(on && own.data ? own.data.map(volBar) : []); ownVolLegend(); }
   else if (k === 'sma20' || k === 'sma50') { ownSma(true); ownVolLegend(); }
   else if (k === 'hilo') { ownHiLo(); ownVolLegend(); }
+  else if (k === 'earnings') ownEarnings();
   else ownCountdown();
 }
 // ---- Tool column + measure tool (desktop, own chart) ----
@@ -1533,6 +1582,7 @@ const CHART_TOOLS = [
   ['sma20', 'SMA 20', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#f7a600"/>', '<b>20</b>')],
   ['sma50', 'SMA 50', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#4f8cff"/>', '<b>50</b>')],
   ['hilo', 'Visible high / low', TI('<path d="M12 3v8M8 7l4-4 4 4M12 21v-8M8 17l4 4 4-4"/>')],
+  ['earnings', 'Earnings markers', TI('<circle cx="12" cy="12" r="9"/><path d="M14.5 8h-5v8h5M9.5 12h4"/>')],
   ['sessions', 'Session shading', TI('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1" opacity=".5"/><rect x="16" y="4" width="5" height="16" rx="1"/>')],
   ['countdown', 'Bar countdown', TI('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>')],
   ['pct', 'Change % on the price label', TI('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>')],
