@@ -160,3 +160,8 @@ Server → client:
 
 Rendering: Lightweight Charts 4.2 (`unpkg.com/lightweight-charts@4.2.0`, Apache-2.0, attribution kept in Settings). The library draws times as UTC, so intraday bar times are shifted by the local offset before `setData`; daily/weekly are not. Our own price label, session shading (phase from the bar's ET time: <04:00 night, <09:30 pre, <16:00 regular, <20:00 post, else night) and volume histogram sit on top of it.
 
+## 7. News headlines
+
+`GET https://news-headlines.tradingview.com/v2/headlines?client=web&lang=en&symbol=NASDAQ:NBIS` → `{items: [{id, title, provider, source, sourceLogoId, published (unix s), urgency (1 = breaking), link, relatedSymbols[], storyPath}]}` (up to ~200, newest first; works for BIST too, `lang=tr` for Turkish sources). `v2/view/headlines/symbol?…` returns the same plus section ids (financial_statement, insider_trading, esg, recommendation).
+`GET https://news-headlines.tradingview.com/v2/story?id=<id>&lang=en` → the story: `shortDescription`, `summary`, `astDescription` (structured full text), `sourceUrl`, `tags`, plus the headline fields. No login needed (verified 2026-10-19). The app calls them directly on localhost and through the relay (`/news`, `/news/story`) elsewhere.
+

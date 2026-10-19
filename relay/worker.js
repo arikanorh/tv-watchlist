@@ -124,6 +124,7 @@ function toRoom(request, env, code, cors) {
   return env.ROOMS.get(env.ROOMS.idFromName(code)).fetch(new Request(request, { headers }));
 }
 const SEARCH = 'https://symbol-search.tradingview.com/symbol_search/v3/';
+const NEWS = 'https://news-headlines.tradingview.com/v2/';
 
 export default {
   async fetch(request, env) {
@@ -162,8 +163,21 @@ export default {
       return new Response(await up.text(), { status: up.status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' } });
     }
 
+    // GET /news?symbol=EX:SYM&lang=en → TradingView headlines; GET /news/story?id=…&lang=en → one story (summary, text).
+    if (url.pathname === '/news' || url.pathname === '/news/story') {
+      if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
+      const cors = { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' };
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+      const lang = (url.searchParams.get('lang') || 'en').slice(0, 5);
+      const target = url.pathname === '/news'
+        ? NEWS + 'headlines?' + new URLSearchParams({ client: 'web', lang, symbol: (url.searchParams.get('symbol') || '').slice(0, 60) })
+        : NEWS + 'story?' + new URLSearchParams({ id: (url.searchParams.get('id') || '').slice(0, 200), lang });
+      const up = await fetch(target, { headers: { Origin: 'https://www.tradingview.com', Referer: 'https://www.tradingview.com/', 'User-Agent': 'Mozilla/5.0' } });
+      return new Response(await up.text(), { status: up.status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' } });
+    }
+
     if (request.headers.get('Upgrade') !== 'websocket') {
-      return new Response('tv-watchlist relay: websocket endpoint, GET /search?text=, GET/PUT /state/<code>, websocket /sync/<code>, GET/POST /log/<code>', { status: 200 });
+      return new Response('tv-watchlist relay: websocket endpoint, GET /search?text=, GET/PUT /state/<code>, websocket /sync/<code>, GET/POST /log/<code>, GET /news?symbol=, GET /news/story?id=', { status: 200 });
     }
     if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
 

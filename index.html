@@ -378,6 +378,16 @@
   .dt-px small { font-size: 12px; color: var(--muted); }
   .dt-ext { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .dt-sec { padding: 10px 16px 12px; border-top: 1px solid var(--line); flex-shrink: 0; }
+  .news .nit { padding: 8px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .news .nit:first-of-type { border-top: 0; }
+  .news .nt { font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .news .nit.open .nt { -webkit-line-clamp: unset; }
+  .news .nm { margin-top: 3px; font-size: 11px; color: var(--muted); }
+  .news .nm b { color: var(--down); font-weight: 600; }
+  .news .nbody { margin-top: 6px; font-size: 12.5px; line-height: 1.45; color: var(--text); opacity: .9; }
+  .news .nbody a { display: block; margin-top: 6px; color: var(--accent); text-decoration: none; }
+  .news .nmuted { font-size: 12px; color: var(--muted); }
+  .news .nit:hover .nt { color: var(--accent); }
   .dt-sec h4 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14px; font-variant-numeric: tabular-nums; }
   .kv > span:first-child { color: var(--muted); white-space: nowrap; }
@@ -616,7 +626,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.4';  // bump on every push to main
+const APP_VERSION = '6.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1869,8 +1879,46 @@ function detailsHtml(sym) {
     + kv('Next earnings', days != null && days >= 0 ? new Date(e * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (days === 0 ? ', today' : `, in ${days}d`) : null)
     + kv('Analyst target', tgt);
   if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
-  return h;
+  return h + newsHtml(sym);
 }
+// ---- News: TradingView headlines for the symbol (direct on localhost, through the relay elsewhere), cached 2 minutes.
+// Tap a headline to open its summary inline; "Read on <source>" opens the original.
+const NEWS_DIRECT = 'https://news-headlines.tradingview.com/v2/';
+const newsUrl = (path, params) => IS_LOCAL ? NEWS_DIRECT + (path === 'story' ? 'story' : 'headlines') + '?' + new URLSearchParams({ client: 'web', ...params })
+  : RELAY_WS.replace(/^wss:/, 'https:') + (path === 'story' ? 'news/story' : 'news') + '?' + new URLSearchParams(params);
+const news = {}, stories = {}, newsOpen = new Set();
+const ago = t => { const m = Math.max(0, Math.round((Date.now() / 1000 - t) / 60)); return m < 60 ? m + 'm' : m < 1440 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd'; };
+async function loadNews(sym) {
+  const n = news[sym] = { ...(news[sym] || {}), loading: true, at: Date.now() };
+  try { const r = await fetch(newsUrl('headlines', { lang: 'en', symbol: sym })); if (!r.ok) throw new Error('HTTP ' + r.status); n.items = ((await r.json()).items || []).slice(0, 25); n.err = null; }
+  catch (e) { n.err = String(e.message || e); clog('warn', 'news: load failed', { sym, err: n.err }); }
+  n.loading = false; renderDetails();
+}
+async function loadStory(id) {
+  stories[id] = { loading: true };
+  try { const r = await fetch(newsUrl('story', { id, lang: 'en' })); if (!r.ok) throw new Error('HTTP ' + r.status); stories[id] = await r.json(); }
+  catch (e) { stories[id] = { err: String(e.message || e) }; }
+  renderDetails();
+}
+function newsHtml(sym) {
+  const n = news[sym];
+  if (!n || (!n.loading && Date.now() - n.at > 120000)) { setTimeout(() => loadNews(sym), 0); if (!n) return `<div class="dt-sec news"><h4>News</h4><div class="nmuted">Loading…</div></div>`; }
+  if (n.err && !n.items) return `<div class="dt-sec news"><h4>News</h4><div class="nmuted">Couldn't load news.</div></div>`;
+  if (!n.items?.length) return n.loading ? `<div class="dt-sec news"><h4>News</h4><div class="nmuted">Loading…</div></div>` : `<div class="dt-sec news"><h4>News</h4><div class="nmuted">No recent news.</div></div>`;
+  return `<div class="dt-sec news"><h4>News</h4>${n.items.map(it => {
+    const open = newsOpen.has(it.id), st = stories[it.id];
+    const body = !open ? '' : !st || st.loading ? '<div class="nbody nmuted">Loading…</div>'
+      : st.err ? '<div class="nbody nmuted">Couldn\'t load the story.</div>'
+      : `<div class="nbody">${esc(st.shortDescription || st.summary || '')}${st.link || it.link ? `<a href="${esc(st.link || it.link)}" target="_blank" rel="noopener">Read on ${esc(it.source || 'source')} ↗</a>` : ''}</div>`;
+    return `<div class="nit${open ? ' open' : ''}" data-news="${esc(it.id)}"><div class="nt">${esc(it.title)}</div><div class="nm">${esc(it.source || it.provider || '')} · ${ago(it.published)}${it.urgency === 1 ? ' · <b>breaking</b>' : ''}</div>${body}</div>`;
+  }).join('')}</div>`;
+}
+document.addEventListener('click', e => {
+  const it = e.target.closest('[data-news]'); if (!it || e.target.closest('a')) return;
+  const id = it.dataset.news;
+  if (newsOpen.has(id)) newsOpen.delete(id); else { newsOpen.add(id); if (!stories[id]) loadStory(id); }
+  renderDetails();
+});
 const detailsTitle = sym => `${short(sym)} · ${raw[sym]?.exchange || sym.split(':')[0]}`;
 // Phones: a bottom sheet. Desktop: the column between list and chart (state.detailsOpen).
 function toggleDetails(sym = state.symbol) {
