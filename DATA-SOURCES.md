@@ -140,7 +140,7 @@ Observed 2026-10-13 00:53 ET: the primary listing (e.g. `NASDAQ:NBIS`) reports `
 
 Same socket and framing as §1 (`wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart`, `~m~len~m~`, `~h~N` heartbeats echoed back). Verified 2026-10-16 with `unauthorized_user_token`; used by `showOwnChart` / `ownRequest` in index.html, through the relay off localhost.
 
-Client → server, in order (one chart session per request; `chart_delete_session` the previous one first):
+Client → server, in order (one chart session per request; `chart_delete_session` the previous one first — **only if it was created on this same socket**: deleting an unknown session id returns `protocol_error` `{unknown_session_id,<<"chart_delete_session">>,…}` and the server closes the socket):
 ```
 {"m":"set_auth_token","p":["unauthorized_user_token"]}
 {"m":"chart_create_session","p":["cs_1",""]}

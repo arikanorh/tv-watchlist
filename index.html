@@ -614,7 +614,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.2';  // bump on every push to main
+const APP_VERSION = '6.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -777,6 +777,24 @@ const SYNC_NAME = (() => {
   return `${dev} · ${app}`;
 })();
 var syncWs = null, syncWsRetry = 0, syncWsTimer = null, syncPeers = null;
+// Client log: socket events, chart loads/timeouts and errors, batched to the sync room (POST /log/<code>; read with
+// GET /log/<code>). Only while sync is on; flushed every 30 s, right away on errors, and with sendBeacon when the page hides.
+const LOG = []; let logTimer = null;
+function clog(kind, msg, data) {
+  LOG.push({ t: Date.now(), c: SYNC_CLIENT, n: SYNC_NAME, v: APP_VERSION, k: kind, m: String(msg).slice(0, 300), ...(data ? { d: data } : {}) });
+  if (LOG.length > 300) LOG.shift();
+  clearTimeout(logTimer); logTimer = setTimeout(flushLog, kind === 'error' ? 1000 : 30000);
+}
+function flushLog(beacon) {
+  const code = state.sync?.code; if (!code || !LOG.length) return;
+  const url = syncApi().replace(/\/state\/$/, '/log/') + code, body = JSON.stringify(LOG.splice(0));
+  if (beacon && navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], { type: 'text/plain' }));
+  else fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'text/plain' }, keepalive: true }).catch(() => {});
+}
+window.addEventListener('error', e => clog('error', e.message, { src: (e.filename || '').split('/').pop(), line: e.lineno, col: e.colno }));
+window.addEventListener('unhandledrejection', e => clog('error', 'unhandled rejection: ' + (e.reason?.message || e.reason)));
+window.addEventListener('pagehide', () => flushLog(true));
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushLog(true); });
 function syncConnect() {
   clearTimeout(syncWsTimer);
   if (syncWs) { syncWs.onclose = null; try { syncWs.close(); } catch (_) {} clearInterval(syncWs._ping); syncWs = null; }
@@ -1035,6 +1053,7 @@ function wsConnect() {
   wsSubscribed = [];
   ws = new WebSocket(IS_LOCAL || !RELAY_WS ? WS_DIRECT : RELAY_WS);
   ws.onopen = () => {
+    clog('info', 'quotes: socket open', { retry: wsRetry });
     wsRetry = 0; wsEverOpen = true;
     wsSend({ m: 'set_auth_token', p: ['unauthorized_user_token'] });
     wsSend({ m: 'quote_create_session', p: ['qs'] });
@@ -1054,7 +1073,8 @@ function wsConnect() {
       else onQuote(n, m.p[1].v);
     }
   };
-  ws.onclose = () => {
+  ws.onclose = e => {
+    clog('warn', 'quotes: socket closed', { code: e.code, retry: wsRetry });
     setStatus('off');
     // TradingView accepts the socket only from allow-listed origins; if it never opened, fall back to polling.
     if (!wsEverOpen && wsRetry >= 1) { quoteSource = 'poll'; return startPolling(); }
@@ -1095,7 +1115,7 @@ function onQuote(sym, v) {
 // Watchdog: the socket can stay open (heartbeats keep coming) while quote data silently stops. Crypto in the lists
 // ticks around the clock, so 30 s without any quote means the session is stuck: reconnect.
 setInterval(() => {
-  if (quoteSource === 'ws' && ws && ws.readyState === 1 && !document.hidden && Date.now() - lastData > 30000) { wsRetry = 0; wsConnect(); }
+  if (quoteSource === 'ws' && ws && ws.readyState === 1 && !document.hidden && Date.now() - lastData > 30000) { clog('warn', 'quotes: no data for 30 s, reconnecting'); wsRetry = 0; wsConnect(); }
 }, 10000);
 function setStatus(st) {
   $('dot').className = 'dot ' + st;
@@ -1289,15 +1309,26 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.vol?.setData([]); own.sma?.forEach(x => x.setData([])); own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
+  own.series?.setData([]); own.vol?.setData([]); own.sma?.forEach(x => x.setData([])); own.hoverBar = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
-  if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
+  // Delete only a session this socket created: deleting an unknown one is a protocol_error and TradingView drops the
+  // socket, which after every reconnect turned into a close → reconnect → close loop (an empty chart, spinner forever).
+  if (own.ws.sid) f('chart_delete_session', [own.ws.sid]);
+  own.ws.sid = cs;
   f('chart_create_session', [cs, '']);
   // Session choice: regular, extended (pre/post) or 24h (adds the overnight Blue Ocean bars; US stocks only, others fall back to extended).
   const want = chartOpts().session, session = want === '24h' && !US_EX.has(sym.split(':')[0]) ? 'extended' : want;
   f('resolve_symbol', [cs, 'sym_' + n, '={"symbol":"' + sym + '","adjustment":"splits","session":"' + session + '"}']);
   f('create_series', [cs, 'ser_' + n, 's' + n, 'sym_' + n, iv, 300, '']);
+  ownSessions(); ownHiLo(); ownVolLegend();   // no overlays from the previous series while this one loads
+  // Watchdog: a socket can stay open yet never answer (relay/upstream gone quiet). No bars in 8 s → drop it; onclose reconnects and re-requests.
+  own.reqAt = Date.now(); clearTimeout(own.reqTimer);
+  own.reqTimer = setTimeout(() => {
+    if (own.sid !== cs || own.loaded || !own.active) return;
+    clog('warn', 'chart: no bars in 8 s, reconnecting', { sym, iv, session, ws: own.ws?.readyState });
+    try { own.ws?.close(); } catch (_) {}
+  }, 8000);
 }
 // Highest / lowest bar of the visible range: a small triangle + price pill above / below that bar (chart option "Visible
 // high / low"). Drawn as our own overlays so they match the price label, repositioned whenever the chart moves.
@@ -1330,19 +1361,21 @@ function ownMaybeMore(range) {
   }, 300);
 }
 function ownConnect() {
-  const w = own.ws = new WebSocket(IS_LOCAL || !RELAY_WS ? WS_DIRECT : RELAY_WS);
-  w.onopen = () => { own.retry = 0; w.send(frame({ m: 'set_auth_token', p: ['unauthorized_user_token'] })); if (own.want) ownRequest(own.want.sym, own.want.iv); };
+  // Direct on localhost; if the direct socket never opens (e.g. a 127.0.0.1 origin TradingView refuses), use the relay.
+  const direct = (IS_LOCAL || !RELAY_WS) && !own.useRelay, w = own.ws = new WebSocket(direct ? WS_DIRECT : RELAY_WS);
+  w.onopen = () => { own.retry = 0; w.opened = true; w.send(frame({ m: 'set_auth_token', p: ['unauthorized_user_token'] })); if (own.want) ownRequest(own.want.sym, own.want.iv); };
   w.onmessage = e => {
     for (const part of String(e.data).split(/~m~\d+~m~/).filter(Boolean)) {
       if (part.startsWith('~h~')) { w.send('~m~' + part.length + '~m~' + part); continue; }
       let m; try { m = JSON.parse(part); } catch (_) { continue; }
+      if (m.m === 'critical_error' || m.m === 'protocol_error') clog('error', 'chart socket: ' + m.m, { p: JSON.stringify(m.p).slice(0, 200) });
       if (!m.m || m.p?.[0] !== own.sid || !own.series) continue;
       if (m.m === 'timescale_update' || m.m === 'du') {
         const ser = Object.values(m.p[1] || {}).find(x => x && Array.isArray(x.s)); if (!ser) continue;
         const bars = ser.s.map(b => ownBar(b.v)).filter(Boolean).sort((a, b) => a.time - b.time);
         // The first timescale_update carries the history; later ones (a new bar opening, or older bars after request_more_data)
         // and du carry only the changed bars. Older bars can't go through series.update, so they are merged and the series reset.
-        if (!own.loaded) { own.loaded = true; own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; ownSma(true); }   // all bars + 2 empty slots before the axis
+        if (!own.loaded) { own.loaded = true; clog('info', 'chart: loaded', { sym: own.want?.sym, iv: own.want?.iv, bars: bars.length, ms: Date.now() - own.reqAt }); own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; ownSma(true); }   // all bars + 2 empty slots before the axis
         else if (own.data && bars.length && bars[0].time < own.data[0].time) {
           const older = bars.filter(b => b.time < own.data[0].time), n = older.length;
           own.data = [...older, ...own.data.filter(b => b.time >= own.data[0].time)];
@@ -1359,10 +1392,10 @@ function ownConnect() {
         if (newest && (!own.last || newest.time >= own.last.time)) { own.last = newest; ownCountdown(); }   // older batches (history) must not move the label
         ownBusy();
       }
-      if (m.m === 'symbol_error' || m.m === 'series_error') toast(`${short(own.want?.sym || '')}: no chart data`);
+      if (m.m === 'symbol_error' || m.m === 'series_error') { toast(`${short(own.want?.sym || '')}: no chart data`); clog('error', 'chart: ' + m.m, { sym: own.want?.sym, p: JSON.stringify(m.p).slice(0, 200) }); }
     }
   };
-  w.onclose = () => { if (own.ws !== w) return; own.ws = null; if (own.active) setTimeout(ownConnect, Math.min(30000, 1000 * 2 ** own.retry++)); };
+  w.onclose = e => { clog('warn', 'chart: socket closed', { code: e.code, opened: !!w.opened, direct, active: own.active, loaded: own.loaded }); if (!w.opened && direct && RELAY_WS) own.useRelay = true; if (own.ws !== w) return; own.ws = null; if (own.active) setTimeout(ownConnect, Math.min(30000, 1000 * 2 ** own.retry++)); };
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
