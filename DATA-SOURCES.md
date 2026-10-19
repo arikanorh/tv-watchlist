@@ -165,3 +165,7 @@ Rendering: Lightweight Charts 4.2 (`unpkg.com/lightweight-charts@4.2.0`, Apache-
 `GET https://news-headlines.tradingview.com/v2/headlines?client=web&lang=en&symbol=NASDAQ:NBIS` → `{items: [{id, title, provider, source, sourceLogoId, published (unix s), urgency (1 = breaking), link, relatedSymbols[], storyPath}]}` (up to ~200, newest first; works for BIST too, `lang=tr` for Turkish sources). `v2/view/headlines/symbol?…` returns the same plus section ids (financial_statement, insider_trading, esg, recommendation).
 `GET https://news-headlines.tradingview.com/v2/story?id=<id>&lang=en` → the story: `shortDescription`, `summary`, `astDescription` (structured full text), `sourceUrl`, `tags`, plus the headline fields. No login needed (verified 2026-10-19). The app calls them directly on localhost and through the relay (`/news`, `/news/story`) elsewhere.
 
+## 8. Earnings timing
+
+Quote/scanner fields: `earnings_release_next_date` (unix s; for after-close reports set to 16:00 ET, for "not given" a placeholder like 08:00 ET), `earnings_release_next_time` (1 = after market close, -1 = before market open, 0 = not given), `earnings_release_date` (last report, the actual release time to the minute), `earnings_release_time` (same code for the last report), `*_calendar_date` / `*_trading_date_fq` (day-level variants). Verified 2026-10-19.
+

@@ -120,6 +120,7 @@
     color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
   .earn.soon { background: var(--pre); color: var(--bg); }
   .kv .earn { margin-left: 6px; vertical-align: 1px; }
+  .kv .etm { margin-left: 4px; color: var(--muted); font-size: 11px; }
   .opt svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted); }
   .opt.danger svg { color: inherit; }
   .row.lift { background: var(--bg3); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); transform: scale(1.015); z-index: 3; }
@@ -648,7 +649,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '7.1';  // bump on every push to main
+const APP_VERSION = '7.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1066,7 +1067,7 @@ $('sent').addEventListener('mousemove', e => {
 $('sent').addEventListener('mouseleave', () => { spark.hover = -1; showSparkTip(); });
 
 // ================= Quotes: websocket (relay off localhost), scanner polling fallback =================
-const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date', 'earnings_release_date',
+const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date', 'earnings_release_date', 'earnings_release_next_time',
   // details panel
   'open_price', 'high_price', 'low_price', 'prev_close_price', 'volume', 'average_volume', 'price_52_week_high', 'price_52_week_low', 'all_time_high',
   'price_percent_change_1_week', 'price_percent_change_52_week', 'market_cap_basic', 'price_earnings_ttm', 'price_earnings_fy', 'earnings_per_share_diluted_ttm',
@@ -1527,7 +1528,8 @@ function ownEarnings() {
     const x = ts.logicalToCoordinate(earningsLogical(t));
     if (x == null || x < 0 || x > ts.width()) continue;   // inside the plot (left of the price axis)
     const d = Math.round((t * 1000 - Date.now()) / 864e5), date = new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    marks.push(`<i class="${next ? 'next' : ''}" style="left:${(tb + x).toFixed(1)}px;top:${y}px" title="Earnings ${date}${next ? (d <= 0 ? ' (today)' : ` (in ${d}d)`) : ''}">E</i>`);
+    const when = next ? (earnTiming(sym) ? `, ${earnTiming(sym)}` : '') : `, ${new Date(t * 1000).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' })} ET`;
+    marks.push(`<i class="${next ? 'next' : ''}" style="left:${(tb + x).toFixed(1)}px;top:${y}px" title="Earnings ${date}${when}${next ? (d <= 0 ? ' (today)' : ` (in ${d}d)`) : ''}">E</i>`);
   }
   const html = marks.join(''); if (box.innerHTML !== html) box.innerHTML = html;
 }
@@ -1769,6 +1771,9 @@ function openFlagSheet(sym) {
 // Small Turkish flag next to BIST tickers (inline SVG: emoji flags don't render on Windows).
 const TR_FLAG = '<svg class="trf" viewBox="0 0 30 20" aria-label="Borsa Istanbul"><rect width="30" height="20" rx="2" fill="#e30a17"/><circle cx="11" cy="10" r="5" fill="#fff"/><circle cx="12.25" cy="10" r="4" fill="#e30a17"/><path fill="#fff" d="M16.4 10l3.9-1.27-2.41 3.32V7.95l2.41 3.32z"/></svg>';
 const isBist = sym => (sym || '').startsWith('BIST:');
+// Next report timing from TradingView's earnings_release_next_time: 1 = after the close, -1 = before the open, 0 = not given.
+const earnTiming = sym => ({ 1: 'after close', '-1': 'before open' })[raw[sym]?.earnings_release_next_time] || '';
+const earnTimingIcon = sym => ({ 1: '☾', '-1': '☀' })[raw[sym]?.earnings_release_next_time] || '';
 const ICON = {
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h12l-2 4 2 4H5"/></svg>',
   details: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>',
@@ -1943,7 +1948,7 @@ function patchRows(withFlash = true) {
     const show = days != null && days >= 0 && days <= 7;
     tag.hidden = !show;
     if (show) { tag.textContent = days === 0 ? 'today' : days + 'd'; tag.classList.toggle('soon', days <= 1);
-      tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
+      tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (earnTiming(sym) ? ', ' + earnTiming(sym) : ''); }
   }
 }
 const earningsDays = sym => { const t = raw[sym]?.earnings_release_next_date; return t ? Math.round((t * 1000 - Date.now()) / 864e5) : null; };
@@ -2054,6 +2059,7 @@ function detailsHtml(sym) {
   const co = kv('Sector', esc(r.sector || '')) + kv('Industry', esc(r.industry || '')) + kv('Country', esc(r.country || ''))
     + kv('Revenue (TTM)', fmtBig(r.total_revenue)) + kv('Net margin', r.net_margin_ttm != null ? num(r.net_margin_ttm, 1) + '%' : null)
     + kv('Next earnings', days != null && days >= 0 ? new Date(e * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+      + (earnTiming(sym) ? ` <small class="etm" title="${earnTiming(sym)}">${earnTimingIcon(sym)} ${earnTiming(sym)}</small>` : '')
       + (days <= 7 ? ` <i class="earn${days <= 1 ? ' soon' : ''}">${days === 0 ? 'today' : days + 'd'}</i>` : `, in ${days}d`) : null)   // same tag as the row within a week
     + kv('Analyst target', tgt);
   if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
