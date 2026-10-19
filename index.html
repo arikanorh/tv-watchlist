@@ -114,6 +114,8 @@
   .fdot { width: 30px; height: 30px; border-radius: 50%; background: var(--c); border: 3px solid transparent; box-shadow: 0 0 0 2px transparent; }
   .fdot.on { box-shadow: 0 0 0 2px var(--text); }
   .fnone { margin-left: auto; height: 30px; padding: 0 12px; border-radius: 8px; background: var(--bg3); color: var(--muted); font-size: 13px; }
+  .trf { flex-shrink: 0; width: 15px; height: 10px; border-radius: 2px; vertical-align: middle; }
+  .sr .s .trf { margin: 0 2px; }
   .earn { flex-shrink: 0; font-style: normal; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 5px; border-radius: 4px;
     color: var(--pre); border: 1px solid rgba(247, 166, 0, .55); }
   .earn.soon { background: var(--pre); color: var(--bg); }
@@ -614,7 +616,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.3';  // bump on every push to main
+const APP_VERSION = '6.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1577,6 +1579,9 @@ function openFlagSheet(sym) {
     `<button class="fdot${n === cur ? ' on' : ''}" data-f="${n}" style="--c:${c}" title="${n}"></button>`).join('')}<button class="fnone" data-f="">None</button></div>`);
   $('shBody').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; setFlag(sym, b.dataset.f || null); closeSheet(); };
 }
+// Small Turkish flag next to BIST tickers (inline SVG: emoji flags don't render on Windows).
+const TR_FLAG = '<svg class="trf" viewBox="0 0 30 20" aria-label="Borsa Istanbul"><rect width="30" height="20" rx="2" fill="#e30a17"/><circle cx="11" cy="10" r="5" fill="#fff"/><circle cx="12.25" cy="10" r="4" fill="#e30a17"/><path fill="#fff" d="M16.4 10l3.9-1.27-2.41 3.32V7.95l2.41 3.32z"/></svg>';
+const isBist = sym => (sym || '').startsWith('BIST:');
 const ICON = {
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h12l-2 4 2 4H5"/></svg>',
   details: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>',
@@ -1694,7 +1699,7 @@ function openGroupMenu(gi) {
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
 const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
-    <span class="sym"><b>${esc(short(sym))}</b><i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
+    <span class="sym"><b>${esc(short(sym))}</b>${isBist(sym) ? TR_FLAG : ''}<i class="earn" hidden></i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
 </div>`;
 let lastSortRender = 0;
 function renderRows() {
@@ -2154,7 +2159,7 @@ function refreshSearch() {
   if (!text) { box.innerHTML = '<div class="shint">Type a ticker or a company name.</div>'; return; }
   if (!search.items.length) { box.innerHTML = `<div class="shint">${search.pending ? 'Searching…' : 'No matches'}</div>`; return; }
   box.innerHTML = search.items.map((it, i) => `<div class="sr${i === search.index ? ' on' : ''}" data-pick="${esc(it.sym)}">
-      <span class="s"><b>${esc(short(it.sym))}</b><small>${esc(it.ex || it.sym.split(':')[0])}</small></span>
+      <span class="s"><b>${esc(short(it.sym))}</b>${isBist(it.sym) ? TR_FLAG : ''}<small>${esc(it.ex || it.sym.split(':')[0])}</small></span>
       <button class="add${inList.has(it.sym) ? ' in' : ''}" ${inList.has(it.sym) ? 'disabled aria-label="In list"' : `data-add="${esc(it.sym)}" aria-label="Add to list"`}>${inList.has(it.sym) ? CHECK : PLUS}</button>
       <span class="d">${esc(it.desc || '')}</span></div>`).join('');
 }
