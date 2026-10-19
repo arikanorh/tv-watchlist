@@ -643,7 +643,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.7';  // bump on every push to main
+const APP_VERSION = '6.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1526,7 +1526,7 @@ function setChartOpt(k, on) {
 const toolW = () => isPhone() ? 0 : 40;
 const TI = (d, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>${extra}`;
 const CHART_TOOLS = [
-  ['measure', 'Measure (or Shift + drag) — price change, bars, time and volume between two points', TI('<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>')],
+  ['measure', 'Measure (or Shift + click): click to start, click to end — price change, bars, time and volume', TI('<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>')],
   '|',
   ['volume', 'Volume', TI('<path d="M5 20v-6M10 20V9M15 20v-9M20 20V5"/>')],
   ['sma20', 'SMA 20', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#f7a600"/>', '<b>20</b>')],
@@ -1556,16 +1556,21 @@ function initMeasure(el) {
     const up = ev => { removeEventListener('pointerup', up, true); if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) { own.meas = null; ownMeasure(); } };
     addEventListener('pointerup', up, true);
   }, true);
+  // Click to start (tool on, or Shift + click), move to size it, click again to finish.
   el.addEventListener('pointerdown', e => {
-    if (isPhone() || e.button !== 0 || !(own.measuring || e.shiftKey) || !e.target.closest('.tv-lightweight-charts')) return;
+    if (isPhone() || e.button !== 0 || !e.target.closest('.tv-lightweight-charts')) return;
+    if (own.meas?.live) {   // second click: pin B and finish
+      e.preventDefault(); e.stopPropagation();
+      const b = at(e); if (b.l != null && b.p != null) own.meas.b = b;
+      own.meas.live = false; own.measuring = false; paintTools(); ownMeasure(); return;
+    }
+    if (!(own.measuring || e.shiftKey)) return;
     e.preventDefault(); e.stopPropagation();
     const a = at(e); if (a.l == null || a.p == null) return;
     own.meas = { a, b: a, live: true }; ownMeasure();
-    const move = ev => { const b = at(ev); if (b.l != null && b.p != null) { own.meas.b = b; ownMeasure(); } };
-    const up = () => { removeEventListener('pointermove', move, true); removeEventListener('pointerup', up, true); if (own.meas) own.meas.live = false; own.measuring = false; paintTools(); ownMeasure(); };
-    addEventListener('pointermove', move, true); addEventListener('pointerup', up, true);
   }, true);
-  for (const t of ['mousedown', 'touchstart']) el.addEventListener(t, e => { if (!isPhone() && (own.measuring || e.shiftKey) && e.target.closest('.tv-lightweight-charts')) e.stopPropagation(); }, true);   // keep the chart from panning
+  el.addEventListener('pointermove', e => { if (!own.meas?.live) return; const b = at(e); if (b.l != null && b.p != null) { own.meas.b = b; ownMeasure(); } });
+  for (const t of ['mousedown', 'touchstart']) el.addEventListener(t, e => { if (!isPhone() && (own.measuring || own.meas?.live || e.shiftKey) && e.target.closest('.tv-lightweight-charts')) e.stopPropagation(); }, true);   // keep the chart from panning
 }
 const spanText = (bars, iv) => {
   const min = /^\d+$/.test(iv) ? bars * +iv : iv === 'D' ? bars * 1440 : iv === 'W' ? bars * 10080 : 0;
