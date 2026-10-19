@@ -643,7 +643,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.6';  // bump on every push to main
+const APP_VERSION = '6.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1549,6 +1549,13 @@ function paintTools() {
 function initMeasure(el) {
   const pane = () => el.querySelector('.tv-lightweight-charts');
   const at = e => { const r = pane().getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; return { l: own.chart.timeScale().coordinateToLogical(x), p: own.series.coordinateToPrice(y) }; };
+  // A plain click (no drag) anywhere on the chart — on the box or on empty space — dismisses a finished measurement.
+  el.addEventListener('pointerdown', e => {
+    if (!own.meas || own.meas.live || own.measuring || e.shiftKey || e.button !== 0) return;
+    const x0 = e.clientX, y0 = e.clientY;
+    const up = ev => { removeEventListener('pointerup', up, true); if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) { own.meas = null; ownMeasure(); } };
+    addEventListener('pointerup', up, true);
+  }, true);
   el.addEventListener('pointerdown', e => {
     if (isPhone() || e.button !== 0 || !(own.measuring || e.shiftKey) || !e.target.closest('.tv-lightweight-charts')) return;
     e.preventDefault(); e.stopPropagation();
