@@ -205,6 +205,12 @@
   .cmenu .ci.r i { border-radius: 50%; }
   .cmenu .ci.r.on i::after { width: 6px; height: 6px; margin: 2.5px; border: 0; border-radius: 50%; background: #fff; transform: none; }
   .cmenu .ci.on i::after { content: ''; display: block; width: 4px; height: 8px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .legs { position: absolute; left: 8px; top: 54px; z-index: 4; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .vleg { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 6px; border-radius: 5px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .vleg b { font-weight: 500; } .vleg b.up { color: var(--up); } .vleg b.down { color: var(--down); }
+  .vleg svg { width: 14px; height: 14px; opacity: 0; }
+  .vleg:hover { background: var(--bg3); } .vleg:hover svg { opacity: 1; }
+  .vleg.off { opacity: .5; } .vleg.off svg { opacity: 1; } .vleg.off b { text-decoration: line-through; }
   .hilo { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
   .hm { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
   .hm.hi { transform: translate(-50%, -100%); margin-top: -4px; } .hm.lo { margin-top: 4px; }
@@ -601,7 +607,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '6.0';  // bump on every push to main
+const APP_VERSION = '6.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1250,6 +1256,11 @@ async function showOwnChart(sym) {
     own.chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });   // bottom fifth, no axis
     new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width && r.height) own.chart.applyOptions({ width: r.width, height: r.height }); ownCountdown(); }).observe(el);
     el.insertAdjacentHTML('afterbegin', '<div class="sessbg" id="sessbg"></div><button class="ownlogo" data-act="chart-kind" title="Switch to the TradingView chart"><img src="icons/icon-192.png" alt=""></button>');
+    // Legend under the ticker panel (TradingView style): one row per study, click toggles it.
+    el.insertAdjacentHTML('beforeend', `<div class="legs" id="legs">${LEGS.map(([k, name]) => `<button class="vleg" data-leg="${k}" title="Show / hide ${name}"><span>${name}</span><b></b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>`).join('')}</div>`);
+    $('legs').addEventListener('click', e => { const b = e.target.closest('[data-leg]'); if (!b) return; e.stopPropagation(); setChartOpt(b.dataset.leg, !chartOpts()[b.dataset.leg]); });
+    own.sma = SMAS.map(([, , color]) => own.chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
+    own.chart.subscribeCrosshairMove(p => { own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); });
     el.addEventListener('contextmenu', e => { if (isPhone()) return; e.preventDefault(); const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
     const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
     el.insertAdjacentHTML('beforeend', '<button class="copts" data-act="chart-opts" title="Chart settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>');
@@ -1268,7 +1279,7 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.vol?.setData([]); own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
+  own.series?.setData([]); own.vol?.setData([]); own.sma?.forEach(x => x.setData([])); own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   if (n > 1) f('chart_delete_session', ['cs_' + (n - 1)]);
@@ -1319,18 +1330,19 @@ function ownConnect() {
         const bars = ser.s.map(b => ownBar(b.v)).filter(Boolean).sort((a, b) => a.time - b.time);
         // The first timescale_update carries the history; later ones (a new bar opening, or older bars after request_more_data)
         // and du carry only the changed bars. Older bars can't go through series.update, so they are merged and the series reset.
-        if (!own.loaded) { own.loaded = true; own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; }   // all bars + 2 empty slots before the axis
+        if (!own.loaded) { own.loaded = true; own.series.setData(bars); own.vol.setData(chartOpts().volume ? bars.map(volBar) : []); own.chart.timeScale().setVisibleLogicalRange({ from: 0, to: bars.length + 1 }); own.data = bars; ownSma(true); }   // all bars + 2 empty slots before the axis
         else if (own.data && bars.length && bars[0].time < own.data[0].time) {
           const older = bars.filter(b => b.time < own.data[0].time), n = older.length;
           own.data = [...older, ...own.data.filter(b => b.time >= own.data[0].time)];
           const vr = own.chart.timeScale().getVisibleLogicalRange();
           own.series.setData(own.data); own.vol.setData(chartOpts().volume ? own.data.map(volBar) : []);
+          ownSma(true);
           if (vr) own.chart.timeScale().setVisibleLogicalRange({ from: vr.from + n, to: vr.to + n });   // keep what was on screen in place
           own.loadingMore = false; if (!n) own.noMore = true;
           ownMaybeMore(own.chart.timeScale().getVisibleLogicalRange());   // still short of the left edge? ask again
         }
         else { for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } } if (own.loadingMore && m.m === 'timescale_update' && !bars.length) { own.loadingMore = false; own.noMore = true; } }   // an empty answer = nothing older; a new live bar meanwhile doesn't count
-        ownHiLo();
+        ownHiLo(); if (own.loaded && m.m === 'du') ownSma(false);
         const newest = bars[bars.length - 1];
         if (newest && (!own.last || newest.time >= own.last.time)) { own.last = newest; ownCountdown(); }   // older batches (history) must not move the label
         ownBusy();
@@ -1342,7 +1354,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, session: '24h', ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, sma20: false, sma50: false, session: '24h', ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1359,7 +1371,31 @@ function ownCountdown() {
   cd.style.top = (y - 9) + 'px'; cd.style.width = own.chart.priceScale('right').width() + 'px';
   const g = $('ownChart').querySelector('.copts'); if (g) g.style.width = cd.style.width;
   cd.classList.toggle('up', b.close >= b.open); cd.hidden = false;
-  ownSessions(); ownHiLo();
+  ownSessions(); ownHiLo(); ownVolLegend();
+}
+// Legend rows: the hovered bar's values, else the latest; a row that is off is dimmed and struck through.
+const SMAS = [['sma20', 20, '#f7a600'], ['sma50', 50, '#4f8cff']];
+const LEGS = [['volume', 'Vol'], ['sma20', 'SMA 20'], ['sma50', 'SMA 50']];
+const fmtVol = v => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(2) + 'K' : String(Math.round(v || 0));
+const smaAt = (n, i) => { if (!own.data || i < n - 1) return null; let t = 0; for (let k = i - n + 1; k <= i; k++) t += own.data[k].close; return t / n; };
+function ownSma(full) {   // full: recompute the whole line; otherwise just the newest point
+  if (!own.sma || !own.data) return;
+  SMAS.forEach(([k, n], j) => {
+    const ser = own.sma[j]; if (!chartOpts()[k]) { if (full !== false) ser.setData([]); return; }
+    if (full !== false) { const out = []; let t = 0; own.data.forEach((b, i) => { t += b.close; if (i >= n) t -= own.data[i - n].close; if (i >= n - 1) out.push({ time: b.time, value: t / n }); }); ser.setData(out); }
+    else { const i = own.data.length - 1, v = smaAt(n, i); if (v != null) try { ser.update({ time: own.data[i].time, value: v }); } catch (_) {} }
+  });
+}
+function ownVolLegend() {
+  const box = $('legs'); if (!box) return;
+  const b = own.hoverBar || own.last;
+  box.hidden = !own.active || !b; if (box.hidden) return;
+  const i = own.data ? own.data.indexOf(b) : -1, o = chartOpts();
+  for (const row of box.children) {
+    const k = row.dataset.leg, v = row.querySelector('b'); row.classList.toggle('off', !o[k]);
+    if (k === 'volume') { v.textContent = fmtVol(b.vol); v.className = b.close >= b.open ? 'up' : 'down'; }
+    else { const s = SMAS.find(x => x[0] === k), val = smaAt(s[1], i < 0 ? (own.data?.length || 0) - 1 : i); v.textContent = val == null ? '–' : fmtPrice(val); v.className = ''; v.style.color = s[2]; }
+  }
 }
 // Session shading (US symbols, minute intervals): pre-market amber, post-market blue, overnight purple behind the bars,
 // one tinted block per run of bars in the same phase, redrawn with every reposition.
@@ -1388,12 +1424,15 @@ const CHART_OPTS = [
   ['sessions', 'Session shading', 'Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).'],
   ['volume', 'Volume', 'Volume bars along the bottom, colored by the candle.'],
   ['hilo', 'Visible high / low', 'Marks the highest and lowest bar in view with their prices.'],
+  ['sma20', 'SMA 20', '20-bar simple moving average (amber).'],
+  ['sma50', 'SMA 50', '50-bar simple moving average (blue).'],
 ];
 const SESSION_OPTS = [['regular', 'Regular only', 'Just the main session.'], ['extended', 'Extended', 'Pre- and post-market too.'], ['24h', '24 hours', 'Extended plus overnight trading (US stocks, 20:00–04:00 ET).']];
 function setChartOpt(k, on) {
   state.chartOpts = { ...chartOpts(), [k]: on }; save();
   if (k === 'session') { if (own.active) ownRequest(state.symbol, state.interval); }
-  else if (k === 'volume') own.vol?.setData(on && own.data ? own.data.map(volBar) : []);
+  else if (k === 'volume') { own.vol?.setData(on && own.data ? own.data.map(volBar) : []); ownVolLegend(); }
+  else if (k === 'sma20' || k === 'sma50') { ownSma(true); ownVolLegend(); }
   else if (k === 'hilo') ownHiLo();
   else ownCountdown();
 }
