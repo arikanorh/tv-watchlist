@@ -652,7 +652,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '7.5';  // bump on every push to main
+const APP_VERSION = '7.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1780,6 +1780,14 @@ const EARN_ICON = {
   1: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.6A8.5 8.5 0 1 1 9.4 3.5a7 7 0 0 0 11.1 11.1z"/></svg>',
   '-1': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.8v2.4M12 19.8v2.4M1.8 12h2.4M19.8 12h2.4M4.8 4.8l1.7 1.7M17.5 17.5l1.7 1.7M4.8 19.2l1.7-1.7M17.5 6.5l1.7-1.7"/></svg>',
 };
+// Does a report at unix time t fall in the session we're in (the trading day whose pre-market … post-market we're in;
+// from 20:00 ET on, the next trading day's)? Used to show the moon / sun in the list only for this session's reports.
+const ET_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+function earnsThisSession(t) {
+  const { wd, m } = nyParts(); let d = new Date();
+  if (m >= 1200 || wd === 'Sat' || wd === 'Sun') d = new Date(d.getTime() + ({ Fri: 3, Sat: 2 }[wd] || 1) * 864e5);   // → next trading day
+  return ET_DAY.format(new Date(t * 1000)) === ET_DAY.format(d);
+}
 const earnTimingIcon = sym => { const k = raw[sym]?.earnings_release_next_time; return EARN_ICON[k] ? `<i class="etm ${k === 1 ? 'amc' : 'bmo'}" title="${earnTiming(sym)}">${EARN_ICON[k]}</i>` : ''; };
 const ICON = {
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h12l-2 4 2 4H5"/></svg>',
@@ -1956,7 +1964,7 @@ function patchRows(withFlash = true) {
     tag.hidden = !show;
     if (show) { tag.textContent = days === 0 ? 'today' : days + 'd'; tag.classList.toggle('soon', days <= 1);
       tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (earnTiming(sym) ? ', ' + earnTiming(sym) : ''); }
-    const etw = row.querySelector('.etw'), icon = show ? earnTimingIcon(sym) : '';   // moon / sun next to the tag
+    const etw = row.querySelector('.etw'), icon = show && earnsThisSession(t) ? earnTimingIcon(sym) : '';   // moon / sun only when it reports this session
     if (etw && etw.innerHTML !== icon) etw.innerHTML = icon;
   }
 }
