@@ -230,6 +230,18 @@
   .emk i { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
     font-style: normal; font-size: 10px; font-weight: 700; color: var(--bg); background: var(--pre); box-shadow: 0 0 0 2px var(--bg); pointer-events: auto; cursor: default; }
   .emk i.next { background: var(--bg); color: var(--pre); border: 1.5px solid var(--pre); }
+  .emk i.beat { background: var(--up); color: #fff; } .emk i.miss { background: var(--down); color: #fff; }
+  .emk .ep { display: none; position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); min-width: 190px; padding: 8px 10px; border-radius: 8px;
+    background: var(--bg2); border: 1px solid var(--line); box-shadow: 0 8px 22px rgba(0, 0, 0, .5); color: var(--text); font-size: 12px; font-weight: 400; text-align: left; white-space: nowrap; }
+  .emk i:hover .ep { display: block; }
+  .emk i.edge .ep { left: auto; right: -6px; transform: none; } .emk i.ledge .ep { left: -6px; transform: none; }   /* keep the popover inside the plot */
+  .emk .ep em { display: block; margin-bottom: 5px; font-style: normal; font-weight: 600; color: var(--muted); font-size: 11px; }
+  .emk .ep div, .dt-earn div { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; font-variant-numeric: tabular-nums; }
+  .emk .ep div span:first-child, .dt-earn div span:first-child { min-width: 58px; color: var(--muted); }
+  .emk .ep small, .dt-earn small { color: var(--muted); }
+  .erep { flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font-style: normal; font-size: 9px; font-weight: 700; color: #fff; background: var(--muted); }
+  .erep.beat { background: var(--up); } .erep.miss { background: var(--down); }
   #ownChart .tv-lightweight-charts { margin-left: var(--tb, 0px); }
   .ctool { display: none; }
   .meas { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
@@ -652,7 +664,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '7.6';  // bump on every push to main
+const APP_VERSION = '7.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -708,14 +720,17 @@ const noChart = sym => !CHART_ALIAS[sym] && /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|
 // TVC:US10Y (US 10Y yield) spins forever in the embed; PYTH:US10Y carries the same yield and charts.
 const CHART_ALIAS = { 'TVC:US10Y': 'PYTH:US10Y', 'TVC:VIX': 'CAPITALCOM:VIX' };
 const chartSymbol = sym => CHART_ALIAS[sym] || sym;
-// The Earnings list (auto: 'earnings') stays last; its "Upcoming" group (auto) is rebuilt from the other lists' earnings dates
-// (updateEarnings) and never synced; the "Manual" group is the user's own. A list already named "Earnings" is adopted.
+// The Earnings list (auto: 'earnings') stays last. Its "Upcoming" group (auto: true, first) and "Reported" group
+// (auto: 'reported', last: reports from the past 2 days) are rebuilt from the other lists (updateEarnings) and never
+// synced; "Manual" in between is the user's own. A list already named "Earnings" is adopted.
 function ensureEarnings(s) {
   let l = s.lists.find(x => x.auto === 'earnings') || s.lists.find(x => /^earnings$/i.test(x.name));
   if (!l) { l = { id: 'earnings', name: 'Earnings', summary: true, groups: [] }; s.lists.push(l); }
   l.auto = 'earnings';
-  if (!l.groups.some(g => g.auto)) l.groups.unshift({ name: 'Upcoming', auto: true, collapsed: false, symbols: [] });
+  if (!l.groups.some(g => g.auto === true)) l.groups.unshift({ name: 'Upcoming', auto: true, collapsed: false, symbols: [] });
   if (!l.groups.some(g => !g.auto)) l.groups.push({ name: 'Manual', collapsed: false, symbols: [] });
+  const rep = l.groups.find(g => g.auto === 'reported') || { name: 'Reported', auto: 'reported', collapsed: false, symbols: [] };
+  l.groups = [...l.groups.filter(g => g !== rep), rep];
   s.lists = [...s.lists.filter(x => x !== l), l];
   return l;
 }
@@ -864,9 +879,9 @@ function syncAdopt(remote, notify = true) {
   if (!remote || !Array.isArray(remote.lists) || !remote.lists.length) return;
   const changes = notify ? syncDiff(syncShape(state.lists), remote.lists) : [];
   const collapsed = new Set(state.lists.flatMap(l => l.groups.filter(g => g.collapsed).map(g => l.id + '|' + g.name)));
-  const upcoming = state.lists.find(l => l.auto === 'earnings')?.groups.find(g => g.auto);
+  const autoGroups = state.lists.find(l => l.auto === 'earnings')?.groups.filter(g => g.auto) || [];
   state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols, collapsed: collapsed.has(l.id + '|' + g.name) })) }));
-  const el = ensureEarnings(state); if (upcoming) el.groups[0].symbols = upcoming.symbols;
+  const el = ensureEarnings(state); for (const a of autoGroups) { const g = el.groups.find(x => x.auto === a.auto); if (g) g.symbols = a.symbols; }
   if (remote.flags && typeof remote.flags === 'object') state.flags = remote.flags;
   if (!state.lists.some(l => l.id === state.activeListId)) state.activeListId = state.lists[0].id;
   state.sync.updatedAt = remote.updatedAt;
@@ -1070,7 +1085,8 @@ $('sent').addEventListener('mousemove', e => {
 $('sent').addEventListener('mouseleave', () => { spark.hover = -1; showSparkTip(); });
 
 // ================= Quotes: websocket (relay off localhost), scanner polling fallback =================
-const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date', 'earnings_release_date', 'earnings_release_next_time',
+const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session', 'lp_time', 'update_mode', 'description', 'exchange', 'type', 'earnings_release_next_date', 'earnings_release_date', 'earnings_release_next_time', 'earnings_release_time',
+  'earnings_per_share_fq', 'earnings_per_share_forecast_fq', 'revenue_fq', 'revenue_forecast_fq', 'earnings_per_share_forecast_next_fq', 'revenue_forecast_next_fq',
   // details panel
   'open_price', 'high_price', 'low_price', 'prev_close_price', 'volume', 'average_volume', 'price_52_week_high', 'price_52_week_low', 'all_time_high',
   'price_percent_change_1_week', 'price_percent_change_52_week', 'market_cap_basic', 'price_earnings_ttm', 'price_earnings_fy', 'earnings_per_share_diluted_ttm',
@@ -1527,12 +1543,17 @@ function ownEarnings() {
   if (!chartOpts().earnings || !own.data?.length || !own.active || !sym) { box.innerHTML = ''; return; }
   const ts = own.chart.timeScale(), y = el.clientHeight - ts.height() - 11, tb = toolW(), marks = [];
   for (const [t, next] of [[r.earnings_release_date, false], [r.earnings_release_next_date, true]]) {
-    if (!t || (!next && Date.now() - t * 1000 > 864e5)) continue;   // the last report only for a day after it
+    if (!t || (!next && t + (own.intraday ? -new Date().getTimezoneOffset() * 60 : 0) < own.data[0].time)) continue;   // the last report: whenever its bar is loaded
     const x = ts.logicalToCoordinate(earningsLogical(t));
     if (x == null || x < 0 || x > ts.width()) continue;   // inside the plot (left of the price axis)
     const d = Math.round((t * 1000 - Date.now()) / 864e5), date = new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const when = next ? (earnTiming(sym) ? `, ${earnTiming(sym)}` : '') : `, ${new Date(t * 1000).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' })} ET`;
-    marks.push(`<i class="${next ? 'next' : ''}" style="left:${(tb + x).toFixed(1)}px;top:${y}px" title="Earnings ${date}${when}${next ? (d <= 0 ? ' (today)' : ` (in ${d}d)`) : ''}">E</i>`);
+    const res = next ? '' : earnResult(sym), cls = next ? 'next' : res?.beat == null ? '' : res.beat ? 'beat' : 'miss';
+    const body = next
+      ? (r.earnings_per_share_forecast_next_fq != null || r.revenue_forecast_next_fq ? `<div><span>EPS est</span><b>${r.earnings_per_share_forecast_next_fq != null ? num(r.earnings_per_share_forecast_next_fq, 2) : '–'}</b></div><div><span>Revenue est</span><b>${r.revenue_forecast_next_fq ? fmtBig(r.revenue_forecast_next_fq) : '–'}</b></div>` : '')
+      : earnResultHtml(sym);
+    const head = `${next ? 'Next earnings' : 'Earnings'} · ${date}${when}${next ? (d <= 0 ? ' (today)' : ` (in ${d}d)`) : ''}`;
+    marks.push(`<i class="${cls}${x > ts.width() - 110 ? ' edge' : x < 110 ? ' ledge' : ''}" style="left:${(tb + x).toFixed(1)}px;top:${y}px">E<span class="ep"><em>${head}</em>${body}</span></i>`);
   }
   const html = marks.join(''); if (box.innerHTML !== html) box.innerHTML = html;
 }
@@ -1906,7 +1927,7 @@ function openGroupMenu(gi) {
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
 const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
-    <span class="sym"><b>${esc(short(sym))}</b>${isBist(sym) ? TR_FLAG : ''}<i class="earn" hidden></i><span class="etw"></span></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
+    <span class="sym"><b>${esc(short(sym))}</b>${isBist(sym) ? TR_FLAG : ''}<i class="earn" hidden></i><span class="etw"></span><i class="erep" hidden>E</i></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
 </div>`;
 let lastSortRender = 0;
 function renderRows() {
@@ -1924,9 +1945,10 @@ function renderRows() {
   } else {
     const single = l.groups.length === 1, first = l.groups.findIndex(g => !g.auto);
     l.groups.forEach((g, gi) => {
+      if (g.auto === 'reported' && !g.symbols.length) return;   // shown only while something reported in the last 2 days
       if (!single && !(gi === first && !g.name)) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false);
       if (single || !g.collapsed) html += g.symbols.map((sy, i) => rowHtml(sy, gi, i, g.symbols.length)).join('');
-      if (g.auto && !g.symbols.length && !g.collapsed) html += '<div class="empty">No earnings within 7 days in your lists.</div>';
+      if (g.auto === true && !g.symbols.length && !g.collapsed) html += '<div class="empty">No earnings within 7 days in your lists.</div>';
     });
   }
   // every list ends with its add row (symbols go to the last group; Earnings → Manual)
@@ -1966,17 +1988,37 @@ function patchRows(withFlash = true) {
       tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (earnTiming(sym) ? ', ' + earnTiming(sym) : ''); }
     const etw = row.querySelector('.etw'), icon = show && earnsThisSession(t) ? earnTimingIcon(sym) : '';   // moon / sun only when it reports this session
     if (etw && etw.innerHTML !== icon) etw.innerHTML = icon;
+    const er = row.querySelector('.erep'), done = reportedRecently(sym);   // reported in the last 2 days: green beat, red miss
+    if (er) { er.hidden = !done; if (done) { const e = earnResult(sym);
+      er.className = 'erep ' + (e?.beat == null ? '' : e.beat ? 'beat' : 'miss');
+      er.title = `Reported ${new Date(e.t * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+        + (e.eps != null ? ` · EPS ${num(e.eps, 2)} vs ${e.epsE != null ? num(e.epsE, 2) : '–'} est` : '') + (e.rev ? ` · Revenue ${fmtBig(e.rev)} vs ${e.revE ? fmtBig(e.revE) : '–'} est` : ''); } }
   }
 }
 const earningsDays = sym => { const t = raw[sym]?.earnings_release_next_date; return t ? Math.round((t * 1000 - Date.now()) / 864e5) : null; };
+// Reported in the last 2 days (earnings_release_date), and the result vs. the estimates TradingView carries for it.
+const reportedRecently = sym => { const t = raw[sym]?.earnings_release_date, a = t ? Date.now() - t * 1000 : -1; return a >= 0 && a <= 2 * 864e5; };
+function earnResult(sym) {
+  const r = raw[sym]; if (!r?.earnings_release_date) return null;
+  const eps = r.earnings_per_share_fq, epsE = r.earnings_per_share_forecast_fq, rev = r.revenue_fq, revE = r.revenue_forecast_fq;
+  const epsS = eps != null && epsE ? (eps - epsE) / Math.abs(epsE) * 100 : null, revS = rev && revE ? (rev - revE) / revE * 100 : null;
+  const beat = eps != null && epsE != null ? eps >= epsE : revS != null ? revS >= 0 : null;
+  return { t: r.earnings_release_date, eps, epsE, rev, revE, epsS, revS, beat };
+}
+const surp = v => v == null ? '' : ` <span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)}%</span>`;
+function earnResultHtml(sym) {   // EPS and revenue: actual vs estimate, surprise %
+  const e = earnResult(sym); if (!e) return '';
+  const row = (k, a, est, s, f) => a == null && est == null ? '' : `<div><span>${k}</span><b>${a != null ? f(a) : '–'}</b><small>est ${est != null ? f(est) : '–'}</small>${surp(s)}</div>`;
+  return row('EPS', e.eps, e.epsE, e.epsS, v => num(v, 2)) + row('Revenue', e.rev || null, e.revE || null, e.revS, fmtBig);
+}
 function updateEarnings() {
-  const l = state.lists.find(x => x.auto === 'earnings'), g = l?.groups.find(x => x.auto); if (!g) return;
+  const l = state.lists.find(x => x.auto === 'earnings'), g = l?.groups.find(x => x.auto === true), gr = l?.groups.find(x => x.auto === 'reported'); if (!g) return;
   const manual = new Set(l.groups.filter(x => !x.auto).flatMap(x => x.symbols));
-  const next = [...new Set(state.lists.filter(x => x !== l).flatMap(flatSymbols))]
-    .filter(sy => !manual.has(sy) && (d => d != null && d >= 0 && d <= 7)(earningsDays(sy)))
-    .sort((a, b) => earningsDays(a) - earningsDays(b));
-  if (next.join() === g.symbols.join()) return;
-  g.symbols = next; save();
+  const pool = [...new Set(state.lists.filter(x => x !== l).flatMap(flatSymbols))].filter(sy => !manual.has(sy));
+  const next = pool.filter(sy => (d => d != null && d >= 0 && d <= 7)(earningsDays(sy))).sort((a, b) => earningsDays(a) - earningsDays(b));
+  const done = pool.filter(reportedRecently).sort((a, b) => raw[b].earnings_release_date - raw[a].earnings_release_date);
+  if (next.join() === g.symbols.join() && (!gr || done.join() === gr.symbols.join())) return;
+  g.symbols = next; if (gr) gr.symbols = done; save();
   if (activeList() === l) renderRows();
   patchChips();
 }
@@ -2080,6 +2122,8 @@ function detailsHtml(sym) {
       + (days <= 7 ? ` <i class="earn${days <= 1 ? ' soon' : ''}">${days === 0 ? 'today' : days + 'd'}</i>` : `, in ${days}d`) : null)   // same tag as the row within a week
     + kv('Analyst target', tgt);
   if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
+  const er = earnResult(sym), erh = er && earnResultHtml(sym);
+  if (erh) h += `<div class="dt-sec dt-earn"><h4>Last earnings · ${new Date(er.t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</h4>${erh}</div>`;
   return h + newsHtml(sym);
 }
 // ---- News: TradingView headlines for the symbol (direct on localhost, through the relay elsewhere), cached 2 minutes.
@@ -2666,7 +2710,7 @@ function moveDivider(gi, slot) {   // re-cut the user's groups so header gi star
   divs.sort((a, b) => a.pos - b.pos || (a.moved ? 1 : 0) - (b.moved ? 1 : 0));
   divs[0].pos = 0;
   divs.forEach((d, i) => { d.g.symbols = flat.slice(d.pos, divs[i + 1]?.pos ?? flat.length); });
-  l.groups = [...l.groups.filter(g => g.auto), ...divs.map(d => d.g)];
+  l.groups = [...l.groups.filter(g => g.auto === true), ...divs.map(d => d.g), ...l.groups.filter(g => g.auto && g.auto !== true)];
   save(); renderRows();
 }
 function updateDrop(y) {
