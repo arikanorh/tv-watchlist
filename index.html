@@ -664,7 +664,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '7.8';  // bump on every push to main
+const APP_VERSION = '7.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1983,22 +1983,29 @@ function patchRows(withFlash = true) {
     ext.classList.toggle('up', c.extCls === 'up'); ext.classList.toggle('down', c.extCls === 'down');
     // Earnings within a week: "3d" tag next to the ticker (filled on the day before and the day itself).
     const t = raw[sym]?.earnings_release_next_date, days = earningsDays(sym), tag = row.querySelector('.earn');
-    const show = days != null && days >= 0 && days <= 7;
+    const show = days != null && days >= 0 && days <= 7 && !reportedRecently(sym);   // a passed date TradingView hasn't rolled yet isn't upcoming
     tag.hidden = !show;
     if (show) { tag.textContent = days === 0 ? 'today' : days + 'd'; tag.classList.toggle('soon', days <= 1);
       tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (earnTiming(sym) ? ', ' + earnTiming(sym) : ''); }
     const etw = row.querySelector('.etw'), icon = show && earnsThisSession(t) ? earnTimingIcon(sym) : '';   // moon / sun only when it reports this session
     if (etw && etw.innerHTML !== icon) etw.innerHTML = icon;
     const er = row.querySelector('.erep'), done = reportedRecently(sym);   // reported in the last 2 days: green beat, red miss
-    if (er) { er.hidden = !done; if (done) { const e = earnResult(sym);
+    if (er) { er.hidden = !done; if (done) { const e = resultsPending(sym) ? null : earnResult(sym);
       er.className = 'erep ' + (e?.beat == null ? '' : e.beat ? 'beat' : 'miss');
-      er.title = `Reported ${new Date(e.t * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
-        + (e.eps != null ? ` · EPS ${num(e.eps, 2)} vs ${e.epsE != null ? num(e.epsE, 2) : '–'} est` : '') + (e.rev ? ` · Revenue ${fmtBig(e.rev)} vs ${e.revE ? fmtBig(e.revE) : '–'} est` : ''); } }
+      er.title = `Reported ${new Date((e?.t || lastEarnings(sym)) * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` + (e ? '' : ' · results not in yet')
+        + (e?.eps != null ? ` · EPS ${num(e.eps, 2)} vs ${e.epsE != null ? num(e.epsE, 2) : '–'} est` : '') + (e?.rev ? ` · Revenue ${fmtBig(e.rev)} vs ${e.revE ? fmtBig(e.revE) : '–'} est` : ''); } }
   }
 }
 const earningsDays = sym => { const t = raw[sym]?.earnings_release_next_date; return t ? Math.round((t * 1000 - Date.now()) / 864e5) : null; };
-// Reported in the last 2 days (earnings_release_date), and the result vs. the estimates TradingView carries for it.
-const reportedRecently = sym => { const t = raw[sym]?.earnings_release_date, a = t ? Date.now() - t * 1000 : -1; return a >= 0 && a <= 2 * 864e5; };
+// When the latest report happened: earnings_release_date, or — until TradingView catches up (it lags, and a fresh quote
+// session can hand back the stale pair) — a scheduled date that has passed: right away when the timing is known
+// (before open / after close), else 12 h later (date-only placeholders sit at 12:00 UTC).
+const lastEarnings = sym => { const r = raw[sym]; if (!r) return null; const n = r.earnings_release_next_date;
+  const grace = earnTiming(sym) ? 0 : 864e5 / 2;
+  return Math.max(r.earnings_release_date || 0, n && Date.now() - n * 1000 > grace ? n : 0) || null; };
+// Reported in the last 2 days, and the result vs. the estimates TradingView carries for it.
+const reportedRecently = sym => { const t = lastEarnings(sym), a = t ? Date.now() - t * 1000 : -1; return a >= 0 && a <= 2 * 864e5; };
+const resultsPending = sym => reportedRecently(sym) && lastEarnings(sym) !== raw[sym].earnings_release_date;
 function earnResult(sym) {
   const r = raw[sym]; if (!r?.earnings_release_date) return null;
   const eps = r.earnings_per_share_fq, epsE = r.earnings_per_share_forecast_fq, rev = r.revenue_fq, revE = r.revenue_forecast_fq;
@@ -2016,8 +2023,8 @@ function updateEarnings() {
   const l = state.lists.find(x => x.auto === 'earnings'), g = l?.groups.find(x => x.auto === true), gr = l?.groups.find(x => x.auto === 'reported'); if (!g) return;
   const manual = new Set(l.groups.filter(x => !x.auto).flatMap(x => x.symbols));
   const pool = [...new Set(state.lists.filter(x => x !== l).flatMap(flatSymbols))].filter(sy => !manual.has(sy));
-  const next = pool.filter(sy => (d => d != null && d >= 0 && d <= 7)(earningsDays(sy))).sort((a, b) => earningsDays(a) - earningsDays(b));
-  const done = pool.filter(reportedRecently).sort((a, b) => raw[b].earnings_release_date - raw[a].earnings_release_date);
+  const done = pool.filter(reportedRecently).sort((a, b) => lastEarnings(b) - lastEarnings(a));
+  const next = pool.filter(sy => !done.includes(sy) && (d => d != null && d >= 0 && d <= 7)(earningsDays(sy))).sort((a, b) => earningsDays(a) - earningsDays(b));
   if (next.join() === g.symbols.join() && (!gr || done.join() === gr.symbols.join())) return;
   g.symbols = next; if (gr) gr.symbols = done; save();
   if (activeList() === l) renderRows();
