@@ -242,12 +242,12 @@
   .erep { flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
     font-style: normal; font-size: 9px; font-weight: 700; color: #fff; background: var(--muted); }
   .erep.beat { background: var(--up); } .erep.miss { background: var(--down); }
-  /* Alert icons next to the ticker: B / S (outline = waiting, filled = reached, kept), bell (muted = armed, amber = fired, until dismissed) */
+  /* Alert icons next to the ticker: B / S (plain outline; filled green / red while the price is below the buy / above the sell point), bell (muted = armed, amber = fired, until dismissed) */
   .alr { display: inline-flex; gap: 3px; flex-shrink: 0; } .alr:empty { display: none; }
   .alr i { --c: var(--muted); width: 15px; height: 15px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
     font-style: normal; font-size: 9px; font-weight: 700; color: var(--c); border: 1.5px solid var(--c); }
-  .alr i.buy { --c: var(--up); } .alr i.sell { --c: var(--down); }
-  .alr i.hit { background: var(--c); color: #fff; }
+  .alr i.buy.in { --c: var(--up); } .alr i.sell.in { --c: var(--down); }
+  .alr i.in { background: var(--c); color: #fff; }
   .alr i.bell { border: 0; } .alr i.bell svg { width: 13px; height: 13px; }
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
@@ -701,7 +701,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '8.0';  // bump on every push to main
+const APP_VERSION = '8.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1854,8 +1854,9 @@ function checkAlerts() {
 function alertIcons(sym) {
   const L = state.lines?.[sym]; if (!L) return '';
   const pick = k => L.filter(l => l.k === k);
-  const pt = (k, ch) => { const a = pick(k); if (!a.length) return ''; const hit = a.some(l => l.hit);
-    return `<i class="${k}${hit ? ' hit' : ''}" title="${k === 'buy' ? 'Buy' : 'Sell'} point ${a.map(l => fmtPrice(l.p)).join(', ')}${hit ? ' — reached' : ''}">${ch}</i>`; };
+  // B / S are plain until the price is in the zone: at or below a buy point, at or above a sell point.
+  const p = livePrice(sym), pt = (k, ch) => { const a = pick(k); if (!a.length) return ''; const zone = p != null && a.some(l => k === 'buy' ? p <= l.p : p >= l.p);
+    return `<i class="${k}${zone ? ' in' : ''}" title="${k === 'buy' ? 'Buy' : 'Sell'} point ${a.map(l => fmtPrice(l.p)).join(', ')}${zone ? (k === 'buy' ? ' — price is below' : ' — price is above') : ''}">${ch}</i>`; };
   const al = pick('alert'), ring = al.filter(l => l.hit && !l.ack), armed = al.filter(l => !l.hit);
   const bell = ring.length || armed.length ? `<i class="bell${ring.length ? ' hit' : ''}" title="${ring.length ? 'Alert fired at ' + ring.map(l => fmtPrice(l.p)).join(', ') : 'Alert at ' + armed.map(l => fmtPrice(l.p)).join(', ')}">${ICON.bell}</i>` : '';
   return pt('buy', 'B') + pt('sell', 'S') + bell;
