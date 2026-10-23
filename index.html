@@ -180,6 +180,8 @@
   #ownChart .tv-lightweight-charts { position: relative; z-index: 2; }   /* the library's container above the shading, below our label */
   .plabel { position: absolute; right: 0; z-index: 3; display: flex; flex-direction: column; padding: 2px 0 2px 6px; border-radius: 4px 0 0 4px; font-size: 11px; line-height: 14px; color: #fff; background: #f23645; font-variant-numeric: tabular-nums; pointer-events: none; box-sizing: border-box; }
   .plabel.up { background: #089981; }
+  .xlabel { position: absolute; right: 0; z-index: 4; height: 18px; padding-left: 6px; border-radius: 4px 0 0 4px; box-sizing: border-box; font-size: 11px; line-height: 18px; font-weight: 600;
+    color: #fff; background: #363a45; font-variant-numeric: tabular-nums; pointer-events: none; }
   .plabel .pr { font-weight: 600; }
   .ownlogo { position: absolute; left: calc(var(--tb, 0px) + 10px); bottom: 36px; z-index: 3; width: 36px; height: 36px; padding: 3px; border-radius: 9px; background: var(--bg3); box-shadow: 0 0 0 1px rgba(255, 255, 255, .12), 0 2px 8px rgba(0, 0, 0, .5); display: block; box-sizing: border-box; }
   .ownlogo img { width: 100%; height: 100%; border-radius: 6px; display: block; }
@@ -191,6 +193,7 @@
   .cmenu .ci:hover { background: var(--bg3); }
   .cmenu .ci i { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--muted); flex-shrink: 0; }
   .cmenu .ci.on i { background: var(--accent); border-color: var(--accent); }
+  .cmenu .csep { height: 1px; margin: 4px 0; background: var(--line); }
   .cmenu .subw { position: relative; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
   .cmenu .ci.sub .cv { margin-left: auto; font-size: 12px; color: var(--muted); }
   /* The flyout touches the menu (the gap is a transparent border) so the pointer can cross over without closing it */
@@ -701,7 +704,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '8.1';  // bump on every push to main
+const APP_VERSION = '8.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1362,7 +1365,7 @@ async function showOwnChart(sym) {
     own.chart = L.createChart(el, {
       ...ownTheme(),
       timeScale: { borderColor: cssVar('--line'), timeVisible: true, secondsVisible: false, rightOffset: 2 },
-      crosshair: { mode: L.CrosshairMode.Normal }, handleScale: { axisPressedMouseMove: true, mouseWheel: false }, handleScroll: { mouseWheel: false },
+      crosshair: { mode: L.CrosshairMode.Normal, horzLine: { labelVisible: false } },   // the price label is ours (#xlabel), above the other axis tags handleScale: { axisPressedMouseMove: true, mouseWheel: false }, handleScroll: { mouseWheel: false },
     });
     // Wheel like TradingView: zoom keeps the right edge (latest bar) fixed and changes how many bars show; sideways wheel pans.
     el.addEventListener('wheel', e => {
@@ -1396,7 +1399,8 @@ async function showOwnChart(sym) {
       const b = e.target.closest('[data-leg]'); if (!b) return; e.stopPropagation(); setChartOpt(b.dataset.leg, !chartOpts()[b.dataset.leg]);
     });
     own.sma = SMAS.map(([, , color]) => own.chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
-    own.chart.subscribeCrosshairMove(p => { own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); });
+    own.chart.subscribeCrosshairMove(p => { own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); ownCrossLabel(p); });
+    el.insertAdjacentHTML('beforeend', '<div class="xlabel" id="xlabel" hidden></div>');
     el.addEventListener('contextmenu', e => { if (isPhone()) return; e.preventDefault(); const r = e.target.closest('[data-ray]'); if (r) { openRayCtx(r.dataset.ray, e.clientX, e.clientY); return; } const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
     const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
     el.insertAdjacentHTML('beforeend', '<button class="copts" data-act="chart-opts" title="Chart settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>');
@@ -1435,6 +1439,13 @@ function ownRequest(sym, iv) {
     clog('warn', 'chart: no bars in 8 s, reconnecting', { sym, iv, session, ws: own.ws?.readyState });
     try { own.ws?.close(); } catch (_) {}
   }, 8000);
+}
+// Crosshair price on the axis, drawn by us so it sits above the last-price label and the line tags (canvas labels can't).
+function ownCrossLabel(p) {
+  const x = $('xlabel'); if (!x) return;
+  const y = p?.point?.y, price = y != null ? own.series.coordinateToPrice(y) : null;
+  if (price == null || !own.active) { x.hidden = true; return; }
+  x.textContent = fmtPrice(price); x.style.top = (y - 9) + 'px'; x.style.width = own.chart.priceScale('right').width() + 'px'; x.hidden = false;
 }
 // Highest / lowest bar of the visible range: a small triangle + price pill above / below that bar (chart option "Visible
 // high / low"). Drawn as our own overlays so they match the price label, repositioned whenever the chart moves.
@@ -1965,10 +1976,17 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
   }
   closeChartMenu();
   const m = document.createElement('div'); m.className = 'cmenu'; m.id = 'cmenu';
-  const paint = () => { const o = chartOpts(); m.innerHTML = CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join('')
+  // Right-click on the plot: first item draws a horizontal ray where the click was.
+  const ray = at && own.data?.length ? (() => { const l = own.chart.timeScale().coordinateToLogical(at.x - toolW()), p = own.series.coordinateToPrice(at.y);
+    return l != null && p != null ? { i: Math.max(0, Math.min(own.data.length - 1, Math.round(l))), p: +p.toPrecision(6) } : null; })() : null;
+  const paint = () => { const o = chartOpts(); m.innerHTML = (ray ? `<button class="ci" data-ray-add>${CHART_TOOLS.find(t => t[0] === 'ray')[2]}Horizontal ray at ${fmtPrice(ray.p)}</button><div class="csep"></div>` : '') + CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join('')
     + `<div class="subw"><button class="ci sub">◂ Session<span class="cv">${SESSION_OPTS.find(x => x[0] === o.session)?.[1] || ''}</span></button><div class="submenu">${SESSION_OPTS.map(([v, t]) => `<button class="ci r${o.session === v ? ' on' : ''}" data-cs="${v}"><i></i>${t}</button>`).join('')}</div></div>`; };
   paint();
   m.addEventListener('click', e => {
+    if (e.target.closest('[data-ray-add]')) {
+      const ln = { id: Date.now().toString(36), t: own.data[ray.i].time, p: ray.p };
+      own.raySel = ln.id; setRays(own.want.sym, [...symRays(own.want.sym), ln]); closeChartMenu(); return;
+    }
     const b = e.target.closest('[data-co], [data-cs]'); if (!b) return;
     if (b.dataset.cs) { setChartOpt('session', b.dataset.cs); closeChartMenu(); return; }   // a session choice closes the menu; checkboxes keep it open
     setChartOpt(b.dataset.co, !chartOpts()[b.dataset.co]);
