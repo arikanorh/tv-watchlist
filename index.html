@@ -704,7 +704,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '8.2';  // bump on every push to main
+const APP_VERSION = '8.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1518,7 +1518,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, session: '24h', ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, sma200: false, session: '24h', ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1610,8 +1610,8 @@ function ownEarnings() {
   const html = marks.join(''); if (box.innerHTML !== html) box.innerHTML = html;
 }
 // Legend rows: the hovered bar's values, else the latest; a row that is off is dimmed and struck through.
-const SMAS = [['sma20', 20, '#f7a600'], ['sma50', 50, '#4f8cff']];
-const LEGS = [['volume', 'Vol'], ['sma20', 'SMA 20'], ['sma50', 'SMA 50'], ['hilo', 'High / Low']];
+const SMAS = [['sma20', 20, '#f7a600'], ['sma50', 50, '#4f8cff'], ['sma200', 200, '#ec407a']];
+const LEGS = [['volume', 'Vol'], ['sma20', 'SMA 20'], ['sma50', 'SMA 50'], ['sma200', 'SMA 200'], ['hilo', 'High / Low']];
 const fmtVol = v => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(2) + 'K' : String(Math.round(v || 0));
 const smaAt = (n, i) => { if (!own.data || i < n - 1) return null; let t = 0; for (let k = i - n + 1; k <= i; k++) t += own.data[k].close; return t / n; };
 function ownSma(full) {   // full: recompute the whole line; otherwise just the newest point
@@ -1664,13 +1664,14 @@ const CHART_OPTS = [
   ['earnings', 'Earnings', 'An "E" on the time line at the last and the next earnings date.'],
   ['sma20', 'SMA 20', '20-bar simple moving average (amber).'],
   ['sma50', 'SMA 50', '50-bar simple moving average (blue).'],
+  ['sma200', 'SMA 200', '200-bar simple moving average (pink).'],
 ];
 const SESSION_OPTS = [['regular', 'Regular only', 'Just the main session.'], ['extended', 'Extended', 'Pre- and post-market too.'], ['24h', '24 hours', 'Extended plus overnight trading (US stocks, 20:00–04:00 ET).']];
 function setChartOpt(k, on) {
   state.chartOpts = { ...chartOpts(), [k]: on }; save(); paintTools();
   if (k === 'session') { if (own.active) ownRequest(state.symbol, state.interval); }
   else if (k === 'volume') { own.vol?.setData(on && own.data ? own.data.map(volBar) : []); ownVolLegend(); }
-  else if (k === 'sma20' || k === 'sma50') { ownSma(true); ownVolLegend(); }
+  else if (SMAS.some(x => x[0] === k)) { ownSma(true); ownVolLegend(); }
   else if (k === 'hilo') { ownHiLo(); ownVolLegend(); }
   else if (k === 'earnings') ownEarnings();
   else ownCountdown();
@@ -1685,6 +1686,7 @@ const CHART_TOOLS = [
   ['volume', 'Volume', TI('<path d="M5 20v-6M10 20V9M15 20v-9M20 20V5"/>')],
   ['sma20', 'SMA 20', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#f7a600"/>', '<b>20</b>')],
   ['sma50', 'SMA 50', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#4f8cff"/>', '<b>50</b>')],
+  ['sma200', 'SMA 200', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#ec407a"/>', '<b>200</b>')],
   ['hilo', 'Visible high / low', TI('<path d="M12 3v8M8 7l4-4 4 4M12 21v-8M8 17l4 4 4-4"/>')],
   ['earnings', 'Earnings markers', TI('<circle cx="12" cy="12" r="9"/><path d="M14.5 8h-5v8h5M9.5 12h4"/>')],
   ['sessions', 'Session shading', TI('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1" opacity=".5"/><rect x="16" y="4" width="5" height="16" rx="1"/>')],
