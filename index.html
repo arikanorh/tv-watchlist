@@ -725,7 +725,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '8.8';  // bump on every push to main
+const APP_VERSION = '8.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1385,7 +1385,7 @@ async function showOwnChart(sym) {
     const el = $('ownChart'), L = window.LightweightCharts;
     own.chart = L.createChart(el, {
       ...ownTheme(),
-      timeScale: { borderColor: cssVar('--line'), timeVisible: true, secondsVisible: false, rightOffset: 2 },
+      timeScale: { borderColor: cssVar('--line'), timeVisible: true, secondsVisible: false, rightOffset: 2, minBarSpacing: 0.1 },
       crosshair: { mode: L.CrosshairMode.Normal, horzLine: { labelVisible: false } },   // the price label is ours (#xlabel), above the other axis tags handleScale: { axisPressedMouseMove: true, mouseWheel: false }, handleScroll: { mouseWheel: false },
     });
     // Wheel like TradingView: zoom keeps the right edge (latest bar) fixed and changes how many bars show; sideways wheel pans.
@@ -1394,7 +1394,8 @@ async function showOwnChart(sym) {
       e.preventDefault();
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) { const d = e.deltaX / ts.options().barSpacing; ts.setVisibleLogicalRange({ from: vr.from + d, to: vr.to + d }); return; }
       // Zoom around the last bar when it's on screen (it keeps its place, empty space to its right scales with it), else around the right edge.
-      const width = vr.to - vr.from, factor = Math.exp(e.deltaY * 0.0015), next = Math.max(8, Math.min(5000, width * factor));
+      // Never ask for more bars than fit at the minimum spacing: the library would clamp the spacing itself and shove the last bar left.
+      const width = vr.to - vr.from, factor = Math.exp(e.deltaY * 0.0015), next = Math.max(8, Math.min(ts.width() / ts.options().minBarSpacing, width * factor));
       const n = (own.data?.length || 0) - 1, anchor = n >= vr.from && n <= vr.to ? n : vr.to, f = (anchor - vr.from) / width;
       ts.setVisibleLogicalRange({ from: anchor - f * next, to: anchor + (1 - f) * next });
     }, { passive: false });
