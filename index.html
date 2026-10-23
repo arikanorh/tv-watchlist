@@ -282,7 +282,7 @@
   .meas.dn .mlbl { background: #f23645; }
   #ownChart.measuring .tv-lightweight-charts { cursor: crosshair; }
   .hrays { position: absolute; inset: 0 0 0 var(--tb, 0px); z-index: 3; pointer-events: none; }
-  .hray { --c: #2962ff; position: absolute; height: 11px; margin-top: -5px; pointer-events: auto; cursor: ns-resize; }
+  .hray { --c: #2962ff; position: absolute; height: 11px; margin-top: -5px; pointer-events: auto; cursor: move; }
   .hray::before { content: ''; position: absolute; left: 0; right: 0; top: 5px; border-top: 1px solid var(--c); }
   .hray i { display: none; position: absolute; left: -5px; top: 0; width: 11px; height: 11px; box-sizing: border-box; border-radius: 50%; background: var(--bg); border: 2px solid var(--c); }
   .hray.sel::before { border-top-width: 2px; top: 4.5px; } .hray.sel i { display: block; }
@@ -704,7 +704,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '8.3';  // bump on every push to main
+const APP_VERSION = '8.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1799,7 +1799,8 @@ function initRays(el) {
     own.rayTool = false; own.raySel = ln.id; paintTools();
     setRays(own.want.sym, [...symRays(own.want.sym), ln]);
   }, true);
-  // Drag a ray up / down (desktop); the move is saved (and synced) on release.
+  // Drag a ray (desktop): the start handle goes where the pointer is (bar + price); the line itself moves as a whole,
+  // keeping the grab offset — so the start can be pulled back in time. Saved (and synced) on release.
   $('hrays') || ownRays();
   $('hrays').addEventListener('pointerdown', e => {
     const n = e.target.closest('[data-ray]'); if (!n || e.button !== 0) return;
@@ -1807,9 +1808,17 @@ function initRays(el) {
     const sym = own.want?.sym, ln = symRays(sym).find(x => x.id === n.dataset.ray); if (!ln) return;
     own.raySel = ln.id; ownRays();
     if (isPhone()) return;
-    const y0 = e.clientY, p0 = ln.p; let moved = false;
-    const mv = ev => { if (!moved && Math.abs(ev.clientY - y0) < 3) return; moved = true; const p = priceAt(ev.clientY); if (p != null) { ln.p = +p.toPrecision(6); ownRays(); } };
-    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved && ln.p !== p0) { armRay(sym, ln); setRays(sym, [...symRays(sym)]); } };
+    const x0 = e.clientX, y0 = e.clientY, p0 = ln.p, t0 = ln.t, g0 = priceAt(y0), i0 = rayIndex(t0), handle = !!e.target.closest('i'), ts = own.chart.timeScale();
+    let moved = false;
+    const mv = ev => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 3) return; moved = true;
+      const g = priceAt(ev.clientY); if (g != null) ln.p = +(handle ? g : p0 + (g - g0)).toPrecision(6);
+      const last = own.data.length - 1;
+      let i = handle ? Math.round(ts.coordinateToLogical(ev.clientX - pane().getBoundingClientRect().left) ?? i0) : i0 >= 0 ? i0 + Math.round((ev.clientX - x0) / ts.options().barSpacing) : null;
+      if (i != null && isFinite(i)) ln.t = own.data[Math.max(0, Math.min(last, i))].time;   // a start older than the loaded bars only moves in price
+      ownRays();
+    };
+    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved && (ln.p !== p0 || ln.t !== t0)) { if (ln.p !== p0) armRay(sym, ln); setRays(sym, [...symRays(sym)]); } };
     addEventListener('pointermove', mv); addEventListener('pointerup', up);
   });
 }
