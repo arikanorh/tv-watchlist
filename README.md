@@ -9,7 +9,7 @@ This file is the map: what the app does, where each piece of data comes from, an
 ## Features
 
 **Lists**
-- Any number of watchlists, each with sections (groups). Sections are dividers: drag a section header between rows to re-cut the list, drag rows to reorder or move between sections (hold on touch, immediate with a mouse), rename/delete from the section menu, "Add section above" from a row.
+- Any number of watchlists, each with sections (groups). Lists show as small icons or two-letter tags with their day move (flags for US / TR, Bitcoin for crypto, a calendar for Earnings; a name starting with an emoji uses it); on desktop they sit as a compact tab row on top of the list. Sections are dividers: drag a section header between rows to re-cut the list, drag rows to reorder or move between sections (hold on touch, immediate with a mouse), rename/delete from the section menu, "Add section above" from a row.
 - Row actions: details, flag, add to another list, move, remove (asks for a second tap; stacked undo).
 - Flags: six colors, drawn as the row's left border; click the border strip to cycle (desktop), picker on phones. Shared across lists and synced.
 - Sorting by Chg% or Ext (extended-hours change) from the column headers; indices stay on top.

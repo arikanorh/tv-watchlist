@@ -157,8 +157,11 @@
   .dock { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg2); border-top: 1px solid var(--line); }
   .chips { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
-  .chip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 66px; padding: 6px 12px; border-radius: 12px;
-    background: var(--bg3); border: 1px solid transparent; text-align: left; }
+  .chip { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 52px; padding: 6px 10px; border-radius: 12px;
+    background: var(--bg3); border: 1px solid transparent; text-align: center; }
+  .chip b { display: flex; align-items: center; justify-content: center; height: 18px; letter-spacing: .02em; }
+  .chip b svg { width: 16px; height: 16px; } .chip b .emo { font-size: 15px; line-height: 1; }
+  .chip b svg.flag { width: 21px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); }
   .chip b { font-size: 14px; font-weight: 600; white-space: nowrap; }
   .chip small { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .chip small.up { color: var(--up); } .chip small.down { color: var(--down); }
@@ -531,19 +534,20 @@
     .row.flagged .fl:hover { box-shadow: inset 0 0 0 8px rgba(255, 255, 255, .12); }
     .row:hover { background: var(--bg2); }
     .row.on:hover { background: var(--accent-bg); }
-    /* Dock as a tab bar: name + sentiment % on one line, the active list underlined */
-    .dock { padding: 0 10px 0 4px; gap: 10px; }
+    /* Dock as a compact tab row on top of the list (level with the chart toolbar): tag + sentiment %, active underlined */
+    .dock { order: -1; height: 50px; padding: 0 8px 0 2px; gap: 8px; border-top: 0; border-bottom: 1px solid var(--line); }
     .chips { gap: 0; align-self: stretch; }
-    .chip { flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; height: 46px; padding: 0 12px; border-radius: 0; background: none; border: 0;
+    .chip { flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 38px; height: 50px; padding: 0 4px; border-radius: 0; background: none; border: 0;
       border-bottom: 2px solid transparent; color: var(--muted); }
-    .chip b { font-size: 13px; font-weight: 600; color: var(--muted); }
-    .chip small { font-size: 11px; }
+    .chip b { font-size: 12.5px; font-weight: 700; color: var(--muted); height: 16px; }
+    .chip small { font-size: 10px; }
     .chip:hover { background: var(--bg3); }
     .chip:hover b { color: var(--text); }
     .chip.on { background: none; border-bottom-color: var(--accent); }
     .chip.on b { color: var(--text); }
-    .acts { padding: 6px 0 6px 10px; }
+    .acts { padding: 0 0 0 8px; align-self: center; height: 30px; align-items: center; }
     .ib { width: 38px; height: 38px; border-radius: 10px; }
+    .acts .ib { width: 32px; height: 32px; border-radius: 8px; } .acts .ib svg { width: 17px; height: 17px; }
     .sbtn, .infobtn { height: 38px; border-radius: 10px; }
     .infobtn { width: 38px; }
     .ctools { order: 0; flex-direction: row; align-items: stretch; gap: 6px; height: 50px; padding: 0 8px 0 0; border-top: 0; border-bottom: 1px solid var(--line); }
@@ -704,7 +708,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '8.4';  // bump on every push to main
+const APP_VERSION = '8.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2046,9 +2050,30 @@ const volBar = b => ({ time: b.time, value: b.vol, color: b.close >= b.open ? 'r
 
 // ================= Rendering =================
 function render() { renderChips(); renderRows(); renderHeader(); renderSentiment(); for (const b of document.querySelectorAll('.sortcol')) b.classList.toggle('on', state.sort === b.dataset.by); document.body.classList.toggle('sorted', !!state.sort); }
+// Lists show as an icon (`l.icon`, else by list id: US / TR flags, Bitcoin, eye; the Earnings list a calendar), a name
+// that starts with an emoji as that emoji ("🚀 Moon" → 🚀), else a two-letter tag (initials of two words, or the first
+// two letters). The full name is the tooltip and the list head.
+const TR_FLAG = '<svg class="trf" viewBox="0 0 30 20" aria-label="Borsa Istanbul"><rect width="30" height="20" rx="2" fill="#e30a17"/><circle cx="11" cy="10" r="5" fill="#fff"/><circle cx="12.25" cy="10" r="4" fill="#e30a17"/><path fill="#fff" d="M16.4 10l3.9-1.27-2.41 3.32V7.95l2.41 3.32z"/></svg>';
+const US_FLAG = '<svg class="flag" viewBox="0 0 30 20"><rect width="30" height="20" rx="2" fill="#fff"/><path fill="#b22234" d="M0 0h30v1.54H0zm0 3.08h30v1.54H0zm0 3.08h30v1.54H0zm0 3.07h30v1.54H0zm0 3.08h30v1.54H0zm0 3.08h30v1.54H0zm0 3.07h30V20H0z"/><rect width="13" height="10.77" fill="#3c3b6e"/><g fill="#fff"><circle cx="2.2" cy="2" r=".6"/><circle cx="5" cy="2" r=".6"/><circle cx="7.8" cy="2" r=".6"/><circle cx="10.6" cy="2" r=".6"/><circle cx="3.6" cy="4.2" r=".6"/><circle cx="6.4" cy="4.2" r=".6"/><circle cx="9.2" cy="4.2" r=".6"/><circle cx="2.2" cy="6.4" r=".6"/><circle cx="5" cy="6.4" r=".6"/><circle cx="7.8" cy="6.4" r=".6"/><circle cx="10.6" cy="6.4" r=".6"/><circle cx="3.6" cy="8.6" r=".6"/><circle cx="6.4" cy="8.6" r=".6"/><circle cx="9.2" cy="8.6" r=".6"/></g></svg>';
+const LIST_ICONS = {
+  us: US_FLAG,
+  tr: TR_FLAG.replace('class="trf"', 'class="flag"'),
+  btc: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#f7931a"/><text x="12" y="16.6" text-anchor="middle" font-size="13.5" font-weight="700" fill="#fff" font-family="-apple-system, Segoe UI, Roboto, sans-serif">₿</text></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+};
+const LIST_ICON_BY_ID = { abd: 'us', tr: 'tr', krip: 'btc', zorning: 'eye' };
+const LIST_ICON = { earnings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' };
+function listTag(l) {
+  if (LIST_ICON[l.auto]) return LIST_ICON[l.auto];
+  const ic = LIST_ICONS[l.icon || LIST_ICON_BY_ID[l.id]]; if (ic) return ic;
+  const name = l.name.trim(), emo = name.match(/^(\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic})*)/u);
+  if (emo) return `<span class="emo">${emo[1]}</span>`;
+  const w = name.split(/\s+/).filter(Boolean);
+  return esc((w.length > 1 ? w[0][0] + w[1][0] : (w[0] || '?').slice(0, 2)).toLocaleUpperCase('tr'));
+}
 function renderChips() {
   const el = $('chips'), x = el.scrollLeft;
-  el.innerHTML = state.lists.map(l => `<button class="chip${l.id === state.activeListId ? ' on' : ''}" data-act="list" data-id="${esc(l.id)}"><b>${esc(l.name)}</b><small data-lv="${esc(l.id)}"></small></button>`).join('');
+  el.innerHTML = state.lists.map(l => `<button class="chip${l.id === state.activeListId ? ' on' : ''}" data-act="list" data-id="${esc(l.id)}" title="${esc(l.name)}"><b>${listTag(l)}</b><small data-lv="${esc(l.id)}"></small></button>`).join('');
   el.scrollLeft = x;
   const on = el.querySelector('.on');
   if (on && (on.offsetLeft < el.scrollLeft || on.offsetLeft + on.offsetWidth > el.scrollLeft + el.clientWidth)) el.scrollLeft = on.offsetLeft - 10;
@@ -2058,7 +2083,7 @@ function patchChips() {
   for (const s of document.querySelectorAll('small[data-lv]')) {
     const l = state.lists.find(x => x.id === s.dataset.lv); if (!l) continue;
     const v = listValue(l);
-    const t = v != null ? pct(v) : l.summary ? '…' : flatSymbols(l).length + ' sym';
+    const t = v != null ? (isPhone() ? pct(v) : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1)) : l.summary ? '…' : isPhone() ? flatSymbols(l).length + ' sym' : flatSymbols(l).length;   // desktop tabs: compact, colored, no %
     if (s.textContent !== t) s.textContent = t;
     s.className = v != null ? dir(v) : '';
   }
@@ -2079,7 +2104,6 @@ function openFlagSheet(sym) {
   $('shBody').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; setFlag(sym, b.dataset.f || null); closeSheet(); };
 }
 // Small Turkish flag next to BIST tickers (inline SVG: emoji flags don't render on Windows).
-const TR_FLAG = '<svg class="trf" viewBox="0 0 30 20" aria-label="Borsa Istanbul"><rect width="30" height="20" rx="2" fill="#e30a17"/><circle cx="11" cy="10" r="5" fill="#fff"/><circle cx="12.25" cy="10" r="4" fill="#e30a17"/><path fill="#fff" d="M16.4 10l3.9-1.27-2.41 3.32V7.95l2.41 3.32z"/></svg>';
 const isBist = sym => (sym || '').startsWith('BIST:');
 // Next report timing from TradingView's earnings_release_next_time: 1 = after the close, -1 = before the open, 0 = not given.
 const earnTiming = sym => ({ 1: 'after close', '-1': 'before open' })[raw[sym]?.earnings_release_next_time] || '';
