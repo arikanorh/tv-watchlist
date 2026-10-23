@@ -389,6 +389,22 @@
   .tseg button { width: 36px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
   .tseg button svg { width: 16px; height: 16px; }
   .tseg button.on { background: var(--accent); color: #fff; }
+  /* Phone chart bar: one compact row — search, interval dropdown, details (no segmented intervals, no theme switch) */
+  @media (max-width: 767.98px) {
+    .ctools { flex-direction: row; align-items: center; gap: 8px; padding: 8px 10px; }
+    .ctools .seg, .ctools .tseg-top, .ctools .ltog { display: none; }
+    .cbar { display: contents; }
+    .cbar .sbtn { order: 1; height: 42px; }
+    .ivbtn { order: 2; display: flex; align-items: center; gap: 4px; height: 42px; padding: 0 10px 0 14px; border-radius: 12px; background: var(--bg3); font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+    .ivbtn svg { width: 15px; height: 15px; color: var(--muted); }
+    .cbar .infobtn { order: 3; width: 42px; height: 42px; }
+    /* Search opens from the top on phones, so the field stays above the keyboard */
+    .sheet.top { top: calc(var(--safe-t) + 6px); bottom: auto; height: calc(100% - var(--safe-t) - var(--kb, 0px) - 12px); max-height: none; border-radius: 0 0 16px 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); padding-bottom: 8px; }
+    .sheet.top::before { display: none; }
+    .sheet.top .sh-title { padding-top: 12px; }
+    .sheet.top .sform { order: -1; padding: 0 12px 8px; }
+    .sheet.top .sh-foot { display: none; }
+  }
   .about a { color: var(--muted); text-decoration: underline; }
   .about { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
   .sync h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
@@ -708,7 +724,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '8.5';  // bump on every push to main
+const APP_VERSION = '8.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2059,9 +2075,10 @@ const LIST_ICONS = {
   us: US_FLAG,
   tr: TR_FLAG.replace('class="trf"', 'class="flag"'),
   btc: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#f7931a"/><text x="12" y="16.6" text-anchor="middle" font-size="13.5" font-weight="700" fill="#fff" font-family="-apple-system, Segoe UI, Roboto, sans-serif">₿</text></svg>',
+  pearl: '<svg viewBox="0 0 24 24"><defs><radialGradient id="pearlG" cx="36%" cy="32%" r="72%"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#ebe6f2"/><stop offset=".85" stop-color="#bdb5cc"/><stop offset="1" stop-color="#9d94b0"/></radialGradient></defs><circle cx="12" cy="12" r="9.5" fill="url(#pearlG)"/><ellipse cx="9" cy="8.3" rx="2.8" ry="1.6" fill="#fff" opacity=".95" transform="rotate(-35 9 8.3)"/><path d="M15.5 17.5a7 7 0 0 0 3-4" stroke="#fff" stroke-width="1" stroke-linecap="round" fill="none" opacity=".55"/></svg>',
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
-const LIST_ICON_BY_ID = { abd: 'us', tr: 'tr', krip: 'btc', zorning: 'eye' };
+const LIST_ICON_BY_ID = { abd: 'us', inci: 'pearl', tr: 'tr', krip: 'btc', zorning: 'eye' };
 const LIST_ICON = { earnings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' };
 function listTag(l) {
   if (LIST_ICON[l.auto]) return LIST_ICON[l.auto];
@@ -2578,6 +2595,7 @@ function moveSymbol(sym, from, to, index) {
 let sheetKind = null;
 function openSheet(kind, title, body) {
   sheetKind = kind;
+  $('sheet').classList.toggle('top', kind === 'search' && isPhone());   // phones: search hangs from the top, clear of the keyboard
   $('shTitle').textContent = title;
   $('shBody').innerHTML = body;
   $('shBody').onclick = null;
@@ -2592,7 +2610,7 @@ function closeSheet() {
 }
 // Desktop: digits 1–8 pick an interval (the picker opens on the first digit); any letter opens search with it typed.
 function openIntervalPicker() {
-  openSheet('interval', 'Interval · press 1–8', INTERVALS.map(([lbl, v], i) =>
+  openSheet('interval', isPhone() ? 'Interval' : 'Interval · press 1–8', INTERVALS.map(([lbl, v], i) =>
     `<button class="opt${v === state.interval ? ' on' : ''}" data-iv="${v}"><span class="c" style="margin:0;min-width:14px">${i + 1}</span>${lbl}</button>`).join(''));
   $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { setChartInterval(b.dataset.iv); closeSheet(); } };
 }
@@ -3096,6 +3114,7 @@ function trackKeyboard() {
   setTimeout(unshift, 60);
 }
 window.visualViewport?.addEventListener('resize', trackKeyboard);
+window.visualViewport?.addEventListener('scroll', trackKeyboard);   // the offset changes when iOS scrolls to the field and again when unshift snaps back
 // Home-screen app: when iOS leaves a gap under the web view, the nav needs no home-indicator padding.
 function fitStandalone() {
   if (!matchMedia('(display-mode: standalone)').matches && !navigator.standalone) return;
