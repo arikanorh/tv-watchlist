@@ -725,7 +725,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '9.3';  // bump on every push to main
+const APP_VERSION = '9.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1389,8 +1389,9 @@ async function showOwnChart(sym) {
       crosshair: { mode: L.CrosshairMode.Normal, horzLine: { labelVisible: false } },   // the price label is ours (#xlabel), above the other axis tags handleScale: { axisPressedMouseMove: true, mouseWheel: false }, handleScroll: { mouseWheel: false },
     });
     // Wheel like TradingView: zoom keeps the right edge (latest bar) fixed and changes how many bars show; sideways wheel pans.
+    // Works on our own view (ownView: gap after the last bar + bar count), never on the library's range, which lags a frame.
     el.addEventListener('wheel', e => {
-      const ts = own.chart.timeScale(), vr = ts.getVisibleLogicalRange(); if (!vr) return;
+      const ts = own.chart.timeScale(); if (!own.data?.length || !ownViewNow()) return;
       e.preventDefault();
       // One mode per gesture, set by its first event: a zoom gesture ignores sideways drift (Magic Mouse / trackpad scrolls carry
       // deltaX, and their momentum tail can lean sideways — that used to pan and shove the last bar off the right edge);
@@ -1398,12 +1399,12 @@ async function showOwnChart(sym) {
       const now = performance.now();
       if (!own.wheel || now - own.wheel.t > 200) own.wheel = { pan: Math.abs(e.deltaX) > 2 * Math.abs(e.deltaY) };
       own.wheel.t = now;
-      if (own.wheel.pan) { const d = e.deltaX / ts.options().barSpacing; ts.setVisibleLogicalRange({ from: vr.from + d, to: vr.to + d }); return; }
+      const v = ownViewNow();
+      if (own.wheel.pan) { ownSetView(v.gap + e.deltaX * v.span / ts.width(), v.span); return; }
       if (!e.deltaY) return;
       // The right edge stays put (so the right margin keeps its size in bars, as on TradingView) and only the bar count changes.
       // Never ask for more bars than fit at the minimum spacing: the library would clamp the spacing itself and shove the last bar left.
-      const width = vr.to - vr.from, factor = Math.exp(e.deltaY * 0.0015), next = Math.max(8, Math.min(ts.width() / ts.options().minBarSpacing, width * factor));
-      ts.setVisibleLogicalRange({ from: vr.to - next, to: vr.to });
+      ownSetView(v.gap, Math.max(8, Math.min(ts.width() / ts.options().minBarSpacing, v.span * Math.exp(e.deltaY * 0.0015))));
     }, { passive: false });
     own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false });
     own.ghost = own.chart.addLineSeries({ lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });   // whitespace only: dates on the axis past the last bar
@@ -1434,6 +1435,7 @@ async function showOwnChart(sym) {
     el.addEventListener('contextmenu', e => { if (isPhone()) return; e.preventDefault(); const r = e.target.closest('[data-ray]'); if (r) { openRayCtx(r.dataset.ray, e.clientX, e.clientY); return; } const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
     const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
     el.insertAdjacentHTML('beforeend', '<button class="copts" data-act="chart-opts" title="Chart settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>');
+    own.chart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (!own.selfSet && r && own.data?.length) own.view = { gap: r.to - (own.data.length - 1), span: r.to - r.from }; });   // drags, fits: adopt what the library shows
     own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownCountdown);
     own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownMaybeMore);
     own.chart.timeScale().subscribeVisibleLogicalRangeChange(() => { clearTimeout(own.hiloT); own.hiloT = setTimeout(ownHiLo, 120); });
@@ -1454,7 +1456,7 @@ function ownRequest(sym, iv) {
   const key = sym + '|' + iv + '|' + chartOpts().session, vr = own.chart?.timeScale().getVisibleLogicalRange();
   own.keep = own.data?.length && own.dataKey === key && vr ? { from: own.data.length - 1 - vr.from, to: own.data.length - 1 - vr.to } : null;
   if (own.keep) { own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); }
-  else { own.series?.setData([]); own.vol?.setData([]); own.ghost?.setData([]); own.futureFrom = null; own.sma?.forEach(x => x.setData([])); own.hoverBar = null; own.meas = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown(); }   // no stale label from the previous symbol
+  else { own.view = null; own.series?.setData([]); own.vol?.setData([]); own.ghost?.setData([]); own.futureFrom = null; own.sma?.forEach(x => x.setData([])); own.hoverBar = null; own.meas = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown(); }   // no stale label from the previous symbol
   own.dataKey = key;
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
@@ -1475,6 +1477,19 @@ function ownRequest(sym, iv) {
     clog('warn', 'chart: no bars in 8 s, reconnecting', { sym, iv, session, ws: own.ws?.readyState });
     try { own.ws?.close(); } catch (_) {}
   }, 8000);
+}
+// The own chart's view as we last set it: `gap` = bars from the last bar to the right edge (negative when scrolled back),
+// `span` = bars across. Logical indices shift whenever older bars are prepended and the library only applies a range on its
+// next frame (reading it back in between gives the old one), so wheel, pan, history merges and new bars all work from this.
+// The library's own changes (drag, fit) are adopted through its range-change event, except right after one of ours.
+function ownViewNow(len = own.data?.length) {
+  if (!own.view && own.chart && len) { const r = own.chart.timeScale().getVisibleLogicalRange(); if (r) own.view = { gap: r.to - (len - 1), span: r.to - r.from }; }
+  return own.view || null;
+}
+function ownSetView(gap, span) {
+  const last = own.data.length - 1; own.view = { gap, span }; own.selfSet = true;
+  own.chart.timeScale().setVisibleLogicalRange({ from: last + gap - span, to: last + gap });
+  cancelAnimationFrame(own.selfRaf); own.selfRaf = requestAnimationFrame(() => requestAnimationFrame(() => { own.selfSet = false; }));
 }
 // Crosshair price on the axis, drawn by us so it sits above the last-price label and the line tags (canvas labels can't).
 function ownCrossLabel(p) {
@@ -1532,22 +1547,22 @@ function ownConnect() {
         else if (own.data && bars.length && bars[0].time < own.data[0].time) {
           const older = bars.filter(b => b.time < own.data[0].time), n = older.length;
           own.data = [...older, ...own.data.filter(b => b.time >= own.data[0].time)];
-          const vr = own.chart.timeScale().getVisibleLogicalRange();
+          const v = ownViewNow(own.data.length - n);   // the view against the bars as they were before the merge
           own.series.setData(own.data); own.vol.setData(chartOpts().volume ? own.data.map(volBar) : []);
           ownSma(true);
           if (own.meas) { own.meas.a.l += n; own.meas.b.l += n; }
-          if (vr) own.chart.timeScale().setVisibleLogicalRange({ from: vr.from + n, to: vr.to + n });   // keep what was on screen in place
+          if (v) ownSetView(v.gap, v.span);   // keep what was on screen in place: same bars after the last one, same count
           own.loadingMore = false; if (!n) own.noMore = true;
-          ownMaybeMore(own.chart.timeScale().getVisibleLogicalRange());   // still short of the left edge? ask again
+          ownMaybeMore(own.view ? { from: own.data.length - 1 + own.view.gap - own.view.span } : own.chart.timeScale().getVisibleLogicalRange());   // still short of the left edge? ask again
         }
         else {
-          const n0 = own.data?.length || 0, vr0 = own.chart.timeScale().getVisibleLogicalRange();
+          const n0 = own.data?.length || 0, v0 = ownViewNow(n0);
           for (const b of bars) { try { own.series.update(b); if (chartOpts().volume) own.vol.update(volBar(b)); } catch (_) {} if (own.data) { const i = own.data.findIndex(x => x.time >= b.time); if (i < 0) own.data.push(b); else if (own.data[i].time === b.time) own.data[i] = b; else own.data.splice(i, 0, b); } }
           if (own.loadingMore && m.m === 'timescale_update' && !bars.length) { own.loadingMore = false; own.noMore = true; }   // an empty answer = nothing older; a new live bar meanwhile doesn't count
           // A new bar lands on a slot the future axis already holds, so the library doesn't scroll: follow it ourselves while the
           // last bar is in view (as TradingView does) — else, left open for days, the newest bars drift off the right edge.
           const added = (own.data?.length || 0) - n0;
-          if (added > 0 && vr0 && vr0.to >= n0 - 1.5) own.chart.timeScale().setVisibleLogicalRange({ from: vr0.from + added, to: vr0.to + added });
+          if (added > 0 && v0) ownSetView(v0.gap > -1.5 ? v0.gap : v0.gap - added, v0.span);   // in view: same gap after the new bar; else keep the same bars
         }
         ownHiLo(); if (own.loaded && m.m === 'du') ownSma(false);
         if (own.data && own.data[own.data.length - 1].time !== own.futureFrom) ownFuture();   // a new bar opened: restart the future axis after it
