@@ -725,7 +725,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '9.5';  // bump on every push to main
+const APP_VERSION = '9.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1386,9 +1386,10 @@ async function showOwnChart(sym) {
     own.chart = L.createChart(el, {
       ...ownTheme(),
       timeScale: { borderColor: cssVar('--line'), timeVisible: true, secondsVisible: false, rightOffset: 2, minBarSpacing: 0.1 },
-      crosshair: { mode: L.CrosshairMode.Normal, horzLine: { labelVisible: false } },   // the price label is ours (#xlabel), above the other axis tags handleScale: { axisPressedMouseMove: true, mouseWheel: false }, handleScroll: { mouseWheel: false },
+      crosshair: { mode: L.CrosshairMode.Normal, horzLine: { labelVisible: false } },   // the price label is ours (#xlabel), above the other axis tags
+      handleScale: { axisPressedMouseMove: true, mouseWheel: false }, handleScroll: { mouseWheel: false },   // the wheel is ours (below); with the library's on too, it zoomed around the pointer and dragged the last bar away
     });
-    // Wheel = zoom only: the last bar keeps its place on screen (else the right edge does) and only the bar count changes.
+    // Wheel = zoom only, like TradingView: the right edge stays put (the right margin keeps its size in bars) and only the bar count changes.
     // Sideways wheel input is ignored — Magic Mouse / trackpad scrolls carry deltaX and used to fling the chart away; drag to pan.
     // Works on our own view (ownView: gap after the last bar + bar count), never on the library's range, which lags a frame.
     el.addEventListener('wheel', e => {
@@ -1397,7 +1398,7 @@ async function showOwnChart(sym) {
       if (!e.deltaY) return;
       // Never ask for more bars than fit at the minimum spacing: the library would clamp the spacing itself and shove the last bar left.
       const v = ownViewNow(), span = Math.max(8, Math.min(ts.width() / ts.options().minBarSpacing, v.span * Math.exp(e.deltaY * 0.0015)));
-      ownSetView(v.gap >= 0 && v.gap < v.span ? v.gap * span / v.span : v.gap, span);   // last bar on screen: same fraction of the width from the right
+      ownSetView(v.gap, span);
     }, { passive: false });
     own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false });
     own.ghost = own.chart.addLineSeries({ lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });   // whitespace only: dates on the axis past the last bar
