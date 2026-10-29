@@ -725,7 +725,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '9.6';  // bump on every push to main
+const APP_VERSION = '9.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1389,12 +1389,17 @@ async function showOwnChart(sym) {
       crosshair: { mode: L.CrosshairMode.Normal, horzLine: { labelVisible: false } },   // the price label is ours (#xlabel), above the other axis tags
       handleScale: { axisPressedMouseMove: true, mouseWheel: false }, handleScroll: { mouseWheel: false },   // the wheel is ours (below); with the library's on too, it zoomed around the pointer and dragged the last bar away
     });
-    // Wheel = zoom only, like TradingView: the right edge stays put (the right margin keeps its size in bars) and only the bar count changes.
-    // Sideways wheel input is ignored — Magic Mouse / trackpad scrolls carry deltaX and used to fling the chart away; drag to pan.
-    // Works on our own view (ownView: gap after the last bar + bar count), never on the library's range, which lags a frame.
+    // Wheel like TradingView: up / down zooms with the right edge staying put (the right margin keeps its size in bars);
+    // a clearly sideways gesture pans. One mode per gesture, set by its first event, so the deltaX that Magic Mouse /
+    // trackpad scrolls carry never pans a zoom. Works on our own view (ownView: gap after the last bar + bar count),
+    // never on the library's range, which lags a frame.
     el.addEventListener('wheel', e => {
       const ts = own.chart.timeScale(); if (!own.data?.length || !ownViewNow()) return;
       e.preventDefault();
+      const now = performance.now();
+      if (!own.wheel || now - own.wheel.t > 200) own.wheel = { pan: Math.abs(e.deltaX) > 2 * Math.abs(e.deltaY) };
+      own.wheel.t = now;
+      if (own.wheel.pan) { const v = ownViewNow(); ownSetView(v.gap + e.deltaX * v.span / ts.width(), v.span); return; }
       if (!e.deltaY) return;
       // Never ask for more bars than fit at the minimum spacing: the library would clamp the spacing itself and shove the last bar left.
       const v = ownViewNow(), span = Math.max(8, Math.min(ts.width() / ts.options().minBarSpacing, v.span * Math.exp(e.deltaY * 0.0015)));
