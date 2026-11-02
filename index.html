@@ -528,9 +528,11 @@
     .lblock { position: relative; flex-shrink: 0; }
     .lhead { position: absolute; top: 0; left: 0; right: 0; z-index: 1; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; pointer-events: none; font-variant-numeric: tabular-nums; }
     .lhead b, .lhead .v { text-shadow: 0 0 4px var(--bg2), 0 0 4px var(--bg2); }
-    .sent-c { cursor: pointer; }
-    .sent .rng { font-size: 11px; font-weight: 600; fill: var(--muted); }
-    .sent-c:hover .rng { fill: var(--text); }
+    .sent { position: relative; }
+    .rseg { position: absolute; top: 6px; right: 12px; z-index: 2; display: flex; gap: 1px; padding: 1px; border-radius: 6px; background: var(--bg3); }
+    .rseg button { height: 18px; padding: 0 6px; border-radius: 5px; font-size: 10.5px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .rseg button:hover { color: var(--text); }
+    .rseg button.on { color: #fff; background: var(--accent); }
     .lhead b { font-size: 16px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .lhead .v { font-size: 14px; font-weight: 600; }
     .hl, body[data-view] .hl { display: none; }
@@ -739,7 +741,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.4';  // bump on every push to main
+const APP_VERSION = '10.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1116,15 +1118,15 @@ function sessionOpenTs() {
 const HIST_RANGES = ['session', '1h', '4h', '24h'];
 const histRange = () => HIST_RANGES.includes(state.histRange) ? state.histRange : 'session';
 const histSince = () => histRange() === 'session' ? sessionOpenTs() : Date.now() - { '1h': 1, '4h': 4, '24h': 24 }[histRange()] * 3600000;
-const rangeLabel = () => histRange() === 'session' ? (sessionPhase()[0] === 'night' ? 'Overnight' : 'Today') : histRange();
 let spark = { pts: [], x: null, y: null, hover: -1 };
 function renderSentiment() {
   const el = $('sent'); if (!el || isPhone()) return;
   const l = activeList();
-  const head = '';
+  // Range as a small segmented control in the chart's top-right corner (Today / 1h / 4h / 24h).
+  const head = `<div class="rseg">${HIST_RANGES.map(r => `<button data-act="hist-range" data-r="${r}"${histRange() === r ? ' class="on"' : ''}>${r === 'session' ? (sessionPhase()[0] === 'night' ? 'Night' : 'Today') : r}</button>`).join('')}</div>`;
   if (!l.summary) { el.innerHTML = '<div class="none">Sentiment is off for this list (⋯ → Σ).</div>'; return; }
   const pts = (hist[l.id] || []).filter(p => p[0] >= histSince());
-  if (pts.length < 2) { el.innerHTML = '<div class="none">Collecting… the sentiment chart fills while the app is open.</div>'; return; }
+  if (pts.length < 2) { el.innerHTML = head + '<div class="none">Collecting… the sentiment chart fills while the app is open.</div>'; return; }
   const W = Math.max(120, el.clientWidth - 28), H = 88, T = 30, B = 15, ih = H - T - B;
   const vals = pts.map(p => p[1]);
   const bench = BENCH.map(([sym, name]) => ({ name, pts: (hist['@' + sym] || []).filter(p => p[0] >= pts[0][0]) })).filter(b => b.pts.length > 1);
@@ -1141,8 +1143,7 @@ function renderSentiment() {
   const bpath = b => b.pts.map((p, i) => `${i ? 'L' : 'M'}${Math.min(W, x(p[0])).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ');
   const benchSvg = bench.map((b, k) => { const e = b.pts[b.pts.length - 1]; return `<path class="bench b${k}" d="${bpath(b)}"/><text class="lbl bname" x="${Math.min(W, x(e[0])) - 2}" y="${(y(e[1]) - 3).toFixed(1)}" text-anchor="end">${b.name}</text>`; }).join('');
   spark = { pts, x, y, hover: spark.hover, bench };
-  el.innerHTML = head + `<div class="sent-c" data-act="hist-range" title="Click to change the range: Today → 1h → 4h → 24h"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" id="sentSvg">
-      <text class="lbl rng" x="${W}" y="20" text-anchor="end">${rangeLabel()}</text>
+  el.innerHTML = head + `<div class="sent-c"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" id="sentSvg">
       <!-- min/max labels sit on the side away from the extreme, off the line -->
       <text class="lbl" x="${lblX(hiAt)}" y="${T + 9}" text-anchor="${lblX(hiAt) ? 'end' : 'start'}">${pct(hi - pad)}</text><text class="lbl" x="${lblX(loAt)}" y="${T + ih - 2}" text-anchor="${lblX(loAt) ? 'end' : 'start'}">${pct(lo + pad)}</text>
       ${zin ? `<line class="zero" x1="0" x2="${W}" y1="${zy.toFixed(1)}" y2="${zy.toFixed(1)}"/>` : ''}
@@ -3007,7 +3008,7 @@ document.addEventListener('click', e => {
     case 'settings': openSettings(); break;
     case 'reconnect': refreshQuotes(); break;
     case 'details': toggleDetails(); break;
-    case 'hist-range': state.histRange = HIST_RANGES[(HIST_RANGES.indexOf(histRange()) + 1) % HIST_RANGES.length]; save(); renderSentiment(); break;
+    case 'hist-range': state.histRange = el.dataset.r; save(); renderSentiment(); break;
     case 'toggle-chart': state.chartHidden = !state.chartHidden; save(); applyChartHidden(); break;
     case 'toggle-list': state.listHidden = !state.listHidden; if (state.listHidden && state.chartHidden) state.chartHidden = false; save(); applyChartHidden(); applyListHidden(); break;
     case 'sheet-close': closeSheet(); break;
