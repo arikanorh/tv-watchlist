@@ -105,6 +105,10 @@
   .row[data-tone="neg"]::after { background: var(--down); }
   .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
   .row .sym b { flex-shrink: 0; font-weight: 600; white-space: nowrap; }   /* the ticker never shrinks; tags after it get clipped first */
+  /* sorted view: a short-lived arrow next to a ticker that moved up / down since the last re-order */
+  .row .sym .mv { flex-shrink: 0; width: 10px; height: 10px; margin-left: -2px; animation: mvFade 2.5s ease-in forwards; }
+  .row .sym .mv.up { color: var(--up); } .row .sym .mv.down { color: var(--down); transform: rotate(180deg); }
+  @keyframes mvFade { 0%, 15% { opacity: 1; } 30% { opacity: .55; } 45% { opacity: 1; } 100% { opacity: 0; } }
   .row .px, .row .chg, .row .ext { text-align: right; white-space: nowrap; }
   .row .ext { display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 13px; }
   .ss { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
@@ -767,7 +771,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '11.4';  // bump on every push to main
+const APP_VERSION = '11.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2335,7 +2339,8 @@ const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symb
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
     <span class="sym"><b>${esc(short(sym))}</b>${isBist(sym) ? TR_FLAG : ''}<i class="earn" hidden></i><span class="etw"></span><i class="erep" hidden>E</i><span class="alr"></span></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
 </div>`;
-let lastSortRender = 0;
+let lastSortRender = 0, lastSortKey = '', lastRank = {};
+const MV_ARROW = '<svg viewBox="0 0 10 10"><path d="M5 1.5 9 7.5H1z" fill="currentColor"/></svg>';
 function renderRows() {
   const l = activeList(), all = flatSymbols(l);
   let html = '';
@@ -2347,8 +2352,17 @@ function renderRows() {
     const fixed = all.filter(sy => NON_EQUITY.has(raw[sy]?.type) || noChart(sy));
     const rest = all.filter(sy => !fixed.includes(sy)).sort((a, b) => (quotes[b]?.[key] ?? -Infinity) - (quotes[a]?.[key] ?? -Infinity));
     if (fixed.length) html += ghHtml('Index', fixed.length, null, false, true) + fixed.map(sy => rowHtml(sy, giOf(sy))).join('');
-    html += ghHtml(state.sort === 'ext' ? 'By ext' : 'By change', rest.length, null, false, true) + rest.map(sy => rowHtml(sy, giOf(sy))).join('');
-    lastSortRender = Date.now();
+    // Arrows only for the symbols that actually jumped: the longest run that kept its old relative order stays quiet
+    // (so one big mover doesn't light up every row it passed). None on list / sort switch; adds/removes don't count.
+    const sortKey = l.id + '|' + state.sort, both = sortKey === lastSortKey ? rest.filter(sy => sy in lastRank) : [], moved = {};
+    const r = both.map(sy => lastRank[sy]), len = r.map(() => 1), prev = r.map(() => -1);
+    for (let i = 0; i < r.length; i++) for (let j = 0; j < i; j++) if (r[j] < r[i] && len[j] + 1 > len[i]) { len[i] = len[j] + 1; prev[i] = j; }
+    const keep = new Set();
+    for (let i = len.length ? len.indexOf(Math.max(...len)) : -1; i >= 0; i = prev[i]) keep.add(both[i]);
+    const oldIdx = Object.fromEntries([...both].sort((a, b) => lastRank[a] - lastRank[b]).map((sy, i) => [sy, i]));
+    both.forEach((sy, i) => { if (!keep.has(sy)) moved[sy] = i < oldIdx[sy] ? 'up' : 'down'; });
+    html += ghHtml(state.sort === 'ext' ? 'By ext' : 'By change', rest.length, null, false, true) + rest.map(sy => rowHtml(sy, giOf(sy)).replace('</b>', moved[sy] ? `</b><i class="mv ${moved[sy]}">${MV_ARROW}</i>` : '</b>')).join('');
+    lastSortRender = Date.now(); lastSortKey = sortKey; lastRank = Object.fromEntries(rest.map((sy, i) => [sy, i]));
   } else {
     const single = l.groups.length === 1, first = l.groups.findIndex(g => !g.auto);
     l.groups.forEach((g, gi) => {

@@ -1,0 +1,343 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Liste Yönetimi Taslağı</title>
+<style>
+  /* Layout: one phone screen. Lists + the active list's tickers on a single view; an edit mode turns the same
+     rows into a management surface (drag handles, remove, move to group, rename). Desktop shows it in a phone frame. */
+  :root {
+    --bg: #131722; --bg2: #1e222d; --bg3: #2a2e39; --border: #2a2e39;
+    --text: #d1d4dc; --muted: #787b86; --accent: #2962ff; --accent-bg: #1c2a52;
+    --up: #089981; --down: #f23645; --warn: #f7a600;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --nav-h: 50px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 var(--font); overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button, input { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; cursor: pointer; }
+  .num { font-variant-numeric: tabular-nums; }
+  .up { color: var(--up); } .down { color: var(--down); }
+
+  .stage { height: 100%; display: flex; flex-direction: column; }
+  .app { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); position: relative; }
+  @media (min-width: 768px) {
+    .stage { align-items: center; justify-content: center; background: #0b0e14; padding: 24px 16px; }
+    .app { width: 390px; height: min(844px, 100%); flex: none; border-radius: 28px; border: 1px solid #2a2e39; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+    .note { position: fixed; left: 16px; bottom: 16px; max-width: 320px; font-size: 12px; color: var(--muted); }
+  }
+  .note { display: none; }
+  @media (min-width: 768px) { .note { display: block; } }
+
+  /* ----- Head: what you read. Name, size, how the list is doing today ----- */
+  .head { padding: 12px 16px 8px; flex-shrink: 0; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
+  .head b { font-size: 24px; font-weight: 700; }
+  .head .big { font-size: 22px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .head .sub { grid-column: 1; font-size: 12px; color: var(--muted); }
+  .head .stat { grid-column: 2; font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .head .meter { grid-column: 1 / -1; height: 6px; margin-top: 8px; display: grid; border-radius: 3px; overflow: hidden; background: var(--bg3); }
+  .head .meter i { display: block; } .head .meter .d { background: var(--down); } .head .meter .f { background: var(--bg3); } .head .meter .u { background: var(--up); }
+  .head input { grid-column: 1 / -1; font-size: 22px; font-weight: 700; background: var(--bg2); border: 1px solid var(--accent); border-radius: 10px; padding: 6px 10px; outline: 0; }
+  /* ----- List strip at the bottom: every watchlist as a chip, tinted by its day; thumb reach ----- */
+  .strip { display: flex; align-items: center; gap: 6px; padding: 8px 12px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg2); }
+  .strip::-webkit-scrollbar { display: none; }
+  .lchip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 12px; border-radius: 12px;
+    background: var(--bg3); color: var(--muted); border: 1px solid transparent; min-width: 64px; }
+  .lchip b { font-size: 14px; font-weight: 600; color: var(--text); }
+  .lchip small { font-size: 11px; font-variant-numeric: tabular-nums; }
+  .lchip.on { border-color: var(--accent); background: var(--accent-bg); }
+  .lchip.s-up { background: rgba(8, 153, 129, .18); } .lchip.s-down { background: rgba(242, 54, 69, .18); }
+  .lchip.on.s-up, .lchip.on.s-down { border-color: var(--text); }
+  .lchip.add { align-items: center; justify-content: center; min-width: 44px; font-size: 20px; color: var(--muted); border: 1px dashed var(--bg3); background: none; }
+  .strip .lchip[draggable] { cursor: grab; }
+
+  .pill { height: 40px; padding: 0 14px; border-radius: 10px; background: var(--bg3); color: var(--text); font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .pill.primary { background: var(--accent); color: #fff; }
+  .pill.danger { color: var(--down); }
+  .icon { width: 34px; height: 34px; border-radius: 17px; background: var(--bg2); display: inline-flex; align-items: center; justify-content: center; color: var(--muted); font-size: 16px; }
+
+  /* ----- Rows ----- */
+  .list { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .ghead { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; background: var(--bg3);
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .ghead .chev { color: var(--muted); font-size: 9px; transition: transform .15s; }
+  .ghead.collapsed .chev { transform: rotate(-90deg); }
+  .ghead .gname { flex: 1; }
+  .ghead .gname input { width: 100%; background: var(--bg); border: 1px solid var(--accent); border-radius: 6px; padding: 3px 6px; font: inherit; text-transform: none; letter-spacing: 0; outline: 0; }
+  .ghead .gcount { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .ghead .gx { display: none; color: var(--muted); font-size: 16px; width: 30px; height: 30px; border-radius: 15px; margin-right: -8px; }
+  .row { display: grid; grid-template-columns: 1fr 92px 68px; gap: 8px; align-items: center; height: 46px; padding: 0 12px;
+    border-bottom: 1px solid rgba(42, 46, 57, .5); font-variant-numeric: tabular-nums; background: var(--bg); position: relative; }
+  .row .sym { font-weight: 600; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .row .sym .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .sym .star { color: var(--warn); font-size: 12px; }
+  .row .px, .row .chg { text-align: right; }
+  .row .px { padding: 3px 6px; border-radius: 5px; margin-right: -6px; justify-self: end; }
+  .row.s-up-1 .px { background: rgba(8, 153, 129, .16); } .row.s-up-2 .px { background: rgba(8, 153, 129, .30); } .row.s-up-3 .px { background: rgba(8, 153, 129, .48); }
+  .row.s-down-1 .px { background: rgba(242, 54, 69, .16); } .row.s-down-2 .px { background: rgba(242, 54, 69, .30); } .row.s-down-3 .px { background: rgba(242, 54, 69, .48); }
+  .row[class*="s-"] .px { color: var(--text); }
+  .row .rm, .row .mv, .row .hnd { display: none; }
+  .row.hidden { display: none; }
+  .empty { padding: 28px 16px; color: var(--muted); text-align: center; font-size: 14px; }
+
+  /* ----- Edit mode: the same rows become a management surface ----- */
+  .app.edit .row { grid-template-columns: 1fr auto 40px; }
+  .app.edit .row .px, .app.edit .row .chg { display: none; }
+  .app.edit .row .rm { display: flex; width: 28px; height: 28px; border-radius: 14px; background: rgba(242, 54, 69, .18); color: var(--down); font-size: 18px; line-height: 1; align-items: center; justify-content: center; }
+  .app.edit .row .hnd { display: flex; width: 40px; height: 46px; align-items: center; justify-content: center; color: var(--muted); cursor: grab; touch-action: none; margin-right: -12px; }
+  .head .hint { grid-column: 1 / -1; margin-top: 6px; font-size: 12px; color: var(--accent); }
+  .app.edit .row .hnd svg { width: 18px; height: 18px; }
+  .app.edit .ghead .gx { display: inline-flex; }
+  .app.edit .ghead .gname { cursor: text; }
+  .row.dragging { opacity: .35; }
+  .row.drop { box-shadow: inset 0 2px 0 var(--accent); }
+  .ghead.drop { box-shadow: inset 0 0 0 1px var(--accent); }
+
+  /* ----- Bottom bar + nav ----- */
+  .bbar { display: flex; gap: 8px; padding: 0 12px 8px; background: var(--bg2); flex-shrink: 0; }
+  .bbar .pill { flex: 1; }
+  .bbar .pill.icon-only { flex: none; width: 44px; padding: 0; font-size: 20px; }
+  .nav { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg2); border-top: 1px solid var(--border); flex-shrink: 0;
+    padding-bottom: max(0px, calc(env(safe-area-inset-bottom, 0px) - 12px)); }
+  .nav button { height: var(--nav-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); font-size: 10px; }
+  .nav button svg { width: 20px; height: 20px; }
+  .nav button.on { color: var(--text); } .nav button.on svg { color: var(--accent); }
+
+  /* ----- Sheets ----- */
+  .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.5); z-index: 20; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 21; background: var(--bg2); border-radius: 16px 16px 0 0; max-height: 80%;
+    display: flex; flex-direction: column; box-shadow: 0 -10px 30px rgba(0,0,0,.5); padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)); }
+  .sheet::before { content: ''; width: 36px; height: 4px; border-radius: 2px; background: var(--bg3); margin: 10px auto 4px; flex-shrink: 0; }
+  .sheet h3 { margin: 4px 16px 8px; font-size: 16px; }
+  .sheet .body { overflow-y: auto; min-height: 0; }
+  .srow { display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 12px 0 16px; border-top: 1px solid var(--border); }
+  .srow .n { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srow .c { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .srow .ck { width: 22px; height: 22px; border-radius: 11px; border: 1px solid var(--bg3); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); }
+  .srow .ck.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .srow .ck.on::after { content: 'Σ'; }
+  .srow .ck::after { content: 'Σ'; }
+  .srow .hnd { color: var(--muted); cursor: grab; touch-action: none; padding: 8px 0 8px 8px; }
+  .srow .hnd svg { width: 18px; height: 18px; }
+  .srow .x { color: var(--muted); font-size: 16px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; }
+  .srow.dragging { opacity: .35; } .srow.drop { box-shadow: inset 0 2px 0 var(--accent); }
+  .srow input { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 8px; outline: 0; }
+  .sheet form { display: flex; gap: 8px; padding: 10px 16px 4px; border-top: 1px solid var(--border); }
+  .sheet form input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 16px; outline: 0; }
+  .sheet form input:focus { border-color: var(--accent); }
+  .sheet form button { background: var(--accent); color: #fff; border-radius: 10px; padding: 0 16px; font-weight: 600; }
+  .gpick { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 16px; border-top: 1px solid var(--border); font-size: 16px; }
+  .gpick.on { color: var(--accent); }
+  .gpick .c { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .toast { position: absolute; left: 50%; bottom: calc(var(--nav-h) + 70px); transform: translateX(-50%); z-index: 30; background: var(--bg3); color: var(--text);
+    padding: 10px 16px; border-radius: 10px; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.5); display: flex; gap: 12px; align-items: center; white-space: nowrap; }
+  .toast button { color: var(--accent); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="stage">
+<div class="app" id="app">
+  <div class="head" id="head"></div>
+  <div class="list" id="list"></div>
+  <div class="strip" id="strip"></div>
+  <div class="bbar" id="bbar"></div>
+  <nav class="nav">
+    <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Listeler</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 5-8 4 5"/></svg>Grafik</button>
+  </nav>
+  <div id="overlay" hidden></div>
+</div>
+<div class="note">Üstte bilgi (liste adı, gün özeti, tablo), altta etkileşim (liste seçimi, ekle, düzenle). Düzenle modunda satıra dokunun veya tutamaçtan sürükleyin.</div>
+</div>
+
+<script>
+// ---------- Sample data (ComeOn'suz, tamamen örnek) ----------
+const L = [
+  { id: 'abd', name: 'ABD', sum: true, groups: [
+    { name: 'Index', syms: ['US100', 'SPX500'] },
+    { name: 'Spot', syms: ['NBIS', 'CRWV', 'BE', 'CEG', 'MOD', 'AVGO', 'ASTS', 'UPST', 'AMPX', 'KRMN'] },
+    { name: 'Moon sh', syms: ['ONDS', 'RCAT', 'GRRR', 'TE', 'ASPI'] } ] },
+  { id: 'inci', name: 'İnci', sum: true, groups: [ { name: 'Main', syms: ['RKLB', 'PL', 'APP', 'EUV', 'COHU', 'RBRK', 'SOFI', 'QS', 'NOW', 'AVAV', 'EOSE', 'RDDT', 'CBRS'] } ] },
+  { id: 'krip', name: 'Krip', sum: true, groups: [ { name: 'Majors', syms: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'] }, { name: 'Alts', syms: ['LINKUSDT', 'AVAXUSDT', 'ARBUSDT', 'OPUSDT'] } ] },
+  { id: 'tr', name: 'TR', sum: false, groups: [ { name: 'BIST', syms: ['XU100', 'THYAO', 'ASELS', 'KCHOL', 'SISE', 'EREGL', 'TUPRS'] } ] },
+  { id: 'ozet', name: 'Özet', sum: false, groups: [ { name: 'Main', syms: ['DXY', 'VIX', 'UKOIL', 'XAUUSD', 'US10Y'] } ] },
+];
+const Q = {};   // deterministic fake quotes
+for (const l of L) for (const g of l.groups) for (const s of g.syms) {
+  let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 9973;
+  const chg = ((h % 1400) - 700) / 100, px = 5 + (h % 900) + (h % 97) / 100;
+  Q[s] = { px, chg };
+}
+const starred = new Set(['NBIS', 'ASTS', 'RKLB']);
+let active = 'abd', edit = false, renamingList = false;
+const collapsed = new Set();
+
+// ---------- Helpers ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+const dir = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
+const tier = v => { const a = Math.abs(v); return a >= 2 ? 3 : a >= 1 ? 2 : a >= .5 ? 1 : 0; };
+const list = () => L.find(l => l.id === active);
+const avg = l => { const xs = l.groups.flatMap(g => g.syms).map(s => Q[s]?.chg).filter(v => v != null); return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null; };
+const HND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9h14M5 15h14"/></svg>';
+
+// ---------- Render ----------
+function render() {
+  $('app').classList.toggle('edit', edit);
+  $('strip').innerHTML = L.map(l => { const a = avg(l); return `<button class="lchip ${l.id === active ? 'on' : ''} ${a != null && Math.abs(a) >= .5 ? 's-' + dir(a) : ''}" data-list="${l.id}">
+      <b>${esc(l.name)}</b><small class="${a == null ? '' : dir(a)}">${a == null ? l.groups.flatMap(g => g.syms).length + ' sembol' : pct(a)}</small></button>`; }).join('')
+    + `<button class="lchip add" data-act="lists" title="Yeni liste">+</button>`;
+  $('strip').querySelector('.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  const l = list(), syms = l.groups.flatMap(g => g.syms), n = syms.length, a = avg(l);
+  const up = syms.filter(s => Q[s].chg >= .5).length, dn = syms.filter(s => Q[s].chg <= -.5).length, fl = n - up - dn;
+  $('head').innerHTML = renamingList
+    ? `<input id="renameList" value="${esc(l.name)}" aria-label="Liste adı">`
+    : `<b>${esc(l.name)}</b><span class="big ${a == null ? '' : dir(a)}">${a == null ? '' : pct(a)}</span>
+       <span class="sub">${n} sembol · ${l.groups.length} grup</span><span class="stat"><span class="up">${up}↑</span> ${fl}– <span class="down">${dn}↓</span></span>
+       ${n ? `<span class="meter" style="grid-template-columns:${dn}fr ${fl}fr ${up}fr"><i class="d"></i><i class="f"></i><i class="u"></i></span>` : ''}
+       ${edit ? `<span class="hint">Düzenleme: satıra dokun → seçenekler · ≡ ile sürükle · grup adına dokun → yeniden adlandır</span>` : ''}`;
+  $('list').innerHTML = l.groups.map((g, gi) => `<div class="ghead ${collapsed.has(l.id + gi) ? 'collapsed' : ''}" data-g="${gi}">
+      <span class="chev">▼</span><span class="gname" data-act="gname">${esc(g.name)}</span><span class="gcount">${g.syms.length}</span>
+      <button class="gx" data-act="gdel" title="Grubu sil">×</button></div>`
+    + g.syms.map(s => { const q = Q[s]; const t = tier(q.chg); return `<div class="row ${t ? 's-' + dir(q.chg) + '-' + t : ''} ${collapsed.has(l.id + gi) ? 'hidden' : ''}" data-g="${gi}" data-s="${s}">
+      <span class="sym" data-act="rowopt">${starred.has(s) ? '<span class="star">★</span>' : ''}<span class="name">${esc(s)}</span></span>
+      <span class="px">${fmt(q.px)}</span><span class="chg ${dir(q.chg)}">${pct(q.chg)}</span>
+      <button class="rm" data-act="rm" title="Listeden çıkar">−</button><span class="hnd" title="Sürükle">${HND}</span></div>`; }).join('')).join('')
+    + (n ? '' : '<div class="empty">Bu liste boş. Alttan sembol ekleyin.</div>');
+  $('bbar').innerHTML = renamingList
+    ? `<button class="pill" data-act="rename-cancel">Vazgeç</button><button class="pill primary" data-act="rename-ok">Kaydet</button>`
+    : edit
+    ? `<button class="pill" data-act="gadd">+ Grup</button><button class="pill" data-act="rename">Adı değiştir</button><button class="pill danger icon-only" data-act="ldel" title="Listeyi sil">🗑</button><button class="pill primary" data-act="edit">Bitti</button>`
+    : `<button class="pill" data-act="edit">Düzenle</button><button class="pill primary" data-act="add">+ Sembol ekle</button><button class="pill icon-only" data-act="lists" title="Listeleri yönet">⋯</button>`;
+}
+
+// ---------- Actions ----------
+let lastRemoved = null;
+document.addEventListener('click', e => {
+  const chip = e.target.closest('[data-list]');
+  if (chip) { active = chip.dataset.list; renamingList = false; render(); return; }
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const l = list(), row = el.closest('.row'), gh = el.closest('.ghead');
+  switch (el.dataset.act) {
+    case 'edit': edit = !edit; renamingList = false; render(); break;
+    case 'rename': renamingList = true; render(); $('renameList').focus(); $('renameList').select(); break;
+    case 'rename-ok': { const v = $('renameList').value.trim(); if (v) l.name = v; renamingList = false; render(); break; }
+    case 'rename-cancel': renamingList = false; render(); break;
+    case 'rowopt': if (edit) openRowOpts(row.dataset.s, +row.dataset.g); break;
+    case 'rm': { const g = l.groups[+row.dataset.g], s = row.dataset.s; g.syms = g.syms.filter(x => x !== s); lastRemoved = { g, s, i: g.syms.indexOf(s) }; render();
+      toast(`${s} çıkarıldı`, 'Geri al', () => { g.syms.push(s); render(); }); break; }
+    case 'gname': if (!edit) { const k = l.id + gh.dataset.g; collapsed.has(k) ? collapsed.delete(k) : collapsed.add(k); render(); }
+      else { const g = l.groups[+gh.dataset.g]; gh.querySelector('.gname').innerHTML = `<input value="${esc(g.name)}" aria-label="Grup adı">`; const i = gh.querySelector('input'); i.focus(); i.select();
+        const done = () => { const v = i.value.trim(); if (v) g.name = v; render(); }; i.addEventListener('blur', done); i.addEventListener('keydown', ev => { if (ev.key === 'Enter') i.blur(); }); }
+      break;
+    case 'gdel': { const gi = +gh.dataset.g, g = l.groups[gi]; if (g.syms.length) { toast(`"${g.name}" boş değil: önce sembolleri taşıyın`); break; } l.groups.splice(gi, 1); render(); break; }
+    case 'gadd': { l.groups.push({ name: 'Yeni grup', syms: [] }); render(); $('list').lastElementChild.scrollIntoView(); break; }
+    case 'ldel': confirmSheet(`"${l.name}" listesini sil?`, () => { const i = L.indexOf(l); L.splice(i, 1); active = (L[i] || L[i - 1] || L[0]).id; edit = false; render(); }); break;
+    case 'add': toast('Sembol arama paleti açılır (gerçek uygulamadaki arama)'); break;
+    case 'lists': openLists(); break;
+    case 'close': closeOverlay(); break;
+  }
+});
+// Collapsed header: tapping the chevron/head outside edit mode toggles (gname handles it); in edit mode the head's chevron still toggles.
+document.addEventListener('click', e => { const ch = e.target.closest('.ghead .chev'); if (!ch) return; const gh = ch.closest('.ghead'), k = list().id + gh.dataset.g; collapsed.has(k) ? collapsed.delete(k) : collapsed.add(k); render(); });
+
+// ---------- Drag to reorder (pointer events on the handle; works with touch) ----------
+let drag = null;
+document.addEventListener('pointerdown', e => {
+  const h = e.target.closest('.hnd'); if (!h) return;
+  const item = h.closest('.row, .srow'); if (!item) return;
+  e.preventDefault();
+  drag = { item, container: item.parentElement, kind: item.classList.contains('row') ? 'row' : 'srow' };
+  item.classList.add('dragging');
+  h.setPointerCapture(e.pointerId);
+});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const sel = drag.kind === 'row' ? '.row:not(.dragging), .ghead' : '.srow:not(.dragging)';
+  const items = [...drag.container.querySelectorAll(sel)].filter(x => !x.classList.contains('hidden'));
+  drag.container.querySelectorAll('.drop').forEach(x => x.classList.remove('drop'));
+  let target = null, before = true;
+  for (const it of items) { const r = it.getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { target = it; before = true; break; } target = it; before = false; }
+  if (!target) return;
+  if (target.classList.contains('ghead') && !before) { target.classList.add('drop'); drag.pos = { ref: target, after: true }; return; }   // drop into a group: right after its header
+  target.classList.add('drop'); drag.pos = { ref: target, after: !before };
+  // keep the container from scrolling away while dragging near the edges
+  const cr = drag.container.getBoundingClientRect();
+  if (e.clientY < cr.top + 40) drag.container.scrollTop -= 6; else if (e.clientY > cr.bottom - 40) drag.container.scrollTop += 6;
+});
+document.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const { item, container, kind, pos } = drag;
+  container.querySelectorAll('.drop').forEach(x => x.classList.remove('drop'));
+  item.classList.remove('dragging');
+  if (pos) { pos.after ? pos.ref.after(item) : pos.ref.before(item); }
+  if (kind === 'row') {   // rebuild groups from DOM order
+    const l = list(); const groups = l.groups.map(g => ({ ...g, syms: [] })); let gi = -1;
+    for (const el of container.children) { if (el.classList.contains('ghead')) gi = +el.dataset.g; else if (el.classList.contains('row') && gi >= 0) groups[gi].syms.push(el.dataset.s); }
+    l.groups = groups; render();
+  } else {   // list order
+    const order = [...container.querySelectorAll('.srow')].map(x => x.dataset.list);
+    L.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); render(); openLists();
+  }
+  drag = null;
+});
+
+// ---------- Sheets ----------
+function sheet(html) { $('overlay').hidden = false; $('overlay').innerHTML = `<div class="backdrop" data-act="close"></div><div class="sheet">${html}</div>`; }
+function closeOverlay() { $('overlay').hidden = true; $('overlay').innerHTML = ''; }
+function openLists() {
+  sheet(`<h3>Listeler</h3><div class="body">${L.map(l => `<div class="srow" data-list-row data-list="${l.id}">
+      <span class="n" data-act="lname">${esc(l.name)}</span><span class="c">${l.groups.flatMap(g => g.syms).length} sembol</span>
+      <button class="ck ${l.sum ? 'on' : ''}" data-act="sum" title="Tab'da özet göster"></button>
+      <button class="x" data-act="ldel2" title="Sil">×</button><span class="hnd">${HND}</span></div>`).join('')}</div>
+    <form id="newList"><input id="newListName" placeholder="Yeni liste adı" autocomplete="off"><button>Ekle</button></form>`);
+  $('newList').addEventListener('submit', e => { e.preventDefault(); const v = $('newListName').value.trim(); if (!v) return; L.push({ id: 'l' + Date.now(), name: v, sum: false, groups: [{ name: 'Main', syms: [] }] }); active = L[L.length - 1].id; render(); openLists(); });
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const sr = el.closest('.srow'); if (!sr) return;
+  e.stopImmediatePropagation();
+  const l = L.find(x => x.id === sr.dataset.list);
+  if (el.dataset.act === 'sum') { l.sum = !l.sum; el.classList.toggle('on', l.sum); render(); }
+  if (el.dataset.act === 'ldel2') { if (L.length === 1) { toast('Son liste silinemez'); return; } confirmSheet(`"${l.name}" listesini sil?`, () => { L.splice(L.indexOf(l), 1); if (active === l.id) active = L[0].id; render(); openLists(); }); }
+  if (el.dataset.act === 'lname') { el.outerHTML = `<input value="${esc(l.name)}" aria-label="Liste adı">`; const i = sr.querySelector('input'); i.focus(); i.select();
+    const done = () => { const v = i.value.trim(); if (v) l.name = v; render(); openLists(); }; i.addEventListener('blur', done); i.addEventListener('keydown', ev => { if (ev.key === 'Enter') i.blur(); }); }
+}, true);
+function openRowOpts(sym, gi) {
+  const l = list(), g = l.groups[gi];
+  sheet(`<h3>${esc(sym)}</h3><div class="body">
+    <button class="gpick" data-o="move" style="width:100%;text-align:left">Gruba taşı / listeye kopyala<span class="c">${esc(g.name)}</span></button>
+    <button class="gpick" data-o="star" style="width:100%;text-align:left">${starred.has(sym) ? 'Yıldızı kaldır' : 'Yıldızla (üst şeride sabitle)'}</button>
+    <button class="gpick" data-o="top" style="width:100%;text-align:left">Grubun başına al</button>
+    <button class="gpick" data-o="rm" style="width:100%;text-align:left;color:var(--down)">Listeden çıkar</button></div>`);
+  $('overlay').querySelectorAll('[data-o]').forEach(b => b.addEventListener('click', () => {
+    const o = b.dataset.o; closeOverlay();
+    if (o === 'move') openMove(sym, gi);
+    if (o === 'star') { starred.has(sym) ? starred.delete(sym) : starred.add(sym); render(); }
+    if (o === 'top') { g.syms = [sym, ...g.syms.filter(x => x !== sym)]; render(); }
+    if (o === 'rm') { g.syms = g.syms.filter(x => x !== sym); render(); toast(`${sym} çıkarıldı`, 'Geri al', () => { g.syms.push(sym); render(); }); }
+  }));
+}
+function openMove(sym, from) {
+  const l = list();
+  sheet(`<h3>${esc(sym)} → grup</h3><div class="body">${l.groups.map((g, gi) => `<button class="gpick ${gi === from ? 'on' : ''}" data-move="${gi}" style="width:100%;text-align:left">${esc(g.name)}<span class="c">${g.syms.length}</span></button>`).join('')}
+    ${L.filter(x => x !== l).map(x => `<button class="gpick" data-move-list="${x.id}" style="width:100%;text-align:left">${esc(x.name)} listesine kopyala<span class="c">${x.groups.flatMap(g => g.syms).length}</span></button>`).join('')}</div>`);
+  $('overlay').querySelectorAll('[data-move]').forEach(b => b.addEventListener('click', () => { const gi = +b.dataset.move; if (gi !== from) { l.groups[from].syms = l.groups[from].syms.filter(s => s !== sym); l.groups[gi].syms.push(sym); } closeOverlay(); render(); }));
+  $('overlay').querySelectorAll('[data-move-list]').forEach(b => b.addEventListener('click', () => { const x = L.find(y => y.id === b.dataset.moveList); const g = x.groups[x.groups.length - 1]; if (!g.syms.includes(sym)) g.syms.push(sym); closeOverlay(); render(); toast(`${sym} → ${x.name}`); }));
+}
+function confirmSheet(text, ok) {
+  sheet(`<h3>${esc(text)}</h3><div class="bbar" style="border:0"><button class="pill" data-act="close">Vazgeç</button><button class="pill primary" id="okBtn" style="background:var(--down)">Sil</button></div>`);
+  $('okBtn').addEventListener('click', () => { closeOverlay(); ok(); });
+}
+let toastTimer = null;
+function toast(text, action, fn) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<span>${esc(text)}</span>${action ? `<button>${esc(action)}</button>` : ''}`;
+  if (action) t.querySelector('button').addEventListener('click', () => { t.remove(); fn(); });
+  $('app').appendChild(t); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 4000);
+}
+render();
+</script>

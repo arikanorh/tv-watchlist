@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Hi/Lo marker proposals</title>
+<style>
+  body { margin: 0; background: #0f1218; color: #d1d4dc; font: 13px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; padding: 20px; }
+  h1 { font-size: 16px; margin: 0 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { background: #131722; border: 1px solid #2a2e39; border-radius: 10px; overflow: hidden; }
+  .card h2 { margin: 0; padding: 10px 14px; font-size: 13px; background: #1e222d; display: flex; justify-content: space-between; }
+  .card h2 b { color: #2962ff; }
+  .card p { margin: 0; padding: 10px 14px; color: #787b86; font-size: 12px; border-top: 1px solid #2a2e39; }
+  svg { display: block; width: 100%; height: 320px; }
+  text { font: 11px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #787b86; }
+  .lbl { fill: #d1d4dc; font-weight: 600; }
+</style></head>
+<body>
+<h1>Visible-range high / low — three looks</h1>
+<div class="grid" id="g"></div>
+<script>
+// deterministic candles
+let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+const N = 60, bars = []; let p = 100;
+for (let i = 0; i < N; i++) { const o = p, c = o + (rnd() - 0.48) * 3; const h = Math.max(o, c) + rnd() * 1.6, l = Math.min(o, c) - rnd() * 1.6; bars.push({ o, h, l, c }); p = c; }
+const W = 440, H = 320, AX = 64, PL = 10, PT = 18, PB = 18;
+const hi = Math.max(...bars.map(b => b.h)), lo = Math.min(...bars.map(b => b.l)), hiI = bars.findIndex(b => b.h === hi), loI = bars.findIndex(b => b.l === lo);
+const y = v => PT + (hi - v) / (hi - lo) * (H - PT - PB), x = i => PL + i * ((W - AX - PL) / N) + 3, bw = (W - AX - PL) / N - 2;
+const fmt = v => v.toFixed(2);
+function candles() {
+  return bars.map((b, i) => { const up = b.c >= b.o, col = up ? '#089981' : '#f23645'; return `<line x1="${x(i) + bw / 2}" x2="${x(i) + bw / 2}" y1="${y(b.h)}" y2="${y(b.l)}" stroke="${col}"/><rect x="${x(i)}" y="${y(Math.max(b.o, b.c))}" width="${bw}" height="${Math.max(1, Math.abs(y(b.o) - y(b.c)))}" fill="${col}"/>`; }).join('');
+}
+const axis = () => `<rect x="${W - AX}" y="0" width="${AX}" height="${H}" fill="#131722"/><line x1="${W - AX}" x2="${W - AX}" y1="0" y2="${H}" stroke="#2a2e39"/>` + [0, .25, .5, .75, 1].map(f => { const v = lo + (hi - lo) * f; return `<text x="${W - AX + 6}" y="${y(v) + 4}">${fmt(v)}</text><line x1="0" x2="${W - AX}" y1="${y(v)}" y2="${y(v)}" stroke="#2a2e39" stroke-opacity=".5"/>`; }).join('');
+const tag = (v, yy, col) => `<rect x="${W - AX}" y="${yy - 8}" width="${AX}" height="16" rx="2" fill="${col}"/><text class="lbl" x="${W - AX + 5}" y="${yy + 4}" style="fill:#fff">${fmt(v)}</text>`;
+
+const A = `<svg viewBox="0 0 ${W} ${H}">${axis()}
+  <line x1="0" x2="${W - AX}" y1="${y(hi)}" y2="${y(hi)}" stroke="#089981" stroke-dasharray="4 3" stroke-opacity=".8"/>
+  <line x1="0" x2="${W - AX}" y1="${y(lo)}" y2="${y(lo)}" stroke="#f23645" stroke-dasharray="4 3" stroke-opacity=".8"/>
+  ${candles()}${tag(hi, y(hi), '#089981')}${tag(lo, y(lo), '#f23645')}
+  <text x="6" y="${y(hi) - 4}" style="fill:#089981">High</text><text x="6" y="${y(lo) + 12}" style="fill:#f23645">Low</text></svg>`;
+
+const B = `<svg viewBox="0 0 ${W} ${H}">${axis()}${candles()}
+  <g transform="translate(${x(hiI) + bw / 2},${y(hi) - 6})"><path d="M0 0l-4-6h8z" fill="#089981"/><rect x="-26" y="-22" width="52" height="15" rx="3" fill="#089981"/><text class="lbl" x="0" y="-11" text-anchor="middle" style="fill:#fff">${fmt(hi)}</text></g>
+  <g transform="translate(${x(loI) + bw / 2},${y(lo) + 6})"><path d="M0 0l-4 6h8z" fill="#f23645"/><rect x="-26" y="7" width="52" height="15" rx="3" fill="#f23645"/><text class="lbl" x="0" y="18" text-anchor="middle" style="fill:#fff">${fmt(lo)}</text></g></svg>`;
+
+const rx = W - AX - 14, pct = ((hi - lo) / lo * 100).toFixed(1);
+const C = `<svg viewBox="0 0 ${W} ${H}">${axis()}${candles()}
+  <circle cx="${x(hiI) + bw / 2}" cy="${y(hi) - 4}" r="2.5" fill="#089981"/><circle cx="${x(loI) + bw / 2}" cy="${y(lo) + 4}" r="2.5" fill="#f23645"/>
+  <line x1="${rx}" x2="${rx}" y1="${y(hi)}" y2="${y(lo)}" stroke="#787b86" stroke-width="2" stroke-opacity=".7"/>
+  <line x1="${rx - 5}" x2="${rx + 5}" y1="${y(hi)}" y2="${y(hi)}" stroke="#089981" stroke-width="2"/><line x1="${rx - 5}" x2="${rx + 5}" y1="${y(lo)}" y2="${y(lo)}" stroke="#f23645" stroke-width="2"/>
+  <text class="lbl" x="${rx - 8}" y="${y(hi) + 4}" text-anchor="end" style="fill:#089981">${fmt(hi)}</text>
+  <text class="lbl" x="${rx - 8}" y="${y(lo) + 4}" text-anchor="end" style="fill:#f23645">${fmt(lo)}</text>
+  <rect x="${rx - 42}" y="${(y(hi) + y(lo)) / 2 - 8}" width="36" height="16" rx="3" fill="#1e222d" stroke="#2a2e39"/><text class="lbl" x="${rx - 24}" y="${(y(hi) + y(lo)) / 2 + 4}" text-anchor="middle">${pct}%</text></svg>`;
+
+document.getElementById('g').innerHTML = [
+  ['A', 'Lines', A, 'Dashed high/low lines across the visible range with green/red price tags on the axis — like TradingView’s "High/Low lines". Easy to read against the whole chart; a bit busy with session shading.'],
+  ['B', 'Bar markers', B, 'A small triangle + price label pinned to the highest and lowest bar of the visible range. Shows where the extremes happened; moves as you scroll/zoom. Quietest option.'],
+  ['C', 'Range bracket', C, 'A vertical bracket near the price axis spanning low→high with both prices and the range %, plus dots on the extreme bars. Adds "how big is this range" at a glance.'],
+].map(([k, t, svg, d]) => `<div class="card"><h2><span><b>${k}</b> &nbsp;${t}</span><span style="color:#787b86">visible range hi/lo</span></h2>${svg}<p>${d}</p></div>`).join('');
+</script>
+</body></html>
