@@ -101,8 +101,9 @@
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; background: var(--bg); transition: transform .12s, box-shadow .12s; }
   .row.on { background: var(--accent-bg); }
   .row.flagged { box-shadow: inset 8px 0 0 var(--c); }   /* the flag is the row's left border */
-  .row[data-tone="pos"]::after, .row[data-tone="neg"]::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background: var(--up); pointer-events: none; }   /* the day's analysis tone, right edge */
+  .row[data-tone="pos"]::after, .row[data-tone="neg"]::after, .row[data-tone="neu"]::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background: var(--up); pointer-events: none; }   /* the day's analysis tone, right edge */
   .row[data-tone="neg"]::after { background: var(--down); }
+  .row[data-tone="neu"]::after { background: var(--muted); }
   .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
   .row .sym b { flex-shrink: 0; font-weight: 600; white-space: nowrap; }   /* the ticker never shrinks; tags after it get clipped first */
   /* sorted view: a short-lived arrow next to a ticker that moved up / down since the last re-order */
@@ -771,7 +772,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '11.6';  // bump on every push to main
+const APP_VERSION = '11.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
