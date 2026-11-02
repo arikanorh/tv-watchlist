@@ -298,8 +298,15 @@
   .hray.sel::before { border-top-width: 2px; top: 4.5px; } .hray.sel i { display: block; }
   .hray[data-k="alert"] { --c: #f7a600; } .hray[data-k="buy"] { --c: #089981; } .hray[data-k="sell"] { --c: #f23645; }
   .hray.done { opacity: .5; } .hray.done::before { border-top-style: dashed; }   /* an alert that already fired */
-  .hray b em { font-style: normal; margin-right: 4px; opacity: .85; }
-  .hray b { position: absolute; left: 100%; top: -2px; padding: 0 0 0 6px; border-radius: 4px 0 0 4px; box-sizing: border-box; font-size: 11px; line-height: 15px; font-weight: 600; color: #fff; background: var(--c); font-variant-numeric: tabular-nums; }
+  /* kind badge: at the start of the line (u) and right of the price on the axis tag (b em) */
+  .hray u { display: none; position: absolute; left: 4px; top: -1px; height: 13px; min-width: 13px; padding: 0 2px; box-sizing: border-box; border-radius: 3px;
+    align-items: center; justify-content: center; text-decoration: none; font-size: 9px; font-weight: 700; line-height: 13px; color: #fff; background: var(--c); }
+  .hray[data-k="buy"] u, .hray[data-k="sell"] u, .hray[data-k="alert"] u { display: inline-flex; }
+  .hray.sel u { left: 10px; }   /* clear of the start handle */
+  .hray u svg, .hray b em svg { width: 9px !important; height: 9px !important; vertical-align: -1px; }
+  .hray b em { display: inline-flex; align-items: center; justify-content: center; min-width: 12px; height: 12px; margin-left: 4px; padding: 0 1px; box-sizing: border-box; border-radius: 3px;
+    font-style: normal; font-size: 9px; line-height: 12px; color: var(--c); background: #fff; }
+  .hray b { position: absolute; right: calc(-1 * var(--aw, 0px)); top: -2px; display: flex; align-items: center; white-space: nowrap; padding: 0 4px 0 6px; border-radius: 4px 0 0 4px; box-sizing: border-box; font-size: 11px; line-height: 15px; font-weight: 600; color: #fff; background: var(--c); font-variant-numeric: tabular-nums; }
   .hm { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
   .hm.hi { transform: translate(-50%, -100%); margin-top: -4px; } .hm.lo { margin-top: 4px; }
   .hm b { padding: 1px 6px; border-radius: 4px; line-height: 15px; }
@@ -732,7 +739,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.2';  // bump on every push to main
+const APP_VERSION = '10.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1784,14 +1791,16 @@ function ownRays() {
   const ts = own.chart.timeScale(), pw = ts.width(), aw = own.chart.priceScale('right').width(), ph = own.chart.paneSize?.().height ?? box.clientHeight - 28;
   for (const ln of L) {
     let n = box.querySelector(`[data-ray="${ln.id}"]`);
-    if (!n) { n = document.createElement('div'); n.className = 'hray'; n.dataset.ray = ln.id; n.innerHTML = '<i></i><b></b>'; box.appendChild(n); }
+    if (!n) { n = document.createElement('div'); n.className = 'hray'; n.dataset.ray = ln.id; n.innerHTML = '<i></i><u></u><b></b>'; box.appendChild(n); }
     seen.add(n);
     if ((n.dataset.k || '') !== (ln.k || '')) n.dataset.k = ln.k || '';
     n.classList.toggle('done', ln.k === 'alert' && !!ln.hit);
     const y = own.series.priceToCoordinate(ln.p), x0 = ts.logicalToCoordinate(rayIndex(ln.t)), x = Math.max(0, x0 ?? 0);
     n.hidden = y == null || x0 == null || x >= pw || y < 0 || y > ph; if (n.hidden) continue;
     Object.assign(n.style, { left: x + 'px', top: y + 'px', width: pw - x + 'px' });
-    const b = n.querySelector('b'), txt = (ALERT_TAG[ln.k] ? `<em>${ALERT_TAG[ln.k]}</em>` : '') + fmtPrice(ln.p); if (b.dataset.h !== txt) { b.dataset.h = txt; b.innerHTML = txt; } b.style.width = aw + 'px';
+    const tag = ALERT_TAG[ln.k] || '', b = n.querySelector('b'), txt = fmtPrice(ln.p) + (tag ? `<em>${tag}</em>` : ''); if (b.dataset.h !== txt) { b.dataset.h = txt; b.innerHTML = txt; }
+    n.style.setProperty('--aw', aw + 'px'); b.style.minWidth = aw + 'px';
+    const u = n.querySelector('u') || n.insertBefore(document.createElement('u'), b); if (u.dataset.h !== tag) { u.dataset.h = tag; u.innerHTML = tag; }
     n.querySelector('i').hidden = x0 < 0;   // the start handle only when the start is on screen
     n.classList.toggle('sel', own.raySel === ln.id);
   }
