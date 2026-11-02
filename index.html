@@ -739,7 +739,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.3';  // bump on every push to main
+const APP_VERSION = '10.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -809,7 +809,7 @@ function ensureEarnings(s) {
   s.lists = [...s.lists.filter(x => x !== l), l];
   return l;
 }
-// The Points list (auto: 'points', just before Earnings): every symbol with a buy / sell point, in a "Buy" and a "Sell"
+// The Points list (auto: 'points', the last list, after Earnings): every symbol with a buy / sell point, in a "Buy" and a "Sell"
 // group, each sorted by how far the price still is from its nearest point (inside a zone first). Rebuilt from
 // state.lines by updatePoints and never synced itself (the lines are). Created / kept in place by ensurePoints.
 function ensurePoints(s) {
@@ -817,8 +817,7 @@ function ensurePoints(s) {
   if (!l) l = { id: 'points', name: 'Points', summary: true, auto: 'points', groups: [] };
   for (const [k, n] of [['buy', 'Buy'], ['sell', 'Sell']]) if (!l.groups.some(g => g.auto === k)) l.groups.push({ name: n, auto: k, collapsed: false, symbols: [] });
   l.groups = ['buy', 'sell'].map(k => l.groups.find(g => g.auto === k));
-  const e = s.lists.find(x => x.auto === 'earnings');
-  s.lists = [...s.lists.filter(x => x !== l && x !== e), l, ...(e ? [e] : [])];
+  s.lists = [...s.lists.filter(x => x !== l), l];
   return l;
 }
 function load() {
