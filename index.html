@@ -766,7 +766,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '11.2';  // bump on every push to main
+const APP_VERSION = '11.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1533,10 +1533,13 @@ function ownHiLo() {
   for (let i = a; i <= b; i++) { const d = own.data[i]; if (!hi || d.high > hi.high) hi = d; if (!lo || d.low < lo.low) lo = d; }
   own.hiloVals = hi && lo ? [hi.high, lo.low] : null;   // the legend shows these even when the markers are off
   if (!chartOpts().hilo) { box.hidden = true; return; }
-  const ts = own.chart.timeScale(), place = (node, bar, price) => {
+  // each pill also says how far the last price is from that extreme (below the high: −, above the low: +)
+  const ts = own.chart.timeScale(), last = own.last?.close, place = (node, bar, price) => {
     const x = bar && ts.timeToCoordinate(bar.time), y = bar && own.series.priceToCoordinate(price);
     node.hidden = x == null || y == null; if (node.hidden) return;
-    node.style.left = x + 'px'; node.style.top = y + 'px'; node.querySelector('b').textContent = fmtPrice(price);
+    const d = last != null && price ? (last - price) / price * 100 : null;
+    node.style.left = x + 'px'; node.style.top = y + 'px';
+    node.querySelector('b').textContent = fmtPrice(price) + (d == null ? '' : ` · ${d >= 0 ? '+' : '−'}${Math.abs(d) < 10 ? Math.abs(d).toFixed(1) : Math.round(Math.abs(d))}%`);
   };
   box.hidden = false; place(box.querySelector('.hi'), hi, hi?.high); place(box.querySelector('.lo'), lo, lo?.low);
 }
