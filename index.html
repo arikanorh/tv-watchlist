@@ -732,7 +732,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.1';  // bump on every push to main
+const APP_VERSION = '10.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -802,6 +802,18 @@ function ensureEarnings(s) {
   s.lists = [...s.lists.filter(x => x !== l), l];
   return l;
 }
+// The Points list (auto: 'points', just before Earnings): every symbol with a buy / sell point, in a "Buy" and a "Sell"
+// group, each sorted by how far the price still is from its nearest point (inside a zone first). Rebuilt from
+// state.lines by updatePoints and never synced itself (the lines are). Created / kept in place by ensurePoints.
+function ensurePoints(s) {
+  let l = s.lists.find(x => x.auto === 'points');
+  if (!l) l = { id: 'points', name: 'Points', summary: true, auto: 'points', groups: [] };
+  for (const [k, n] of [['buy', 'Buy'], ['sell', 'Sell']]) if (!l.groups.some(g => g.auto === k)) l.groups.push({ name: n, auto: k, collapsed: false, symbols: [] });
+  l.groups = ['buy', 'sell'].map(k => l.groups.find(g => g.auto === k));
+  const e = s.lists.find(x => x.auto === 'earnings');
+  s.lists = [...s.lists.filter(x => x !== l && x !== e), l, ...(e ? [e] : [])];
+  return l;
+}
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
@@ -821,11 +833,11 @@ function load() {
       for (const k of ['pinned', 'hudHidden', 'histRange', 'panelWidth', 'mview']) delete s[k];
       if (!['list', 'chart'].includes(s.view)) s.view = 'list';
       if (!s.flags || typeof s.flags !== 'object') s.flags = {};
-      ensureEarnings(s);
+      ensureEarnings(s); ensurePoints(s);
       return s;
     }
   } catch (_) {}
-  const s = seed(); s.flags = {}; ensureEarnings(s); return s;
+  const s = seed(); s.flags = {}; ensureEarnings(s); ensurePoints(s); return s;
 }
 let state = load();
 function save() {
@@ -840,7 +852,7 @@ function save() {
 var syncTimer = null, syncStatus = { st: 'idle', at: 0, msg: '' }, syncLast = null;
 const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
-const syncShape = lists => lists.map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
+const syncShape = lists => lists.filter(l => l.auto !== 'points').map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
   groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols })) }));
 const syncJson = () => JSON.stringify({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {} });
 const fmtCode = c => c.length === 12 ? c.replace(/(.{4})(?=.)/g, '$1-') : c;   // 12-character codes from v1.3–1.5 read in groups
@@ -950,6 +962,7 @@ function syncAdopt(remote, notify = true) {
   const autoGroups = state.lists.find(l => l.auto === 'earnings')?.groups.filter(g => g.auto) || [];
   state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols, collapsed: collapsed.has(l.id + '|' + g.name) })) }));
   const el = ensureEarnings(state); for (const a of autoGroups) { const g = el.groups.find(x => x.auto === a.auto); if (g) g.symbols = a.symbols; }
+  ensurePoints(state); updatePoints(false);
   if (remote.flags && typeof remote.flags === 'object') state.flags = remote.flags;
   if ('sort' in remote) state.sort = ['chg', 'ext'].includes(remote.sort) ? remote.sort : null;   // the Chg% / Ext sort travels too
   if (remote.lines && typeof remote.lines === 'object') state.lines = remote.lines;   // chart lines and alerts too
@@ -1867,7 +1880,7 @@ function armRay(sym, ln) {
   ln.d = p == null || p <= ln.p ? 1 : -1;
 }
 const alertSyms = () => Object.keys(state.lines || {}).filter(s => state.lines[s].some(l => l.k));
-function alertsChanged() { wsSync(); patchRows(false); renderNotes(); }
+function alertsChanged() { wsSync(); updatePoints(); patchRows(false); renderNotes(); }
 // Run on every quote batch: a level whose crossing happened fires (once).
 function checkAlerts() {
   let fired = 0;
@@ -1878,12 +1891,12 @@ function checkAlerts() {
   }
   if (fired) { save(); ownRays(); alertsChanged(); }
 }
-function alertIcons(sym) {
+function alertIcons(sym, only) {   // only: 'buy' / 'sell' — the tag for that kind (rows of the Points list's groups)
   const L = state.lines?.[sym]; if (!L) return '';
   const pick = k => L.filter(l => l.k === k);
   // One B / S tag for the nearest buy or sell point with how far the price still has to move ("B 7.6%"); plain until the
   // price is in a zone (at or below a buy point, at or above a sell point), then filled green / red with just the letter.
-  const p = livePrice(sym), pts = L.filter(l => l.k === 'buy' || l.k === 'sell');
+  const p = livePrice(sym), pts = L.filter(l => only ? l.k === only : l.k === 'buy' || l.k === 'sell');
   const near = () => {
     if (!pts.length) return '';
     const all = pts.map(l => ({ l, d: p == null ? null : (l.k === 'buy' ? p - l.p : l.p - p) / p * 100 }));   // % left to go; ≤ 0 = in the zone
@@ -2078,7 +2091,7 @@ const LIST_ICONS = {
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
 const LIST_ICON_BY_ID = { abd: 'us', inci: 'pearl', tr: 'tr', krip: 'btc', zorning: 'eye' };
-const LIST_ICON = { earnings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' };
+const LIST_ICON = { points: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg>', earnings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' };
 function listTag(l) {
   if (LIST_ICON[l.auto]) return LIST_ICON[l.auto];
   const ic = LIST_ICONS[l.icon || LIST_ICON_BY_ID[l.id]]; if (ic) return ic;
@@ -2163,7 +2176,7 @@ function openRowCtx(sym, gi, x, y) {
   const m = document.createElement('div'); m.className = 'cmenu rowctx flip'; m.id = 'rowctx';
   const sub = (label, items) => `<div class="subw"><button class="ci sub">${label}<span class="cv">▸</span></button><div class="submenu">${items}</div></div>`;
   const flagItems = FLAGS.map(([n, c]) => `<button class="ci r${state.flags?.[sym] === n ? ' on' : ''}" data-f="${n}" style="--c:${c}"><i class="fsw"></i>${n[0].toUpperCase() + n.slice(1)}</button>`).join('') + `<button class="ci" data-f=""><i class="fsw" style="--c:transparent"></i>None</button>`;
-  const others = state.lists.filter(x => x.id !== l.id), own = x => x.groups.filter(q => !q.auto).flatMap(q => q.symbols);
+  const others = state.lists.filter(x => x.id !== l.id && x.auto !== 'points'), own = x => x.groups.filter(q => !q.auto).flatMap(q => q.symbols);
   const listItems = others.map(x => `<button class="ci" data-l="${esc(x.id)}"${own(x).includes(sym) ? ' disabled' : ''}>${esc(x.name)}<span class="cv">${own(x).includes(sym) ? '✓' : ''}</span></button>`).join('');
   m.innerHTML = `<div class="ch">${esc(short(sym))}</div>
     <button class="ci" data-o="details">${ICON.details}Details</button>
@@ -2263,6 +2276,7 @@ function renderRows() {
   const l = activeList(), all = flatSymbols(l);
   let html = '';
   if (!all.length && !l.auto) html = '<div class="empty">This list is empty.</div>';
+  else if (!all.length && l.auto === 'points') html = '<div class="empty">No buy or sell points yet. Right-click the chart → Horizontal ray → Buy point / Sell point, or a row → Alerts.</div>';
   else if (state.sort) {
     // Indices and other non-equities keep their order on top; everything else is one group, biggest Chg% (or Ext) first.
     const giOf = sy => l.groups.findIndex(g => g.symbols.includes(sy)), key = state.sort === 'ext' ? 'e' : 'c';
@@ -2274,14 +2288,14 @@ function renderRows() {
   } else {
     const single = l.groups.length === 1, first = l.groups.findIndex(g => !g.auto);
     l.groups.forEach((g, gi) => {
-      if (g.auto === 'reported' && !g.symbols.length) return;   // shown only while something reported in the last 2 days
+      if ((g.auto === 'reported' || g.auto === 'buy' || g.auto === 'sell') && !g.symbols.length) return;   // shown only when they have something
       if (!single && !(gi === first && !g.name)) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false);
       if (single || !g.collapsed) html += g.symbols.map((sy, i) => rowHtml(sy, gi, i, g.symbols.length)).join('');
       if (g.auto === true && !g.symbols.length && !g.collapsed) html += '<div class="empty">No earnings within 7 days in your lists.</div>';
     });
   }
-  // every list ends with its add row (symbols go to the last group; Earnings → Manual)
-  html += `<div class="addrow"><button data-act="add" title="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Symbol</button>${l.auto ? '' : `<button class="sec" data-act="add-section" title="New section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Section</button>`}</div>`;
+  // every list ends with its add row (symbols go to the last group; Earnings → Manual) — except Points, which only fills itself
+  if (l.auto !== 'points') html += `<div class="addrow"><button data-act="add" title="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Symbol</button>${l.auto ? '' : `<button class="sec" data-act="add-section" title="New section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Section</button>`}</div>`;
   $('rows').innerHTML = html;
   patchRows(false);
 }
@@ -2317,7 +2331,7 @@ function patchRows(withFlash = true) {
       tag.title = 'Earnings ' + new Date(t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (earnTiming(sym) ? ', ' + earnTiming(sym) : ''); }
     const etw = row.querySelector('.etw'), icon = show && earnsThisSession(t) ? earnTimingIcon(sym) : '';   // moon / sun only when it reports this session
     if (etw && etw.innerHTML !== icon) etw.innerHTML = icon;
-    const al = row.querySelector('.alr'), ah = alertIcons(sym); if (al && al.dataset.h !== ah) { al.dataset.h = ah; al.innerHTML = ah; }   // compared by source: re-setting would restart the bell's ring
+    const pg = activeList().groups[+row.dataset.g]?.auto, al = row.querySelector('.alr'), ah = alertIcons(sym, pg === 'buy' || pg === 'sell' ? pg : null); if (al && al.dataset.h !== ah) { al.dataset.h = ah; al.innerHTML = ah; }   // compared by source: re-setting would restart the bell's ring
     const er = row.querySelector('.erep'), done = reportedRecently(sym);   // reported in the last 2 days: green beat, red miss
     if (er) { er.hidden = !done; if (done) { const e = resultsPending(sym) ? null : earnResult(sym);
       er.className = 'erep ' + (e?.beat == null ? '' : e.beat ? 'beat' : 'miss');
@@ -2348,10 +2362,26 @@ function earnResultHtml(sym) {   // EPS and revenue: actual vs estimate, surpris
   const row = (k, a, est, s, f) => a == null && est == null ? '' : `<div><span>${k}</span><b>${a != null ? f(a) : '–'}</b><small>est ${est != null ? f(est) : '–'}</small>${surp(s)}</div>`;
   return row('EPS', e.eps, e.epsE, e.epsS, v => num(v, 2)) + row('Revenue', e.rev || null, e.revE || null, e.revS, fmtBig);
 }
+function updatePoints(render = true) {
+  const l = state.lists.find(x => x.auto === 'points'); if (!l) return;
+  let changed = false;
+  for (const g of l.groups) {
+    const next = Object.entries(state.lines || {}).map(([sym, L]) => {
+      const a = L.filter(x => x.k === g.auto); if (!a.length) return null;
+      const p = livePrice(sym);
+      return [sym, p == null ? Infinity : Math.min(...a.map(x => (g.auto === 'buy' ? p - x.p : x.p - p) / p))];   // share of the price left to go; ≤ 0 = in the zone
+    }).filter(Boolean).sort((a, b) => a[1] - b[1]).map(x => x[0]);
+    if (next.join() !== g.symbols.join()) { g.symbols = next; changed = true; }
+  }
+  if (!changed || !render) return;
+  save();
+  if (activeList() === l) renderRows();
+  patchChips();
+}
 function updateEarnings() {
   const l = state.lists.find(x => x.auto === 'earnings'), g = l?.groups.find(x => x.auto === true), gr = l?.groups.find(x => x.auto === 'reported'); if (!g) return;
   const manual = new Set(l.groups.filter(x => !x.auto).flatMap(x => x.symbols));
-  const pool = [...new Set(state.lists.filter(x => x !== l).flatMap(flatSymbols))].filter(sy => !manual.has(sy));
+  const pool = [...new Set(state.lists.filter(x => x !== l && x.auto !== 'points').flatMap(flatSymbols))].filter(sy => !manual.has(sy));
   const done = pool.filter(reportedRecently).sort((a, b) => lastEarnings(b) - lastEarnings(a));
   const next = pool.filter(sy => !done.includes(sy) && (d => d != null && d >= 0 && d <= 7)(earningsDays(sy))).sort((a, b) => earningsDays(a) - earningsDays(b));
   if (next.join() === g.symbols.join() && (!gr || done.join() === gr.symbols.join())) return;
@@ -2413,7 +2443,7 @@ function renderQuotes() {
   // In sorted view, re-order at most every 3 s and never under a finger or an open sheet.
   if (state.sort && Date.now() - lastSortRender > 3000 && !press && $('sheet').hidden) renderRows();
   else patchRows(true);
-  if (!press) updateEarnings();
+  if (!press) { updateEarnings(); updatePoints(); }
   checkAlerts(); renderNotes();
   patchChips();
   renderHeader();
@@ -2692,7 +2722,7 @@ function addSection(split) {
   toast(`${name} added`);
 }
 function openCopySheet(sym) {   // add the symbol to another list (it stays in this one)
-  const others = state.lists.filter(x => x.id !== state.activeListId);
+  const others = state.lists.filter(x => x.id !== state.activeListId && x.auto !== 'points');
   const own = x => x.groups.filter(g => !g.auto).flatMap(g => g.symbols);   // the Earnings list's auto group doesn't count as "there"
   openSheet('copy', `Add ${short(sym)} to`, others.map(x => `<button class="opt" data-l="${esc(x.id)}">${esc(x.name)}<span class="c">${own(x).includes(sym) ? 'already there' : own(x).length}</span></button>`).join(''));
   $('shBody').onclick = e => {
@@ -2830,7 +2860,7 @@ function openListManager() {
       save(); patchChips(); renderHeader(); renderListManager();
     }
     if (b.dataset.lm === 'del') {
-      if (l.auto) { toast('The Earnings list fills itself and stays'); return; }
+      if (l.auto) { toast(`The ${l.name} list fills itself and stays`); return; }
       if (state.lists.length === 1) { toast('Keep at least one list'); return; }
       if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Delete?'; return; }
       state.lists = state.lists.filter(x => x !== l);
@@ -2858,7 +2888,7 @@ function renderListManager() {
     e.preventDefault();
     const name = $('lmname').value.trim(); if (!name) return;
     const l = { id: 'l' + uid(), name, summary: true, groups: [{ name: 'Main', collapsed: false, symbols: [] }] };
-    state.lists.push(l); ensureEarnings(state); state.activeListId = l.id; save(); render(); renderListManager();
+    state.lists.push(l); ensureEarnings(state); ensurePoints(state); state.activeListId = l.id; save(); render(); renderListManager();
     toast(`${name} created`);
   });
 }
