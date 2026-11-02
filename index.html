@@ -317,7 +317,7 @@
   .hm { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
   .hm.hi { transform: translate(-50%, -100%); margin-top: -4px; } .hm.lo { margin-top: 4px; }
   .hm b { padding: 1px 6px; border-radius: 4px; line-height: 15px; text-align: center; }
-  .hm b small { display: block; font-size: 10px; line-height: 12px; font-weight: 600; opacity: .9; }   /* % from the last price, under the price */
+  .hm b small { display: block; font-size: 10px; line-height: 12px; font-weight: 600; opacity: .9; }   /* swing to the other extreme, under the price */
   .hm.hi b { background: #089981; } .hm.lo b { background: #f23645; }
   .hm i { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; }
   .hm.hi i { border-top: 5px solid #089981; } .hm.lo i { border-bottom: 5px solid #f23645; }
@@ -772,7 +772,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '11.7';  // bump on every push to main
+const APP_VERSION = '11.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1539,16 +1539,16 @@ function ownHiLo() {
   for (let i = a; i <= b; i++) { const d = own.data[i]; if (!hi || d.high > hi.high) hi = d; if (!lo || d.low < lo.low) lo = d; }
   own.hiloVals = hi && lo ? [hi.high, lo.low] : null;   // the legend shows these even when the markers are off
   if (!chartOpts().hilo) { box.hidden = true; return; }
-  // each pill also says how far the last price is from that extreme (below the high: −, above the low: +)
-  const ts = own.chart.timeScale(), last = own.last?.close, place = (node, bar, price) => {
+  // each pill also gives the swing to the other extreme: the high vs the low (+), the low vs the high (−)
+  const ts = own.chart.timeScale(), place = (node, bar, price, other) => {
     const x = bar && ts.timeToCoordinate(bar.time), y = bar && own.series.priceToCoordinate(price);
     node.hidden = x == null || y == null; if (node.hidden) return;
-    const d = last != null && price ? (last - price) / price * 100 : null;
+    const d = other ? (price - other) / other * 100 : null;
     node.style.left = x + 'px'; node.style.top = y + 'px';
     const html = fmtPrice(price) + (d == null ? '' : `<small>${d >= 0 ? '+' : '−'}${Math.abs(d) < 10 ? Math.abs(d).toFixed(1) : Math.round(Math.abs(d))}%</small>`), b = node.querySelector('b');
     if (b.dataset.h !== html) { b.dataset.h = html; b.innerHTML = html; }
   };
-  box.hidden = false; place(box.querySelector('.hi'), hi, hi?.high); place(box.querySelector('.lo'), lo, lo?.low);
+  box.hidden = false; place(box.querySelector('.hi'), hi, hi?.high, lo?.low); place(box.querySelector('.lo'), lo, lo?.low, hi?.high);
 }
 // Scrolling past the oldest bar asks the socket for 300 more (request_more_data), debounced so a long scroll sends one request.
 function ownMaybeMore(range) {
