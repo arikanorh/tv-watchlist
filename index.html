@@ -599,7 +599,8 @@
     .ctool button svg { width: 18px; height: 18px; }
     .ctool button b { position: absolute; right: 2px; bottom: 1px; font-size: 8px; font-weight: 700; color: inherit; }
     .ctool button:hover { background: var(--bg3); color: var(--text); }
-    .ctool button.on { color: var(--accent); }
+    .ctool button.on { color: var(--accent); background: var(--accent-bg); }   /* what's on in the chart stands out */
+    .ctool button.on:hover { background: var(--accent-bg); filter: brightness(1.15); }
     .ctool button[data-tool="measure"].on, .ctool button[data-tool="ray"].on { background: var(--accent); color: #fff; }
     .ctool .sep { width: 22px; height: 1px; margin: 5px 0; background: var(--line); }
     .cover { position: absolute; left: calc(var(--tb, 0px) + 8px); top: 8px; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 9px; background: var(--cover); backdrop-filter: blur(4px); }
@@ -750,7 +751,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.7';  // bump on every push to main
+const APP_VERSION = '10.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
