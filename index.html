@@ -101,8 +101,8 @@
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; background: var(--bg); transition: transform .12s, box-shadow .12s; }
   .row.on { background: var(--accent-bg); }
   .row.flagged { box-shadow: inset 8px 0 0 var(--c); }   /* the flag is the row's left border */
-  .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; }
-  .row .sym b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+  .row .sym b { flex-shrink: 0; font-weight: 600; white-space: nowrap; }   /* the ticker never shrinks; tags after it get clipped first */
   .row .px, .row .chg, .row .ext { text-align: right; white-space: nowrap; }
   .row .ext { display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 13px; }
   .ss { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
@@ -254,6 +254,9 @@
     font-style: normal; font-size: 9px; font-weight: 700; color: var(--c); border: 1.5px solid var(--c); }
   .alr i.buy.in { --c: var(--up); } .alr i.sell.in { --c: var(--down); }
   .alr i.in { background: var(--c); color: #fff; }
+  .alr i.pt { width: auto; min-width: 15px; padding: 0; gap: 3px; }
+  .alr i.pt b { font-weight: 700; padding: 0 0 0 3px; } .alr i.pt.in b { padding: 0 3px; }
+  .alr i.pt span { padding-right: 3px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
   .alr i.bell { border: 0; } .alr i.bell svg { width: 13px; height: 13px; }
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
@@ -725,7 +728,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '9.9';  // bump on every push to main
+const APP_VERSION = '10.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1874,12 +1877,21 @@ function checkAlerts() {
 function alertIcons(sym) {
   const L = state.lines?.[sym]; if (!L) return '';
   const pick = k => L.filter(l => l.k === k);
-  // B / S are plain until the price is in the zone: at or below a buy point, at or above a sell point.
-  const p = livePrice(sym), pt = (k, ch) => { const a = pick(k); if (!a.length) return ''; const zone = p != null && a.some(l => k === 'buy' ? p <= l.p : p >= l.p);
-    return `<i class="${k}${zone ? ' in' : ''}" title="${k === 'buy' ? 'Buy' : 'Sell'} point ${a.map(l => fmtPrice(l.p)).join(', ')}${zone ? (k === 'buy' ? ' — price is below' : ' — price is above') : ''}">${ch}</i>`; };
+  // One B / S tag for the nearest buy or sell point with how far the price still has to move ("B 7.6%"); plain until the
+  // price is in a zone (at or below a buy point, at or above a sell point), then filled green / red with just the letter.
+  const p = livePrice(sym), pts = L.filter(l => l.k === 'buy' || l.k === 'sell');
+  const near = () => {
+    if (!pts.length) return '';
+    const all = pts.map(l => ({ l, d: p == null ? null : (l.k === 'buy' ? p - l.p : l.p - p) / p * 100 }));   // % left to go; ≤ 0 = in the zone
+    const zone = all.filter(x => x.d != null && x.d <= 0).sort((a, b) => a.d - b.d)[0];
+    const best = zone || all.filter(x => x.d != null).sort((a, b) => a.d - b.d)[0] || all[0];
+    const k = best.l.k, ch = k === 'buy' ? 'B' : 'S', pc = x => x.d == null ? '' : String(x.d < 10 ? x.d.toFixed(1) : Math.round(x.d));
+    const tip = all.map(x => `${x.l.k === 'buy' ? 'Buy' : 'Sell'} ${fmtPrice(x.l.p)}${x.d == null ? '' : x.d <= 0 ? ' — reached' : ' — ' + pc(x) + '% away'}`).join('\n');
+    return `<i class="pt ${k}${zone ? ' in' : ''}" title="${esc(tip)}"><b>${ch}</b>${zone || best.d == null ? '' : `<span>${pc(best)}</span>`}</i>`;
+  };
   const al = pick('alert'), ring = al.filter(l => l.hit && !l.ack), armed = al.filter(l => !l.hit);
   const bell = ring.length || armed.length ? `<i class="bell${ring.length ? ' hit' : ''}" title="${ring.length ? 'Alert fired at ' + ring.map(l => fmtPrice(l.p)).join(', ') : 'Alert at ' + armed.map(l => fmtPrice(l.p)).join(', ')}">${ICON.bell}</i>` : '';
-  return pt('buy', 'B') + pt('sell', 'S') + bell;
+  return near() + bell;
 }
 // Alerts of one symbol: a sheet on every device (row menu → Alerts, or the line's menu). Edit type / price, remove, add.
 function openAlerts(sym) {
