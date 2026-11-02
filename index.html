@@ -101,6 +101,8 @@
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; background: var(--bg); transition: transform .12s, box-shadow .12s; }
   .row.on { background: var(--accent-bg); }
   .row.flagged { box-shadow: inset 8px 0 0 var(--c); }   /* the flag is the row's left border */
+  .row[data-tone="pos"]::after, .row[data-tone="neg"]::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background: var(--up); pointer-events: none; }   /* the day's analysis tone, right edge */
+  .row[data-tone="neg"]::after { background: var(--down); }
   .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
   .row .sym b { flex-shrink: 0; font-weight: 600; white-space: nowrap; }   /* the ticker never shrinks; tags after it get clipped first */
   .row .px, .row .chg, .row .ext { text-align: right; white-space: nowrap; }
@@ -559,7 +561,9 @@
     body[data-view] .detailspane { display: none; }
     .sent { display: block; padding: 0 14px 6px; border-bottom: 1px solid var(--line); background: var(--bg2); }
     body.details-open[data-view] .detailspane { display: flex; width: 300px; border-right: 1px solid var(--line); background: var(--bg); }
-    .detailspane .dt-top { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 4px 16px; font-size: 12px; font-weight: 600; color: var(--muted); }
+    .detailspane { position: relative; }
+    .detailspane .dt-top { position: absolute; top: 6px; right: 6px; z-index: 2; }   /* just the close button in the corner; no title row */
+    .detailspane #dbody .dt-head { padding-top: 12px; } .detailspane #dbody .dt-head .dsc { padding-right: 32px; }
     .detailspane .dt-top button { width: 28px; height: 28px; border-radius: 6px; color: var(--muted); }
     .detailspane .dt-top button:hover { background: var(--bg3); color: var(--text); }
     .detailspane #dbody { flex: 1; min-height: 0; overflow-y: auto; }
@@ -603,7 +607,9 @@
     .ctool button.on:hover { background: var(--accent-bg); filter: brightness(1.15); }
     .ctool button[data-tool="measure"].on, .ctool button[data-tool="ray"].on { background: var(--accent); color: #fff; }
     .ctool .sep { width: 22px; height: 1px; margin: 5px 0; background: var(--line); }
-    .cover { position: absolute; left: calc(var(--tb, 0px) + 8px); top: 8px; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 9px; background: var(--cover); backdrop-filter: blur(4px); }
+    .ohlc { display: flex; align-items: baseline; gap: 9px; padding: 0 8px 0 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ohlc span b { margin-left: 3px; font-weight: 500; } .ohlc b.up { color: var(--up); } .ohlc b.down { color: var(--down); }
+    .cover { position: absolute; left: calc(var(--tb, 0px) + 8px); top: 8px; z-index: 5; display: flex; flex-wrap: wrap; row-gap: 4px; max-width: calc(100% - var(--tb, 0px) - 96px); align-items: center; gap: 6px; padding: 4px; border-radius: 9px; background: var(--cover); backdrop-filter: blur(4px); }
     .cover .sbtn { flex: none; height: 32px; padding: 0 10px; border-radius: 6px; gap: 8px; background: var(--bg3); }
     .cover .sbtn:hover { color: var(--text); }
     .cover .seg { display: flex; align-items: stretch; gap: 1px; padding: 0; height: 32px; }
@@ -715,11 +721,11 @@
     </div>
   </section>
   <aside class="pane detailspane" aria-label="Symbol details">
-    <div class="dt-top"><span>Details</span><button data-act="details" aria-label="Close details">✕</button></div>
+    <div class="dt-top"><button data-act="details" aria-label="Close details" title="Close">✕</button></div>
     <div id="dbody"></div>
   </aside>
   <section class="pane chartpane" id="chartWrap" aria-label="Chart">
-    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button><button class="cinfo" data-act="details" title="Details panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button></div><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
+    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button><button class="cinfo" data-act="details" title="Details panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button><span class="ohlc" id="ohlc" hidden></span></div><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -751,7 +757,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.8';  // bump on every push to main
+const APP_VERSION = '11.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1130,15 +1136,20 @@ function sessionOpenTs() {
   const open = m >= 240 && m < 1200 ? 240 : 1200;
   return Date.now() - ((m - open + 1440) % 1440) * 60000;
 }
-const HIST_RANGES = ['session', '1h', '4h', '24h'];
+// Start of the current US phase (CS): pre 04:00, regular 09:30, post 16:00, overnight 20:00 ET.
+function phaseStartTs() {
+  const { m } = nyParts(), start = m >= 1200 || m < 240 ? 1200 : m >= 960 ? 960 : m >= 570 ? 570 : 240;
+  return Date.now() - ((m - start + 1440) % 1440) * 60000;
+}
+const HIST_RANGES = ['session', 'cs', '1h', '4h', '24h'];
 const histRange = () => HIST_RANGES.includes(state.histRange) ? state.histRange : 'session';
-const histSince = () => histRange() === 'session' ? sessionOpenTs() : Date.now() - { '1h': 1, '4h': 4, '24h': 24 }[histRange()] * 3600000;
+const histSince = () => histRange() === 'session' ? sessionOpenTs() : histRange() === 'cs' ? phaseStartTs() : Date.now() - { '1h': 1, '4h': 4, '24h': 24 }[histRange()] * 3600000;
 let spark = { pts: [], x: null, y: null, hover: -1 };
 function renderSentiment() {
   const el = $('sent'); if (!el || isPhone()) return;
   const l = activeList();
   // Range as a small segmented control in the chart's top-right corner (Today / 1h / 4h / 24h).
-  const head = `<div class="rseg">${HIST_RANGES.map(r => `<button data-act="hist-range" data-r="${r}"${histRange() === r ? ' class="on"' : ''}>${r === 'session' ? (sessionPhase()[0] === 'night' ? 'Night' : 'Today') : r}</button>`).join('')}</div>`;
+  const head = `<div class="rseg">${HIST_RANGES.map(r => `<button data-act="hist-range" data-r="${r}"${histRange() === r ? ' class="on"' : ''}${r === 'cs' ? ' title="Current session: since the current pre-market / regular / post-market / overnight phase began"' : ''}>${r === 'session' ? (sessionPhase()[0] === 'night' ? 'Night' : 'Today') : r === 'cs' ? 'CS' : r}</button>`).join('')}</div>`;
   if (!l.summary) { el.innerHTML = '<div class="none">Sentiment is off for this list (⋯ → Σ).</div>'; return; }
   const pts = (hist[l.id] || []).filter(p => p[0] >= histSince());
   if (pts.length < 2) { el.innerHTML = head + '<div class="none">Collecting… the sentiment chart fills while the app is open.</div>'; return; }
@@ -1572,7 +1583,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, sma200: false, session: '24h', ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, sma200: false, ohlc: true, session: '24h', ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1662,7 +1673,20 @@ function ownSma(full) {   // full: recompute the whole line; otherwise just the 
     else { const i = own.data.length - 1, v = smaAt(n, i); if (v != null) try { ser.update({ time: own.data[i].time, value: v }); } catch (_) {} }
   });
 }
+// OHLC of the bar under the pointer (else the latest) and its change from the previous close, right of the intervals
+// (desktop, own chart; chart option "OHLC").
+function ownOhlc() {
+  const el = $('ohlc'); if (!el) return;
+  const b = own.hoverBar || own.last, i = b && own.data ? own.data.indexOf(b) : -1;
+  if (!own.active || !b || !chartOpts().ohlc) { el.hidden = true; if ($('legs')) $('legs').style.top = ''; return; }
+  const prev = i > 0 ? own.data[i - 1].close : b.open, ch = prev ? (b.close - prev) / prev * 100 : 0, c = b.close >= b.open ? 'up' : 'down';
+  const html = `<span>O<b class="${c}">${fmtPrice(b.open)}</b></span><span>H<b class="${c}">${fmtPrice(b.high)}</b></span><span>L<b class="${c}">${fmtPrice(b.low)}</b></span><span>C<b class="${c}">${fmtPrice(b.close)}</b></span><b class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%</b>`;
+  if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
+  el.hidden = false;
+  const cv = $('cover'), lg = $('legs'); if (cv && lg) lg.style.top = Math.max(54, cv.offsetTop + cv.offsetHeight + 6) + 'px';   // the legend sits below the (maybe two-line) cover
+}
 function ownVolLegend() {
+  ownOhlc();
   const box = $('legs'); if (!box) return;
   const b = own.hoverBar || own.last;
   box.hidden = !own.active || !b; if (box.hidden) return;
@@ -1705,6 +1729,7 @@ const CHART_OPTS = [
   ['sma20', 'SMA 20', '20-bar simple moving average (amber).'],
   ['sma50', 'SMA 50', '50-bar simple moving average (blue).'],
   ['sma200', 'SMA 200', '200-bar simple moving average (pink).'],
+  ['ohlc', 'OHLC', 'Open, high, low, close and % change of the bar under the pointer (else the latest), next to the intervals.'],
 ];
 const SESSION_OPTS = [['regular', 'Regular only', 'Just the main session.'], ['extended', 'Extended', 'Pre- and post-market too.'], ['24h', '24 hours', 'Extended plus overnight trading (US stocks, 20:00–04:00 ET).']];
 function setChartOpt(k, on) {
@@ -1713,6 +1738,7 @@ function setChartOpt(k, on) {
   else if (k === 'volume') { own.vol?.setData(on && own.data ? own.data.map(volBar) : []); ownVolLegend(); }
   else if (SMAS.some(x => x[0] === k)) { ownSma(true); ownVolLegend(); }
   else if (k === 'hilo') { ownHiLo(); ownVolLegend(); }
+  else if (k === 'ohlc') ownOhlc();
   else if (k === 'earnings') ownEarnings();
   else ownCountdown();
 }
@@ -2336,7 +2362,8 @@ function flash(node, cls) { if (node.classList.contains('flash')) return; node.c
 function patchRows(withFlash = true) {
   const now = Date.now();
   for (const row of $('rows').querySelectorAll('.row')) {
-    const sym = row.dataset.sym, c = cellsFor(sym);
+    const sym = row.dataset.sym, c = cellsFor(sym), tone = analysis.items?.[sym]?.tone || '';
+    if ((row.dataset.tone || '') !== tone) row.dataset.tone = tone;
     const px = row.querySelector('.px'), chg = row.querySelector('.chg'), ext = row.querySelector('.ext');
     if (px.textContent !== c.px) {
       const d = parseFloat(c.px.replace(/,/g, '')) - parseFloat(px.textContent.replace(/,/g, ''));
@@ -2500,6 +2527,7 @@ function detailsHtml(sym) {
     <div class="dt-px"><b>${fmtPrice(r.lp)}</b><span class="${dir(q.c)}">${ch != null ? (ch > 0 ? '+' : '') + fmtPrice(ch) + ' ' : ''}${pct(q.c)}</span><small>${esc(r.currency_code || '')}</small></div>${ext}</div>`;
   const vol = r.volume != null ? fmtBig(r.volume) + (r.average_volume ? ` <small class="${r.volume >= r.average_volume ? 'up' : ''}">${(r.volume / r.average_volume).toFixed(1)}× avg</small>` : '') : null;
   const today = rangeBar(r.low_price, r.high_price, r.lp) + kv('Open', fmtPrice(r.open_price)) + kv('Prev close', fmtPrice(r.prev_close_price)) + kv('Volume', vol);
+  h += analysisHtml(sym);   // the day's analysis first, right under the price
   if (today) h += `<div class="dt-sec"><h4>Today</h4>${today}</div>`;
   const fromAth = r.all_time_high ? (r.lp - r.all_time_high) / r.all_time_high * 100 : null;
   const year = rangeBar(r.price_52_week_low, r.price_52_week_high, r.lp) + kv('1 week', signed(r.price_percent_change_1_week)) + kv('52 weeks', signed(r.price_percent_change_52_week))
@@ -2521,7 +2549,7 @@ function detailsHtml(sym) {
   if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
   const er = earnResult(sym), erh = er && earnResultHtml(sym);
   if (erh) h += `<div class="dt-sec dt-earn"><h4>Last earnings · ${new Date(er.t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</h4>${erh}</div>`;
-  return h + analysisHtml(sym) + newsHtml(sym);
+  return h + newsHtml(sym);
 }
 // ---- News: TradingView headlines for the symbol (direct on localhost, through the relay elsewhere), cached 2 minutes.
 // Tap a headline to open its summary inline; "Read on <source>" opens the original.
@@ -2549,7 +2577,7 @@ async function loadAnalysis() {
   const code = state.sync?.code; if (!code || analysis.loading) return;
   analysis.loading = true;
   try { const r = await fetch(`${RELAY_HTTP}/analysis/${code}`); if (r.ok) analysis.items = await r.json(); } catch (e) { clog('warn', 'analysis: load failed', { err: String(e.message || e) }); }
-  analysis.loading = false; analysis.at = Date.now(); renderDetails();
+  analysis.loading = false; analysis.at = Date.now(); renderDetails(); if ($('rows')) patchRows(false);
 }
 const TONES = { pos: ['Olumlu', 'up'], neg: ['Olumsuz', 'down'], neu: ['Nötr', 'neu'] };
 function analysisHtml(sym) {
@@ -2617,7 +2645,7 @@ function placeTools() {   // the session/tick/toggle block stays in the header (
   if (pins.parentElement !== pdest) pdest.insertBefore(pins, before);
   // desktop: the search box and the interval buttons float over the chart's top-left corner
   const cover = $('cover'), sb = $('sbtn'), seg = $('seg');
-  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg); } }   // order: search, market dot, details, intervals
+  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg, $('ohlc')); } }   // order: search, market dot, details, intervals, OHLC
   else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend(sb); document.querySelector('.ctools').prepend(seg); } }
   renderPins();
 }
@@ -3248,6 +3276,7 @@ syncLast = syncJson();
     if (state.sync?.code !== c) { pendingSyncCode = fmtCode(c); setTimeout(openSettings, 300); } } }
 syncPull();
 syncConnect();
+loadAnalysis(); setInterval(() => { if (!document.hidden) loadAnalysis(); }, 30 * 60e3);   // row tone strips + details; the routine refreshes it daily
 document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (!syncLive()) { syncConnect(); syncPull(); } });
 setInterval(() => { if (!document.hidden && !syncLive()) syncPull(); }, 60000);
 
