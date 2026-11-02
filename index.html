@@ -494,6 +494,11 @@
   .news .nbody a { display: block; margin-top: 6px; color: var(--accent); text-decoration: none; }
   .news .nmuted { font-size: 12px; color: var(--muted); }
   .news .nit:hover .nt { color: var(--accent); }
+  .ana p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+  .ana h4 { display: flex; align-items: center; }
+  .ana .tone { margin-left: auto; padding: 1px 7px; border-radius: 4px; font-size: 10.5px; letter-spacing: 0; text-transform: none; font-weight: 700; }
+  .ana .tone.up { color: var(--up); background: rgba(8, 153, 129, .15); } .ana .tone.down { color: var(--down); background: rgba(242, 54, 69, .15); }
+  .ana .tone.neu { color: var(--muted); background: var(--bg3); }
   .dt-sec h4 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14px; font-variant-numeric: tabular-nums; }
   .kv > span:first-child { color: var(--muted); white-space: nowrap; }
@@ -745,7 +750,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.6';  // bump on every push to main
+const APP_VERSION = '10.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2515,7 +2520,7 @@ function detailsHtml(sym) {
   if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
   const er = earnResult(sym), erh = er && earnResultHtml(sym);
   if (erh) h += `<div class="dt-sec dt-earn"><h4>Last earnings · ${new Date(er.t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</h4>${erh}</div>`;
-  return h + newsHtml(sym);
+  return h + analysisHtml(sym) + newsHtml(sym);
 }
 // ---- News: TradingView headlines for the symbol (direct on localhost, through the relay elsewhere), cached 2 minutes.
 // Tap a headline to open its summary inline; "Read on <source>" opens the original.
@@ -2535,6 +2540,24 @@ async function loadStory(id) {
   try { const r = await fetch(newsUrl('story', { id, lang: 'en' })); if (!r.ok) throw new Error('HTTP ' + r.status); stories[id] = await r.json(); }
   catch (e) { stories[id] = { err: String(e.message || e) }; }
   renderDetails();
+}
+// Daily analysis per symbol: the cloud routine writes 2–3 Turkish sentences and a tone for every listed symbol to the relay
+// under the sync code (GET/PUT /analysis/<code>); the details panel shows it above the news. Re-read every 30 min.
+const analysis = { at: 0, items: null, loading: false };
+async function loadAnalysis() {
+  const code = state.sync?.code; if (!code || analysis.loading) return;
+  analysis.loading = true;
+  try { const r = await fetch(`${RELAY_HTTP}/analysis/${code}`); if (r.ok) analysis.items = await r.json(); } catch (e) { clog('warn', 'analysis: load failed', { err: String(e.message || e) }); }
+  analysis.loading = false; analysis.at = Date.now(); renderDetails();
+}
+const TONES = { pos: ['Olumlu', 'up'], neg: ['Olumsuz', 'down'], neu: ['Nötr', 'neu'] };
+function analysisHtml(sym) {
+  if (!state.sync?.code) return '';
+  if (Date.now() - analysis.at > 30 * 60e3 && !analysis.loading) setTimeout(loadAnalysis, 0);
+  const a = analysis.items?.[sym];
+  if (!a) return analysis.items ? `<div class="dt-sec ana"><h4>Analiz</h4><div class="nmuted">Bu hisse için analiz yarın sabah hazır olacak.</div></div>` : '';
+  const [label, cls] = TONES[a.tone] || TONES.neu, day = new Date(a.t).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+  return `<div class="dt-sec ana"><h4>Analiz · ${day}<span class="tone ${cls}">${label}</span></h4><p>${esc(a.text)}</p></div>`;
 }
 function newsHtml(sym) {
   const n = news[sym];

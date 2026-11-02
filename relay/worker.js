@@ -62,6 +62,24 @@ export class SyncRoom extends DurableObject {
       const since = +url.searchParams.get('since') || 0;
       return json(log.filter(e => (e.t || 0) >= since), 200, cors);
     }
+    // Daily per-symbol analysis for this code (written by the cloud routine, read by the details panel):
+    // GET → { [sym]: { t, tone: 'pos' | 'neg' | 'neu', text } }; PUT { items: { [sym]: { tone, text } }, drop?: [sym] } merges.
+    if (url.pathname.startsWith('/analysis/')) {
+      let a = (await this.ctx.storage.get('analysis')) || {};
+      if (request.method === 'PUT') {
+        const text = await request.text(); if (text.length > 256000) return json({ error: 'too large' }, 413, cors);
+        let body; try { body = JSON.parse(text); } catch (_) { return json({ error: 'bad json' }, 400, cors); }
+        const now = Date.now();
+        for (const [sym, v] of Object.entries(body.items || {})) {
+          if (!/^[A-Z0-9_.!]+:[A-Z0-9_.!\-]+$/i.test(sym) || !v || typeof v.text !== 'string') continue;
+          a[sym] = { t: now, tone: ['pos', 'neg', 'neu'].includes(v.tone) ? v.tone : 'neu', text: v.text.slice(0, 600) };
+        }
+        for (const sym of Array.isArray(body.drop) ? body.drop : []) delete a[sym];
+        await this.ctx.storage.put('analysis', a);
+        return json({ ok: true, n: Object.keys(a).length }, 200, cors);
+      }
+      return json(a, 200, cors);
+    }
     if (request.headers.get('Upgrade') === 'websocket') {
       const [client, server] = Object.values(new WebSocketPair());
       const id = (url.searchParams.get('client') || '').slice(0, 40);
@@ -145,6 +163,13 @@ export default {
       return toRoom(request, env, url.pathname.split('/')[2] || '', cors);
     }
 
+    if (url.pathname.startsWith('/analysis/')) {
+      if (request.method !== 'GET' && !allowed(origin, env)) return new Response('forbidden', { status: 403 });   // anyone with the code may read
+      const cors = { 'Access-Control-Allow-Origin': origin || '*', 'Vary': 'Origin', 'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+      return toRoom(request, env, url.pathname.split('/')[2] || '', cors);
+    }
+
     if (url.pathname.startsWith('/sync/')) {
       if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
       if (request.headers.get('Upgrade') !== 'websocket') return new Response('websocket only', { status: 426 });
@@ -177,7 +202,7 @@ export default {
     }
 
     if (request.headers.get('Upgrade') !== 'websocket') {
-      return new Response('tv-watchlist relay: websocket endpoint, GET /search?text=, GET/PUT /state/<code>, websocket /sync/<code>, GET/POST /log/<code>, GET /news?symbol=, GET /news/story?id=', { status: 200 });
+      return new Response('tv-watchlist relay: websocket endpoint, GET /search?text=, GET/PUT /state/<code>, websocket /sync/<code>, GET/POST /log/<code>, GET/PUT /analysis/<code>, GET /news?symbol=, GET /news/story?id=', { status: 200 });
     }
     if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
 

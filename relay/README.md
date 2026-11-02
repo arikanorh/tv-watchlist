@@ -21,3 +21,5 @@ CLOUDFLARE_API_TOKEN=... npx wrangler@4 deploy   # prints https://tv-watchlist-r
 
 Then set `RELAY_WS` in `index.html` to `wss://tv-watchlist-relay.<subdomain>.workers.dev` and push.
 Add any new page origin to `ALLOWED_ORIGINS` in `worker.js`.
+
+- `GET /analysis/<code>` → `{ [sym]: { t, tone: 'pos'|'neg'|'neu', text } }`; `PUT /analysis/<code>` `{ items: { [sym]: { tone, text } }, drop?: [sym] }` merges (allowed Origin only). Stored in the code's SyncRoom; written daily by the cloud routine.
