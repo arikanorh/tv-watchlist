@@ -197,6 +197,10 @@
   .cmenu .ci i { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--muted); flex-shrink: 0; }
   .cmenu .ci.on i { background: var(--accent); border-color: var(--accent); }
   .cmenu .csep { height: 1px; margin: 4px 0; background: var(--line); }
+  .cmenu .subw.rayw { margin-top: 0; padding-top: 0; border-top: 0; } .cmenu .subw.rayw .submenu { top: 0; bottom: auto; }
+  .cmenu .rk { width: 16px; height: 16px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 10px; font-weight: 700; color: #fff; }
+  .cmenu .rk.buy { background: #089981; } .cmenu .rk.sell { background: #f23645; } .cmenu .rk.alert { background: #f7a600; }
+  .cmenu .rk svg { width: 10px !important; height: 10px !important; color: #fff !important; }
   .cmenu .subw { position: relative; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
   .cmenu .ci.sub .cv { margin-left: auto; font-size: 12px; color: var(--muted); }
   /* The flyout touches the menu (the gap is a transparent border) so the pointer can cross over without closing it */
@@ -728,7 +732,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.0';  // bump on every push to main
+const APP_VERSION = '10.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2000,13 +2004,17 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
   // Right-click on the plot: first item draws a horizontal ray where the click was.
   const ray = at && own.data?.length ? (() => { const l = own.chart.timeScale().coordinateToLogical(at.x - toolW()), p = own.series.coordinateToPrice(at.y);
     return l != null && p != null ? { i: Math.max(0, Math.min(own.data.length - 1, Math.round(l))), p: +p.toPrecision(6) } : null; })() : null;
-  const paint = () => { const o = chartOpts(); m.innerHTML = (ray ? `<button class="ci" data-ray-add>${CHART_TOOLS.find(t => t[0] === 'ray')[2]}Horizontal ray at ${fmtPrice(ray.p)}</button><div class="csep"></div>` : '') + CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join('')
+  const paint = () => { const o = chartOpts(); m.innerHTML = (ray ? `<div class="subw rayw"><button class="ci sub" data-ray-add="">${CHART_TOOLS.find(t => t[0] === 'ray')[2]}Horizontal ray at ${fmtPrice(ray.p)}<span class="cv">${m.classList.contains('flip') ? '▸' : '◂'}</span></button><div class="submenu">`
+      + [['buy', 'Buy point', 'B'], ['sell', 'Sell point', 'S'], ['alert', 'Alert', ALERT_TAG.alert]].map(([k, t, g]) => `<button class="ci" data-ray-add="${k}"><span class="rk ${k}">${g}</span>${t}</button>`).join('')
+      + `</div></div><div class="csep"></div>` : '') + CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join('')
     + `<div class="subw"><button class="ci sub">◂ Session<span class="cv">${SESSION_OPTS.find(x => x[0] === o.session)?.[1] || ''}</span></button><div class="submenu">${SESSION_OPTS.map(([v, t]) => `<button class="ci r${o.session === v ? ' on' : ''}" data-cs="${v}"><i></i>${t}</button>`).join('')}</div></div>`; };
   paint();
   m.addEventListener('click', e => {
-    if (e.target.closest('[data-ray-add]')) {
-      const ln = { id: Date.now().toString(36), t: own.data[ray.i].time, p: ray.p };
-      own.raySel = ln.id; setRays(own.want.sym, [...symRays(own.want.sym), ln]); closeChartMenu(); return;
+    const ra = e.target.closest('[data-ray-add]');
+    if (ra) {   // the item itself: a plain line; its flyout: the same line as a buy / sell point or an alert
+      const sym = own.want.sym, ln = { id: Date.now().toString(36), t: own.data[ray.i].time, p: ray.p };
+      if (ra.dataset.rayAdd) { ln.k = ra.dataset.rayAdd; armRay(sym, ln); askNotify(); }
+      own.raySel = ln.id; setRays(sym, [...symRays(sym), ln]); closeChartMenu(); return;
     }
     const b = e.target.closest('[data-co], [data-cs]'); if (!b) return;
     if (b.dataset.cs) { setChartOpt('session', b.dataset.cs); closeChartMenu(); return; }   // a session choice closes the menu; checkboxes keep it open
@@ -2020,6 +2028,7 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
     const x = Math.min(at.x, box.width - w - 4), y = Math.min(at.y, box.height - h - 4);
     m.style.cssText = `left:${Math.max(4, x)}px;top:${Math.max(4, y)}px;right:auto;bottom:auto`;
     m.classList.toggle('flip', x < 170);   // submenu flies right when there's no room on the left
+    const cv = m.querySelector('[data-ray-add=""] .cv'); if (cv) cv.textContent = m.classList.contains('flip') ? '▸' : '◂';
   }
   setTimeout(() => document.addEventListener('pointerdown', closeChartMenuOutside), 0);
 }
