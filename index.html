@@ -563,10 +563,19 @@
     body.details-open[data-view] .detailspane { display: flex; width: 300px; border-right: 1px solid var(--line); background: var(--bg); }
     .detailspane { position: relative; }
     .detailspane .dt-top { position: absolute; top: 6px; right: 6px; z-index: 2; }   /* just the close button in the corner; no title row */
-    .detailspane #dbody .dt-head { padding-top: 12px; } .detailspane #dbody .dt-head .dsc { padding-right: 32px; }
+    .detailspane #dbody .dt-head { padding: 10px 14px 8px; } .detailspane #dbody .dt-head .dsc { padding-right: 32px; }
+    /* compact column: tighter sections and rows */
+    .detailspane .dt-px { margin-top: 3px; } .detailspane .dt-px b { font-size: 24px; }
+    .detailspane .dt-sec { padding: 7px 14px 8px; }
+    .detailspane .dt-sec h4 { margin-bottom: 4px; }
+    .detailspane .kv { padding: 2px 0; font-size: 13px; }
+    .detailspane .rb { margin: 4px 0 5px; } .detailspane .rbl { margin-top: 3px; }
+    .detailspane .ana p { font-size: 12.5px; line-height: 1.42; }
+    .detailspane .news .nit { padding: 6px 0; }
     .detailspane .dt-top button { width: 28px; height: 28px; border-radius: 6px; color: var(--muted); }
     .detailspane .dt-top button:hover { background: var(--bg3); color: var(--text); }
-    .detailspane #dbody { flex: 1; min-height: 0; overflow-y: auto; }
+    .detailspane #dbody { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }   /* scrolls, no visible bar */
+    .detailspane #dbody::-webkit-scrollbar { display: none; }
     .kv { font-size: 13px; padding: 3px 0; }
     .dt-px b { font-size: 24px; }
     body.chart-hidden .listpane { border-right: 0; }
@@ -757,7 +766,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '11.1';  // bump on every push to main
+const APP_VERSION = '11.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
