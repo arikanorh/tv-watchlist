@@ -329,6 +329,10 @@
   .pin { flex: none; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; height: 34px; padding: 0 5px; border-radius: 6px; font-size: 10px; line-height: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
   .pin .l2 { display: flex; gap: 4px; align-items: baseline; }
   .pin b { font-weight: 600; color: var(--text); font-size: 11.5px; }
+  .pin.padd { position: sticky; right: 0; align-items: center; padding: 0 8px; color: var(--muted); background: var(--bg2); }   /* stays in view when the pins scroll */ .pin.padd svg { width: 15px; height: 15px; }
+  .pin.padd:hover { color: var(--text); }
+  body.sess-open .pin.padd { background: var(--sess-open); } body.sess-pre .pin.padd { background: var(--sess-pre); }
+  body.sess-post .pin.padd { background: var(--sess-post); } body.sess-night .pin.padd { background: var(--sess-night); }
   .pin .p { color: var(--text); }
   .pin .v { font-weight: 600; }
   .pin.on { background: rgba(255, 255, 255, .08); }
@@ -741,7 +745,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '10.5';  // bump on every push to main
+const APP_VERSION = '10.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -862,7 +866,7 @@ const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
 const syncShape = lists => lists.filter(l => l.auto !== 'points').map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
   groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols })) }));
-const syncJson = () => JSON.stringify({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {} });
+const syncJson = () => JSON.stringify({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null });
 const fmtCode = c => c.length === 12 ? c.replace(/(.{4})(?=.)/g, '$1-') : c;   // 12-character codes from v1.3–1.5 read in groups
 function newSyncCode() { const b = crypto.getRandomValues(new Uint8Array(4)); return [...b].map(x => SYNC_ALPHA[x & 31]).join(''); }
 // A free code: one nobody has stored lists under yet.
@@ -888,7 +892,7 @@ async function syncPush() {
   setSyncStatus('busy');
   try {
     const r = await fetch(syncApi() + code + '?name=' + encodeURIComponent(SYNC_NAME), { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client-Id': SYNC_CLIENT },   // name in the URL: no new CORS header for older workers
-      body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {} }) });
+      body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null }) });
     if (r.status === 409) { syncAdopt(await r.json()); return setSyncStatus('ok'); }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     setSyncStatus('ok');
@@ -975,13 +979,14 @@ function syncAdopt(remote, notify = true) {
   if ('sort' in remote) state.sort = ['chg', 'ext'].includes(remote.sort) ? remote.sort : null;   // the Chg% / Ext sort travels too
   if (remote.lines && typeof remote.lines === 'object') state.lines = remote.lines;   // chart lines and alerts too
   if (remote.seen && typeof remote.seen === 'object') state.seen = remote.seen;   // dismissed earnings notes
+  if (Array.isArray(remote.pins)) state.pins = remote.pins;   // pinned quick symbols
   if (!state.lists.some(l => l.id === state.activeListId)) state.activeListId = state.lists[0].id;
   state.sync.updatedAt = remote.updatedAt;
   syncLast = syncJson();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
   if (typeof render === 'function' && document.getElementById('rows')) {
     if (['row', 'copy', 'flag', 'group'].includes(sheetKind)) closeSheet();
-    render(); wsSync(); ownRays(); renderNotes();
+    render(); wsSync(); ownRays(); renderNotes(); renderPins();
     if (sheetKind === 'lists') renderListManager();
     if (changes.length) showSyncNote(changes);
   }
@@ -1019,7 +1024,11 @@ try { localStorage.removeItem('tvwl.eod.v1'); } catch (_) {}
 const activeList = () => state.lists.find(l => l.id === state.activeListId) || state.lists[0];
 const flatSymbols = list => list.groups.flatMap(g => g.symbols);
 const PINS = [['SKILLING:US100', 'US100'], ['SKILLING:SPX500', 'SPX'], ['TVC:US10Y', 'US10Y'], ['TVC:VIX', 'VIX'], ['BINANCE:BTCUSDT', 'BTC'], ['BINANCE:ETHUSDT', 'ETH']];   // quick symbols in the desktop toolbar
-const allSymbols = () => [...new Set([...state.lists.flatMap(flatSymbols), ...PINS.map(p => p[0]), ...Object.keys(state.lines || {}).filter(s => state.lines[s].some(l => l.k))])];   // + symbols with alerts
+// The pinned quick symbols are the user's (`state.pins`, synced; PINS until first changed): + adds one from search, right-click removes.
+const pinList = () => Array.isArray(state.pins) ? state.pins : PINS.map(p => p[0]);
+const pinLabel = sym => PINS.find(p => p[0] === sym)?.[1] || short(sym);
+function setPins(list) { state.pins = list; save(); renderPins(); wsSync(); }
+const allSymbols = () => [...new Set([...state.lists.flatMap(flatSymbols), ...pinList(), ...Object.keys(state.lines || {}).filter(s => state.lines[s].some(l => l.k))])];   // + symbols with alerts
 
 // ================= Formatting =================
 const NF2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2400,8 +2409,13 @@ function updateEarnings() {
 }
 function renderPins() {
   const el = $('pins'); if (!el) return;
-  if (!el.childElementCount) el.innerHTML = PINS.map(([sym, lbl]) => `<button class="pin" data-act="pin" data-sym="${esc(sym)}"><b>${lbl}</b><span class="l2"><span class="p"></span><span class="v"></span></span></button>`).join('');
-  for (const b of el.children) {
+  const sig = pinList().join();
+  if (el.dataset.sig !== sig) {
+    el.dataset.sig = sig;
+    el.innerHTML = pinList().map(sym => `<button class="pin" data-act="pin" data-sym="${esc(sym)}"><b>${esc(pinLabel(sym))}</b><span class="l2"><span class="p"></span><span class="v"></span></span></button>`).join('')
+      + `<button class="pin padd" data-act="pin-add" title="Pin a symbol" aria-label="Pin a symbol">${PLUS}</button>`;
+  }
+  for (const b of el.querySelectorAll('[data-sym]')) {
     const sym = b.dataset.sym, q = quotes[sym], last = q ? (!regular && q.ep != null ? q.ep : q.p) : null, v = b.querySelector('.v'), pr = b.querySelector('.p');
     const t = q ? pct(q.c) : '', px = last == null ? '' : last >= 1000 ? Math.round(last).toLocaleString('en-US') : fmtPrice(last);   // big prices without decimals
     if (v.textContent !== t) v.textContent = t;
@@ -2774,9 +2788,9 @@ const PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg>';
 // Two modes. From the list (+): Enter or a tap adds the result to the active list and selects it, staying on the list.
 // From the chart (Search, header symbol): Enter or a tap only opens the result on the chart. The row's + adds in both.
-function openSearch(addMode = false) {
-  search.addMode = addMode;
-  openSheet('search', addMode ? `Add to ${activeList().name}` : 'Search',
+function openSearch(addMode = false) {   // true: add to the active list; 'pin': pin the pick to the quick symbols
+  search.pinMode = addMode === 'pin'; search.addMode = addMode === true;
+  openSheet('search', search.pinMode ? 'Pin a symbol' : addMode ? `Add to ${activeList().name}` : 'Search',
     `<div class="sres" id="sres"><div class="shint">Type a ticker or a company name.</div></div>
      <form class="sform" id="sform"><input class="field" id="sq" type="search" placeholder="Search symbol" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search"></form>`);
   search.items = []; search.pending = false; search.index = 0; search.enterQueued = false;
@@ -2821,6 +2835,7 @@ function pickSearch(sym) {
   const it = sym ? { sym } : search.items[search.index] || search.items[firstChartable()];
   if (!it) return;
   closeSheet();
+  if (search.pinMode) { if (!pinList().includes(it.sym)) { setPins([...pinList(), it.sym]); toast(`${short(it.sym)} pinned`); } return; }
   if (search.addMode) {
     if (!flatSymbols(activeList()).includes(it.sym)) addSymbol(it.sym);
     selectSymbol(it.sym, false);
@@ -3023,6 +3038,7 @@ document.addEventListener('click', e => {
       showSymbol(); break;
     }
     case 'pin': selectSymbol(el.dataset.sym, false); break;
+    case 'pin-add': openSearch('pin'); break;
     case 'add-section': addSection(); break;
     case 'group': { const g = activeList().groups[+el.dataset.g]; if (g) { g.collapsed = !g.collapsed; save(); renderRows(); } break; }
     case 'row-flag': { e.stopPropagation(); cycleFlag(el.closest('.row').dataset.sym); break; }
@@ -3132,6 +3148,25 @@ rowsEl.addEventListener('click', e => {
   if (suppressClick) { e.stopPropagation(); return; }
   if (e.target.closest('[data-act]')) return;
   const row = e.target.closest('.row'); if (row) selectSymbol(row.dataset.sym);
+});
+$('pins').addEventListener('contextmenu', e => {
+  const b = e.target.closest('[data-sym]'); if (!b || isPhone()) return;
+  e.preventDefault(); closeRowCtx(); closeChartMenu();
+  const sym = b.dataset.sym, list = pinList(), i = list.indexOf(sym);
+  const m = document.createElement('div'); m.className = 'cmenu rowctx'; m.id = 'rowctx';
+  m.innerHTML = `<div class="ch">${esc(pinLabel(sym))}</div>`
+    + (i > 0 ? `<button class="ci" data-o="l">${ICON.up}Move left</button>` : '') + (i < list.length - 1 ? `<button class="ci" data-o="r">${ICON.down}Move right</button>` : '')
+    + `<button class="ci danger" data-o="rm">${ICON.rm}Remove pin</button>`;
+  m.addEventListener('click', ev => {
+    const o = ev.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    closeRowCtx(); const l = [...pinList()];
+    if (o === 'rm') { setPins(l.filter(x => x !== sym)); undoable(`${pinLabel(sym)} unpinned`, () => { const n = [...pinList()]; n.splice(i, 0, sym); setPins(n); }); return; }
+    const j = o === 'l' ? i - 1 : i + 1; [l[i], l[j]] = [l[j], l[i]]; setPins(l);
+  });
+  document.body.appendChild(m);
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(4, Math.min(e.clientX, innerWidth - w - 4)) + 'px'; m.style.top = Math.max(4, Math.min(e.clientY, innerHeight - h - 4)) + 'px';
+  setTimeout(() => document.addEventListener('pointerdown', closeRowCtxOutside), 0);
 });
 rowsEl.addEventListener('contextmenu', e => {
   const row = e.target.closest('.row, .gh[data-g]'); if (!row) return;

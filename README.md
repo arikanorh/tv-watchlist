@@ -15,7 +15,7 @@ This file is the map: what the app does, where each piece of data comes from, an
 - Sorting by Chg% or Ext (extended-hours change) from the column headers; indices stay on top.
 - "Earnings" list, next to last: its "Upcoming" section fills itself with every symbol of your other lists whose earnings are within 7 days; "Manual" is yours; "Reported" keeps the ones that reported in the last 2 days, with a green (beat) / red (miss) badge.
 - "Points" list, the last one: every symbol with a buy or a sell point, in a Buy and a Sell group, closest to its point first.
-- Pinned quick symbols (US100, SPX, US10Y, VIX, BTC, ETH) in the toolbar / phone header.
+- Pinned quick symbols in the toolbar / phone header (US100, SPX, US10Y, VIX, BTC, ETH to start): + at the end pins any symbol from search; right-click a pin to move it or unpin it (desktop). Synced.
 
 **Quotes**
 - Live last / change / extended-hours change for every symbol of every list, with session awareness: pre-market, regular, post-market and overnight (Blue Ocean, 20:00–04:00 ET) — the header is tinted by session.
