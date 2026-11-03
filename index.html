@@ -772,7 +772,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '11.8';  // bump on every push to main
+const APP_VERSION = '11.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -828,17 +828,16 @@ const noChart = sym => !CHART_ALIAS[sym] && /^(TVC:VIX|NASDAQ:NDX|SP:SPX|INDEX:|
 // TVC:US10Y (US 10Y yield) spins forever in the embed; PYTH:US10Y carries the same yield and charts.
 const CHART_ALIAS = { 'TVC:US10Y': 'PYTH:US10Y', 'TVC:VIX': 'CAPITALCOM:VIX' };
 const chartSymbol = sym => CHART_ALIAS[sym] || sym;
-// The Earnings list (auto: 'earnings') stays last. Its "Upcoming" group (auto: true, first) and "Reported" group
-// (auto: 'reported', last: reports from the past 2 days) are rebuilt from the other lists (updateEarnings) and never
-// synced; "Manual" in between is the user's own. A list already named "Earnings" is adopted.
+// The Earnings list (auto: 'earnings') stays last and fills itself: "Reported" on top (auto: 'reported': reports from
+// the past 2 days), then "Upcoming" (auto: true: within 7 days), both rebuilt from the other lists (updateEarnings) and
+// never synced. It has no groups of its own (the old "Manual" one is dropped). A list already named "Earnings" is adopted.
 function ensureEarnings(s) {
   let l = s.lists.find(x => x.auto === 'earnings') || s.lists.find(x => /^earnings$/i.test(x.name));
   if (!l) { l = { id: 'earnings', name: 'Earnings', summary: true, groups: [] }; s.lists.push(l); }
   l.auto = 'earnings';
-  if (!l.groups.some(g => g.auto === true)) l.groups.unshift({ name: 'Upcoming', auto: true, collapsed: false, symbols: [] });
-  if (!l.groups.some(g => !g.auto)) l.groups.push({ name: 'Manual', collapsed: false, symbols: [] });
+  const up = l.groups.find(g => g.auto === true) || { name: 'Upcoming', auto: true, collapsed: false, symbols: [] };
   const rep = l.groups.find(g => g.auto === 'reported') || { name: 'Reported', auto: 'reported', collapsed: false, symbols: [] };
-  l.groups = [...l.groups.filter(g => g !== rep), rep];
+  l.groups = [rep, up];
   s.lists = [...s.lists.filter(x => x !== l), l];
   return l;
 }
@@ -2245,7 +2244,7 @@ function openRowCtx(sym, gi, x, y) {
   const m = document.createElement('div'); m.className = 'cmenu rowctx flip'; m.id = 'rowctx';
   const sub = (label, items) => `<div class="subw"><button class="ci sub">${label}<span class="cv">▸</span></button><div class="submenu">${items}</div></div>`;
   const flagItems = FLAGS.map(([n, c]) => `<button class="ci r${state.flags?.[sym] === n ? ' on' : ''}" data-f="${n}" style="--c:${c}"><i class="fsw"></i>${n[0].toUpperCase() + n.slice(1)}</button>`).join('') + `<button class="ci" data-f=""><i class="fsw" style="--c:transparent"></i>None</button>`;
-  const others = state.lists.filter(x => x.id !== l.id && x.auto !== 'points'), own = x => x.groups.filter(q => !q.auto).flatMap(q => q.symbols);
+  const others = state.lists.filter(x => x.id !== l.id && !x.auto), own = x => x.groups.filter(q => !q.auto).flatMap(q => q.symbols);
   const listItems = others.map(x => `<button class="ci" data-l="${esc(x.id)}"${own(x).includes(sym) ? ' disabled' : ''}>${esc(x.name)}<span class="cv">${own(x).includes(sym) ? '✓' : ''}</span></button>`).join('');
   m.innerHTML = `<div class="ch">${esc(short(sym))}</div>
     <button class="ci" data-o="details">${ICON.details}Details</button>
@@ -2373,8 +2372,8 @@ function renderRows() {
       if (g.auto === true && !g.symbols.length && !g.collapsed) html += '<div class="empty">No earnings within 7 days in your lists.</div>';
     });
   }
-  // every list ends with its add row (symbols go to the last group; Earnings → Manual) — except Points, which only fills itself
-  if (l.auto !== 'points') html += `<div class="addrow"><button data-act="add" title="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Symbol</button>${l.auto ? '' : `<button class="sec" data-act="add-section" title="New section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Section</button>`}</div>`;
+  // every list ends with its add row (symbols go to the last group) — except Earnings and Points, which only fill themselves
+  if (!l.auto) html += `<div class="addrow"><button data-act="add" title="Add symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Symbol</button><button class="sec" data-act="add-section" title="New section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add Section</button></div>`;
   $('rows').innerHTML = html;
   patchRows(false);
 }
@@ -2460,8 +2459,7 @@ function updatePoints(render = true) {
 }
 function updateEarnings() {
   const l = state.lists.find(x => x.auto === 'earnings'), g = l?.groups.find(x => x.auto === true), gr = l?.groups.find(x => x.auto === 'reported'); if (!g) return;
-  const manual = new Set(l.groups.filter(x => !x.auto).flatMap(x => x.symbols));
-  const pool = [...new Set(state.lists.filter(x => x !== l && x.auto !== 'points').flatMap(flatSymbols))].filter(sy => !manual.has(sy));
+  const pool = [...new Set(state.lists.filter(x => x !== l && x.auto !== 'points').flatMap(flatSymbols))];
   const done = pool.filter(reportedRecently).sort((a, b) => lastEarnings(b) - lastEarnings(a));
   const next = pool.filter(sy => !done.includes(sy) && (d => d != null && d >= 0 && d <= 7)(earningsDays(sy))).sort((a, b) => earningsDays(a) - earningsDays(b));
   if (next.join() === g.symbols.join() && (!gr || done.join() === gr.symbols.join())) return;
@@ -2614,7 +2612,7 @@ function analysisHtml(sym) {
   if (Date.now() - analysis.at > 30 * 60e3 && !analysis.loading) setTimeout(loadAnalysis, 0);
   const a = analysis.items?.[sym];
   if (!a) return analysis.items ? `<div class="dt-sec ana"><h4>Analiz</h4><div class="nmuted">Bu hisse için analiz yarın sabah hazır olacak.</div></div>` : '';
-  const [label, cls] = TONES[a.tone] || TONES.neu, day = new Date(a.t).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+  const [label, cls] = TONES[a.tone] || TONES.neu, day = new Date(a.t).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   return `<div class="dt-sec ana"><h4>Analiz · ${day}<span class="tone ${cls}">${label}</span></h4><p>${esc(a.text)}</p></div>`;
 }
 function newsHtml(sym) {
@@ -2703,6 +2701,7 @@ function addSymbol(sym) {
   const l = activeList();
   sym = sym.trim().toUpperCase();
   if (!sym) return;
+  if (l.auto) { toast(`${l.name} fills itself`); return; }   // Earnings / Points take no symbols by hand
   if (flatSymbols(l).includes(sym)) { toast(`${short(sym)} is already in ${l.name}`); return; }
   if (!l.groups.length) l.groups.push({ name: 'Main', collapsed: false, symbols: [] });
   const g = l.groups[l.groups.length - 1];
@@ -2826,7 +2825,7 @@ function addSection(split) {
   toast(`${name} added`);
 }
 function openCopySheet(sym) {   // add the symbol to another list (it stays in this one)
-  const others = state.lists.filter(x => x.id !== state.activeListId && x.auto !== 'points');
+  const others = state.lists.filter(x => x.id !== state.activeListId && !x.auto);
   const own = x => x.groups.filter(g => !g.auto).flatMap(g => g.symbols);   // the Earnings list's auto group doesn't count as "there"
   openSheet('copy', `Add ${short(sym)} to`, others.map(x => `<button class="opt" data-l="${esc(x.id)}">${esc(x.name)}<span class="c">${own(x).includes(sym) ? 'already there' : own(x).length}</span></button>`).join(''));
   $('shBody').onclick = e => {

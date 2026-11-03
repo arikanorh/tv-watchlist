@@ -13,7 +13,7 @@ This file is the map: what the app does, where each piece of data comes from, an
 - Row actions: details, flag, add to another list, move, remove (asks for a second tap; stacked undo).
 - Flags: six colors, drawn as the row's left border; click the border strip to cycle (desktop), picker on phones. Shared across lists and synced.
 - Sorting by Chg% or Ext (extended-hours change) from the column headers; indices stay on top.
-- "Earnings" list, next to last: its "Upcoming" section fills itself with every symbol of your other lists whose earnings are within 7 days; "Manual" is yours; "Reported" keeps the ones that reported in the last 2 days, with a green (beat) / red (miss) badge.
+- "Earnings" list, next to last: it fills itself: "Reported" on top keeps the ones that reported in the last 2 days, with a green (beat) / red (miss) badge; "Upcoming" lists every symbol of your other lists whose earnings are within 7 days.
 - "Points" list, the last one: every symbol with a buy or a sell point, in a Buy and a Sell group, closest to its point first.
 - Pinned quick symbols in the toolbar / phone header (US100, SPX, US10Y, VIX, BTC, ETH to start): + at the end pins any symbol from search; right-click a pin to move it or unpin it (desktop). Synced.
 
