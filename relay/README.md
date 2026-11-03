@@ -22,4 +22,4 @@ CLOUDFLARE_API_TOKEN=... npx wrangler@4 deploy   # prints https://tv-watchlist-r
 Then set `RELAY_WS` in `index.html` to `wss://tv-watchlist-relay.<subdomain>.workers.dev` and push.
 Add any new page origin to `ALLOWED_ORIGINS` in `worker.js`.
 
-- `GET /analysis/<code>` → `{ [sym]: { t, tone: 'pos'|'neg'|'neu', text } }`; `PUT /analysis/<code>` `{ items: { [sym]: { tone, text } }, drop?: [sym] }` merges (allowed Origin only). Stored in the code's SyncRoom; written daily by the cloud routine.
+- `GET /analysis/<code>` → `{ [sym]: { t, tone: 'pos'|'neg'|'neu', text, earn? } }`; `PUT /analysis/<code>` `{ items: { [sym]: { tone, text, earn? } }, drop?: [sym] }` merges (allowed Origin only). `earn` = `{ rt, tone, text }`, the analysis of the latest earnings report (`rt` = report time, unix s; text ≤ 800 chars): kept when an item comes without it, replaced when given, removed with `earn: null`. Stored in the code's SyncRoom; written daily by the cloud routine.

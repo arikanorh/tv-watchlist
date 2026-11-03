@@ -63,7 +63,9 @@ export class SyncRoom extends DurableObject {
       return json(log.filter(e => (e.t || 0) >= since), 200, cors);
     }
     // Daily per-symbol analysis for this code (written by the cloud routine, read by the details panel):
-    // GET → { [sym]: { t, tone: 'pos' | 'neg' | 'neu', text } }; PUT { items: { [sym]: { tone, text } }, drop?: [sym] } merges.
+    // GET → { [sym]: { t, tone: 'pos' | 'neg' | 'neu', text, earn? } }; PUT { items: { [sym]: { tone, text, earn? } }, drop?: [sym] } merges.
+    // earn = the analysis of the latest earnings report { t, rt: report time (unix s), tone, text }: kept when an item comes
+    // without it, replaced when given, removed with earn: null.
     if (url.pathname.startsWith('/analysis/')) {
       let a = (await this.ctx.storage.get('analysis')) || {};
       if (request.method === 'PUT') {
@@ -72,7 +74,9 @@ export class SyncRoom extends DurableObject {
         const now = Date.now();
         for (const [sym, v] of Object.entries(body.items || {})) {
           if (!/^[A-Z0-9_.!]+:[A-Z0-9_.!\-]+$/i.test(sym) || !v || typeof v.text !== 'string') continue;
-          a[sym] = { t: now, tone: ['pos', 'neg', 'neu'].includes(v.tone) ? v.tone : 'neu', text: v.text.slice(0, 600) };
+          const tone = x => ['pos', 'neg', 'neu'].includes(x) ? x : 'neu', e = v.earn;
+          const earn = e === null ? undefined : e && typeof e.text === 'string' ? { t: now, rt: +e.rt || 0, tone: tone(e.tone), text: e.text.slice(0, 800) } : a[sym]?.earn;
+          a[sym] = { t: now, tone: tone(v.tone), text: v.text.slice(0, 600), ...(earn ? { earn } : {}) };
         }
         for (const sym of Array.isArray(body.drop) ? body.drop : []) delete a[sym];
         await this.ctx.storage.put('analysis', a);

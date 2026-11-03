@@ -772,7 +772,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '11.9';  // bump on every push to main
+const APP_VERSION = '12.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2613,7 +2613,16 @@ function analysisHtml(sym) {
   const a = analysis.items?.[sym];
   if (!a) return analysis.items ? `<div class="dt-sec ana"><h4>Analiz</h4><div class="nmuted">Bu hisse için analiz yarın sabah hazır olacak.</div></div>` : '';
   const [label, cls] = TONES[a.tone] || TONES.neu, day = new Date(a.t).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  return `<div class="dt-sec ana"><h4>Analiz · ${day}<span class="tone ${cls}">${label}</span></h4><p>${esc(a.text)}</p></div>`;
+  return `<div class="dt-sec ana"><h4>Analiz · ${day}<span class="tone ${cls}">${label}</span></h4><p>${esc(a.text)}</p></div>` + earnAnalysisHtml(sym, a.earn);
+}
+// The routine's take on the latest earnings report (results vs estimates, guidance, reaction), under the daily analysis.
+// Shown while it is about the latest report TradingView knows (rt within a day of it), else for 14 days after writing.
+function earnAnalysisHtml(sym, e) {
+  if (!e?.text) return '';
+  const last = lastEarnings(sym), ref = e.rt || e.t / 1000;
+  if (last ? Math.abs(last - ref) > 864e2 * 1.5 && !(e.rt && e.rt > last) : Date.now() - e.t > 14 * 864e5) return '';
+  const [label, cls] = TONES[e.tone] || TONES.neu, day = new Date(ref * 1000).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+  return `<div class="dt-sec ana earn"><h4>Earnings · ${day} raporu<span class="tone ${cls}">${label}</span></h4><p>${esc(e.text)}</p></div>`;
 }
 function newsHtml(sym) {
   const n = news[sym];
