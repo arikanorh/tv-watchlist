@@ -772,7 +772,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '12.0';  // bump on every push to main
+const APP_VERSION = '12.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1697,7 +1697,19 @@ function ownOhlc() {
   const el = $('ohlc'); if (!el) return;
   const b = own.hoverBar || own.last, i = b && own.data ? own.data.indexOf(b) : -1;
   if (!own.active || !b || !chartOpts().ohlc) { el.hidden = true; if ($('legs')) $('legs').style.top = ''; return; }
-  const prev = i > 0 ? own.data[i - 1].close : b.open, ch = prev ? (b.close - prev) / prev * 100 : 0, c = b.close >= b.open ? 'up' : 'down';
+  // a hovered bar shows its own change; with no bar under the pointer the % is the day's change (as on the price label):
+  // the quote's, else, on intraday intervals, from the last bar of the previous day in the loaded bars
+  let prev = i > 0 ? own.data[i - 1].close : b.open, ch = null;
+  if (!own.hoverBar) {
+    const q = quotes[own.want?.sym];
+    if (q?.c != null) ch = q.c;
+    else if (/^\d+$/.test(own.want?.iv || '')) {
+      const day = t => Math.floor(t / 86400), d = own.data, k = d.findLastIndex(x => day(x.time) < day(b.time));
+      if (k >= 0) prev = d[k].close;
+    }
+  }
+  if (ch == null) ch = prev ? (b.close - prev) / prev * 100 : 0;
+  const c = b.close >= b.open ? 'up' : 'down';
   const html = `<span>O<b class="${c}">${fmtPrice(b.open)}</b></span><span>H<b class="${c}">${fmtPrice(b.high)}</b></span><span>L<b class="${c}">${fmtPrice(b.low)}</b></span><span>C<b class="${c}">${fmtPrice(b.close)}</b></span><b class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%</b>`;
   if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
   el.hidden = false;
