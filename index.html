@@ -14,8 +14,8 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Watchlist</title>
 <style>
-  /* Mobile first. Phone: one pane at a time (list or chart) behind a two-tab nav; what you read sits at the top
-     (header), what you tap sits at the bottom (dock, chart bar, nav, sheets). ≥768px: list | chart side by side. */
+  /* Mobile first. Phone: one pane at a time (list or chart; a row opens the chart, a list tab the list); what you read
+     sits at the top (header), what you tap sits at the bottom (chart bar, the list dock under both panes, sheets). ≥768px: list | chart side by side. */
   :root {
     --bg: #131722; --bg2: #1e222d; --bg3: #2a2e39; --line: #2a2e39;
     --text: #d1d4dc; --muted: #787b86; --accent: #2962ff; --accent-bg: #1c2a52;
@@ -410,14 +410,9 @@
   .infobtn svg { width: 20px; height: 20px; }
   body.details-open .infobtn { background: var(--accent-bg); color: var(--accent); }
 
-  /* Bottom nav (phones) */
-  .nav { position: relative; flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; background: var(--bg2); border-top: 1px solid var(--line);
-    padding-bottom: max(0px, calc(var(--safe-b) - 12px)); }
-  body.ios-gap .nav { padding-bottom: 0; }
-  .nav button { height: var(--nav-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--muted); }
-  .nav button svg { width: 21px; height: 21px; }
-  .nav button.on { color: var(--text); } .nav button.on svg { color: var(--accent); }
-  .nav .ver { position: absolute; right: 8px; bottom: 4px; font-size: 9px; color: var(--muted); opacity: .7; pointer-events: none; }
+  /* Phones: the list dock is the page's bottom bar under both panes (placeTools moves it out of the list pane) */
+  body > .dock { padding-bottom: max(8px, calc(var(--safe-b) - 4px)); }
+  body.ios-gap > .dock { padding-bottom: 8px; }
 
   /* Sheets: bottom sheet on phones, centered dialog on desktop */
   .scrim { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .5); }
@@ -474,6 +469,7 @@
   .tseg button.on { background: var(--accent); color: #fff; }
   /* Phone chart bar: one compact row — search, interval dropdown, details (no segmented intervals, no theme switch) */
   @media (max-width: 767.98px) {
+    .acts .ib:not(.dock-menu) { display: none; }   /* phones: one menu button, the rest in its sheet (openDockMenu) */
     .ctools { flex-direction: row; align-items: center; gap: 8px; padding: 8px 10px; }
     .ctools .seg, .ctools .tseg-top, .ctools .ltog { display: none; }
     .cbar { display: contents; }
@@ -622,7 +618,6 @@
     .hs .chg { font-size: 13px; }
     .hs { cursor: pointer; }
     .hbtn, .hver { display: flex; }
-    .nav { display: none; }
     body[data-view] .pane { display: flex; }
     .listpane { width: auto; border-right: 1px solid var(--line); }
     body.chart-hidden .chartpane { display: none; }
@@ -746,7 +741,7 @@
     .alpbtn { margin-left: auto; } .histbtn + .histbtn { margin-left: 2px; }
     .histbtn { display: flex; align-self: center; width: 30px; height: 28px; border-radius: 6px; color: var(--muted); }   /* notification history, top right (desktop) */
     .histbtn svg { width: 16px; height: 16px; } .histbtn:hover { background: var(--bg3); color: var(--text); }
-    .dock-hist { display: none; }   /* phones keep it in the dock */
+    .dock-hist, .dock-menu { display: none; }   /* phones keep them in the dock */
     .histbtn + .ltog { margin-left: 8px; } .histbtn:not(.alpbtn) { margin-left: 2px; }
     .ltog { margin-left: auto; align-self: center; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--bg3); }
     .ltog .hbtn { width: 30px; height: 24px; border-radius: 5px; }
@@ -795,6 +790,7 @@
     <div class="dock">
       <div class="chips" id="chips"></div>
       <div class="acts">
+        <button class="ib dock-menu" data-act="dock-menu" aria-label="Menu" title="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
         <button class="ib dock-hist" data-act="alerts-all" aria-label="Alerts" title="Alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
         <button class="ib dock-hist" data-act="history" aria-label="Notification history" title="Notification history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></button>
         <button class="ib" data-act="lists" aria-label="Manage lists"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
@@ -825,11 +821,6 @@
   </section>
 </main>
 
-<nav class="nav" aria-label="Views">
-  <button data-act="view" data-view="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Liste</button>
-  <button data-act="view" data-view="chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 5-8 4 5"/></svg>Grafik</button>
-  <span class="ver" id="ver"></span>
-</nav>
 
 <div class="drscrim" id="drScrim" hidden data-act="drawer-close"></div>
 <aside class="drawer" id="drawer" hidden aria-label="Alerts and notifications">
@@ -847,7 +838,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '13.3';  // bump on every push to main
+const APP_VERSION = '13.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2963,7 +2954,6 @@ function renderDetails() {
 function setView(v) {
   state.view = v; save();
   document.body.dataset.view = v;
-  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
   if (v === 'chart') {
     // A widget mounted while its pane was display:none stays blank; mount it fresh the first time it is shown.
     if (chart.hiddenAtMount) { mountChart(); showSymbol(); }
@@ -2980,6 +2970,9 @@ function placeTools() {   // the session/tick/toggle block stays in the header (
   const cover = $('cover'), sb = $('sbtn'), seg = $('seg');
   if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg, $('ohlc')); } }   // order: search, market dot, details, intervals, OHLC
   else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend(sb); document.querySelector('.ctools').prepend(seg); } }
+  // the list dock: last row of the list pane on desktop (CSS lifts it above the list), the page's bottom bar on phones
+  const dock = document.querySelector('.dock'), ddest = isPhone() ? document.body : document.querySelector('.listpane');
+  if (dock.parentElement !== ddest) { if (isPhone()) document.querySelector('.main').after(dock); else ddest.append(dock); }
   renderPins();
 }
 function applyListHidden() {
@@ -3038,6 +3031,12 @@ function openSheet(kind, title, body) {
   $('shBody').innerHTML = body;
   $('shBody').onclick = $('shBody').onchange = $('shBody').onkeydown = $('shBody').onfocusout = null;
   $('sheet').hidden = false; $('scrim').hidden = false;
+}
+// Phones: the dock's tools in one sheet, listed top-down; each row reuses its desktop button's action and icon.
+function openDockMenu() {
+  const n = alertItems().length;
+  openSheet('menu', 'Menu', [...document.querySelectorAll('.dock .acts .ib:not(.dock-menu)')].map(b =>
+    `<button class="opt" data-act="${b.dataset.act}">${b.querySelector('svg').outerHTML}${esc(b.getAttribute('aria-label'))}${b.dataset.act === 'alerts-all' && n ? `<span class="c">${n}</span>` : ''}</button>`).join(''));
 }
 function closeSheet() {
   if ($('sheet').hidden) return;
@@ -3403,7 +3402,7 @@ function showUndo() {
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   switch (el.dataset.act) {
-    case 'list': state.activeListId = el.dataset.id; save(); render(); $('rows').scrollTop = 0; break;
+    case 'list': state.activeListId = el.dataset.id; save(); render(); $('rows').scrollTop = 0; if (isPhone()) setView('list'); break;
     case 'view': setView(el.dataset.view); break;
     case 'search': openSearch(false); break;
     case 'add': openSearch(true); break;
@@ -3414,6 +3413,7 @@ document.addEventListener('click', e => {
     case 'sort': state.sort = state.sort === el.dataset.by ? null : el.dataset.by; save(); render(); break;
     case 'lists': openListManager(); break;
     case 'settings': openSettings(); break;
+    case 'dock-menu': openDockMenu(); break;
     case 'reconnect': refreshQuotes(); break;
     case 'details': toggleDetails(); break;
     case 'hist-range': state.histRange = el.dataset.r; save(); renderSentiment(); break;
@@ -3598,7 +3598,7 @@ window.addEventListener('resize', () => { if (chart.hiddenAtMount && $('chartWra
 state.histRange = 'session';   // the sentiment chart always opens on the current session
 setInterval(sampleHistory, HIST_MS);
 window.addEventListener('resize', () => { clearTimeout(window._sentT); window._sentT = setTimeout(renderSentiment, 150); });
-$('ver').textContent = $('hver').textContent = $('tver').textContent = 'v' + APP_VERSION;
+$('hver').textContent = $('tver').textContent = 'v' + APP_VERSION;
 renderSession();
 setInterval(renderSession, 30000);
 render();
