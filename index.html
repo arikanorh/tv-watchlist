@@ -271,34 +271,53 @@
   .alr i.pt span { padding-right: 3px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
   .alr i.bell { border: 0; } .alr i.bell svg { width: 13px; height: 13px; }
   .alr i.fol { --c: #b06cff; border: 0; color: var(--c); } .alr i.fol svg { width: 13px; height: 13px; } .alr i.fol.hit { animation: ring .9s ease-in-out 4; }
-  /* all-alerts panel: one compact row per alert */
-  .alp-g { display: flex; align-items: center; gap: 6px; padding: 10px 4px 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-  .alp-g span { font-weight: 500; letter-spacing: 0; }
-  .alp-row { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 4px; border-radius: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
-  .alp-row:hover { background: var(--bg3); }
-  .alp-row.done .alp-lv, .alp-row.done .alp-t { opacity: .75; }
-  .alp-t { flex: 0 0 60px; text-align: left; background: none; border: 0; padding: 0; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .alp-t:hover { color: var(--accent); }
-  .alp-row .rk { --c: #f7a600; width: 18px; height: 18px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 10px; font-weight: 700; color: #fff; background: var(--c); }
-  .alp-row .rk.buy { --c: #089981; } .alp-row .rk.sell { --c: #f23645; } .alp-row .rk.follow { --c: #b06cff; } .alp-row .rk svg { width: 10px !important; height: 10px !important; }
-  .alp-lv { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .alp-l { background: none; border: 0; padding: 2px 4px; margin-left: -4px; border-radius: 4px; color: var(--text); font: inherit; cursor: text; } .alp-l:hover { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--line); }
-  .alp-in { width: 100px; height: 28px; padding: 0 6px; font-size: 13px; }
-  .alp-s { flex: 0 0 56px; text-align: right; color: var(--muted); } .alp-s .hit { color: #f7a600; }
-  .alp-snd { flex: 0 0 96px; height: 26px; padding: 0 4px; border: 0; border-radius: 4px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
-  .alp-snd:hover, .alp-snd:focus { background: var(--bg2); color: var(--text); }
-  .alp-x { width: 26px; height: 26px; flex-shrink: 0; color: var(--muted); font-size: 13px; } .alp-x:hover { color: var(--text); }
-  @media (max-width: 600px) { .alp-row { gap: 6px; } .alp-t { flex-basis: 50px; } .alp-s { flex-basis: 44px; } .alp-snd { flex-basis: 78px; } }
-  /* notification history sheet */
-  .hist { display: flex; flex-direction: column; }
-  .hrow { --c: #f7a600; display: flex; align-items: center; gap: 10px; padding: 8px 4px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-  .hrow:hover { background: var(--bg3); }
-  .hrow.buy, .hrow.beat { --c: var(--up); } .hrow.sell, .hrow.miss { --c: var(--down); } .hrow.earn { --c: var(--pre); } .hrow.follow { --c: #b06cff; }
-  .hrow .ni { flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; background: var(--c); }
-  .hrow .ni svg { width: 13px; height: 13px; }
-  .hrow .ht { flex: 1; min-width: 0; font-size: 13px; } .hrow .ht small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
-  .hrow time { flex-shrink: 0; font-size: 11px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
-  .hfoot { display: flex; justify-content: flex-end; padding-top: 10px; }
+  /* right-hand drawer (alerts / history): full height, slides in from the right */
+  .drscrim { position: fixed; inset: 0; z-index: 52; background: rgba(0, 0, 0, .28); }
+  .drawer { position: fixed; z-index: 53; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); display: flex; flex-direction: column; background: var(--bg2); border-left: 1px solid var(--line);
+    box-shadow: -12px 0 32px rgba(0, 0, 0, .28); transform: translateX(102%); transition: transform .2s ease; padding-top: var(--safe-t, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .drawer.in { transform: none; }
+  .dr-h { flex-shrink: 0; display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 10px 0 16px; border-bottom: 1px solid var(--line); }
+  .dr-tabs { flex: 1; display: flex; gap: 4px; align-self: stretch; }
+  .dr-tabs button { position: relative; display: flex; align-items: center; gap: 6px; padding: 0 10px; background: none; border: 0; color: var(--muted); font: 600 14px var(--font, inherit); cursor: pointer; }
+  .dr-tabs button span { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 9px; background: var(--bg3); color: var(--muted); } .dr-tabs button span:empty { display: none; }
+  .dr-tabs button:hover { color: var(--text); }
+  .dr-tabs button.on { color: var(--text); } .dr-tabs button.on::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+  .dr-x, .dr-ib { width: 30px; height: 30px; display: grid; place-items: center; flex-shrink: 0; border: 0; border-radius: 7px; background: none; color: var(--muted); cursor: pointer; }
+  .dr-x svg, .dr-ib svg { width: 16px; height: 16px; } .dr-ib svg { width: 14px; height: 14px; }
+  .dr-x:hover, .dr-ib:hover { background: var(--bg3); color: var(--text); }
+  .dr-x:focus-visible, .dr-ib:focus-visible, .dr-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .dr-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--bg3) transparent; }
+  .dr-body::-webkit-scrollbar { width: 8px; } .dr-body::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 4px; border: 2px solid var(--bg2); } .dr-body::-webkit-scrollbar-track { background: transparent; }
+  .dr-f { flex-shrink: 0; display: flex; justify-content: flex-end; padding: 10px 16px; border-top: 1px solid var(--line); }
+  .dr-link { background: none; border: 0; padding: 4px 6px; border-radius: 6px; color: var(--muted); font-size: 13px; cursor: pointer; } .dr-link:hover { color: var(--down); background: var(--bg3); }
+  .dr-empty { padding: 48px 24px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  /* an alert: badge · ticker + level / kind + distance + sound · actions on hover */
+  .ar { display: flex; align-items: center; gap: 12px; padding: 9px 10px 9px 16px; border-top: 1px solid var(--line); }
+  .ar:first-child { border-top: 0; }
+  .ar:hover { background: var(--bg3); }
+  .ar-b { --c: #f7a600; width: 28px; height: 28px; flex-shrink: 0; border-radius: 7px; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; background: var(--c); }
+  .ar-b svg { width: 13px !important; height: 13px !important; vertical-align: 0 !important; }
+  .ar-b.buy, .ar-b.beat { --c: #089981; } .ar-b.sell, .ar-b.miss { --c: #f23645; } .ar-b.follow { --c: #b06cff; } .ar-b.earn { --c: var(--pre); }
+  .ar.done .ar-b { opacity: .55; }
+  .ar-m { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ar-1, .ar-2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+  .ar-t { padding: 0; border: 0; background: none; color: var(--text); font: 600 14px var(--font, inherit); cursor: pointer; } .ar-t:hover { color: var(--accent); }
+  .ar-1 { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ar-lv { padding: 1px 6px; margin-right: -6px; border: 0; border-radius: 5px; background: none; color: var(--text); font: 600 14px var(--font, inherit); font-variant-numeric: tabular-nums; cursor: text; } .ar-lv:hover { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--line); }
+  .ar-in { width: 110px; height: 26px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: var(--text); font: 600 14px var(--font, inherit); text-align: right; outline: none; }
+  .ar-2 { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; } .ar-2 > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ar-2 .hit { color: #f7a600; }
+  .ar-snd { flex-shrink: 0; max-width: 130px; height: 22px; margin-right: -4px; padding: 0 4px; border: 0; border-radius: 5px; background: none; color: var(--muted); font: 12px var(--font, inherit); cursor: pointer; }
+  .ar-snd:hover, .ar-snd:focus { background: var(--bg2); color: var(--text); outline: none; }
+  .ar-a { flex: 0 0 auto; display: flex; gap: 2px; }
+  @media (hover: hover) { .ar-a { opacity: 0; transition: opacity .1s; } .ar:hover .ar-a, .ar:focus-within .ar-a { opacity: 1; } }
+  /* a history entry */
+  .hr-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .hr-row:first-child { border-top: 0; } .hr-row:hover { background: var(--bg3); }
+  .hr-m { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .hr-1 { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .hr-1 b { font-weight: 600; margin-right: 6px; }
+  .hr-m small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hr-row time { flex-shrink: 0; font-size: 11px; line-height: 1.35; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
   .alm.fol .flab { flex: 0 0 122px; font-size: 14px; color: var(--text); white-space: nowrap; padding-left: 4px; } .lmnew.alm .field.st { flex: 0 0 84px; } .lm.alm.fol .ast { flex: 1; font-size: 14px; color: var(--muted); }
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
@@ -808,6 +827,12 @@
   <span class="ver" id="ver"></span>
 </nav>
 
+<div class="drscrim" id="drScrim" hidden data-act="drawer-close"></div>
+<aside class="drawer" id="drawer" hidden aria-label="Alerts and notifications">
+  <header class="dr-h"><div class="dr-tabs" role="tablist"><button role="tab" data-dtab="active">Active<span id="drCntA"></span></button><button role="tab" data-dtab="triggered">Triggered<span id="drCntT"></span></button><button role="tab" data-dtab="history">History<span id="drCntH"></span></button></div><button class="dr-x" data-act="drawer-close" aria-label="Close" title="Close (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+  <div class="dr-body" id="drBody"></div>
+  <footer class="dr-f" id="drFoot" hidden></footer>
+</aside>
 <div class="scrim" id="scrim" hidden data-act="sheet-close"></div>
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
   <div class="sh-title" id="shTitle"></div>
@@ -818,7 +843,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '13.1';  // bump on every push to main
+const APP_VERSION = '13.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2025,7 +2050,7 @@ function armRay(sym, ln) {
   ln.d = p == null || p <= ln.p ? 1 : -1;
 }
 const alertSyms = () => Object.keys(state.lines || {}).filter(s => state.lines[s].some(l => l.k));
-function alertsChanged() { wsSync(); updatePoints(); patchRows(false); renderNotes(); }
+function alertsChanged() { wsSync(); updatePoints(); patchRows(false); renderNotes(); if (drawer.open && !drawer.editing) paintDrawer(); }
 // ---- Follow alerts ----
 // A pair of lines (k: 'follow', same group g, step s): one step below and one above a centre. Whichever is crossed fires a
 // note and the pair re-centres on that level — stepping on while the price is already past further levels — so it keeps
@@ -2062,76 +2087,100 @@ function logNote(e) {
 const defaultSound = k => k === 'follow' ? state.followSound || 'B' : state.alertSound || 'A';
 const soundName = id => id === 'off' ? 'Off' : SOUNDS.find(x => x.id === id)?.name || id;
 const sndOptions = (sel, k) => `<option value=""${!sel ? ' selected' : ''}>♪ ${soundName(defaultSound(k))}</option>` + SOUNDS.map(x => `<option value="${x.id}"${sel === x.id ? ' selected' : ''}>${x.name}</option>`).join('') + `<option value="off"${sel === 'off' ? ' selected' : ''}>Off</option>`;
-function openAlertsPanel() {
-  const KN = { alert: 'Alert', buy: 'Buy', sell: 'Sell', follow: 'Follow' };
-  let editing = null;   // ray id whose level is being edited
-  const items = () => {
-    const out = [];
-    for (const sym of alertSyms()) {
-      const p = livePrice(sym), seen = new Set();
-      for (const ln of symRays(sym)) {
-        if (!ln.k) continue;
-        if (ln.k === 'follow') { if (seen.has(ln.g)) continue; seen.add(ln.g); }
-        const pair = ln.k === 'follow' ? followPair(sym, ln.g) : null;
-        out.push({ sym, ln, pair, p, hit: !pair && !!ln.hit, dist: !pair && p ? (ln.p - p) / p * 100 : null });
-      }
+// Right-hand drawer, full height: three tabs — Active alerts (by distance), Triggered (fired / reached; re-arm or remove)
+// and History (notifications). Desktop: the bell
+// / clock at the top right; phones: the dock. Esc, ✕ or the scrim close it. Repaints on alert changes and, for the
+// distances, every 3 s (never while a level is being edited or a sound picker has focus).
+const drawer = { open: false, tab: 'active', editing: null, armed: false, at: 0 };
+function openAlertsPanel() { openDrawer(alertItems().some(x => x.hit) && !alertItems().some(x => !x.hit) ? 'triggered' : 'active'); }
+function openHistory() { openDrawer('history'); }
+function openDrawer(tab) {
+  closeSheet(); drawer.tab = tab; drawer.editing = null; drawer.armed = false;
+  if (!drawer.open) { drawer.open = true; $('drawer').hidden = false; $('drScrim').hidden = false; requestAnimationFrame(() => $('drawer').classList.add('in')); }
+  paintDrawer();
+}
+function closeDrawer() {
+  if (!drawer.open) return; drawer.open = false; drawer.editing = null;
+  $('drawer').classList.remove('in'); $('drScrim').hidden = true; setTimeout(() => { if (!drawer.open) $('drawer').hidden = true; }, 200);
+}
+const KN = { alert: 'Alert', buy: 'Buy point', sell: 'Sell point', follow: 'Follow' };
+function alertItems() {
+  const out = [];
+  for (const sym of alertSyms()) {
+    const p = livePrice(sym), seen = new Set();
+    for (const ln of symRays(sym)) {
+      if (!ln.k) continue;
+      if (ln.k === 'follow') { if (seen.has(ln.g)) continue; seen.add(ln.g); }
+      const pair = ln.k === 'follow' ? followPair(sym, ln.g) : null;
+      out.push({ sym, ln, pair, hit: !pair && !!ln.hit, dist: !pair && p ? (ln.p - p) / p * 100 : null });
     }
-    return out;
-  };
-  const row = it => {
-    const { sym, ln, pair, dist } = it, pc = v => `${v >= 0 ? '+' : '−'}${Math.abs(v) < 10 ? Math.abs(v).toFixed(1) : Math.round(Math.abs(v))}%`;
-    const lvl = pair ? `${pair.map(x => fmtPrice(x.p)).join(' / ')}` : editing === ln.id ? `<input class="field alp-in" id="alpIn" inputmode="decimal" value="${ln.p}">` : `<button class="alp-l" data-alp-edit title="Click to change the level">${fmtPrice(ln.p)}</button>`;
-    const st = pair ? `±${fmtStep(ln.s)}` : it.hit ? `<span class="hit">${ln.k === 'alert' ? 'fired' : 'reached'}</span>` : dist != null ? pc(dist) : '';
-    return `<div class="alp-row${it.hit ? ' done' : ''}" data-sym="${esc(sym)}" data-id="${ln.id}"><button class="alp-t" data-alp-go title="Open chart">${esc(short(sym))}</button><span class="rk ${ln.k}" title="${KN[ln.k]}">${ALERT_TAG[ln.k]}</span>`
-      + `<span class="alp-lv">${lvl}</span><span class="alp-s">${st}</span><select class="alp-snd" data-alp-snd title="Sound">${sndOptions(ln.snd, ln.k)}</select>`
-      + (it.hit ? `<button class="ib alp-x" data-alp-rearm title="Re-arm">↻</button>` : '') + `<button class="ib alp-x" data-alp-rm title="Remove">✕</button></div>`;
-  };
-  const paint = () => {
-    const all = items(), done = all.filter(x => x.hit), act = all.filter(x => !x.hit).sort((a, b) => Math.abs(a.dist ?? 0) - Math.abs(b.dist ?? 0));
-    $('shBody').innerHTML = !all.length ? '<div class="empty">No alerts yet. Right-click the chart → Horizontal ray, or a row → Alerts…</div>'
-      : (done.length ? `<div class="alp-g">Triggered <span>${done.length}</span></div>${done.map(row).join('')}` : '')
-      + (act.length ? `<div class="alp-g">Active <span>${act.length}</span></div>${act.map(row).join('')}` : '');
-    const inp = $('alpIn'); if (inp) { inp.focus(); inp.select(); }
-  };
-  openSheet('allalerts', 'Alerts', ''); paint();
-  const body = $('shBody'), at = el => { const r = el.closest('[data-id]'); if (!r) return {}; const sym = r.dataset.sym; return { sym, ln: symRays(sym).find(x => x.id === r.dataset.id) }; };
+  }
+  return out;
+}
+function paintDrawer() {
+  if (!drawer.open) return;
+  drawer.at = Date.now();
+  for (const b of document.querySelectorAll('[data-dtab]')) b.classList.toggle('on', b.dataset.dtab === drawer.tab);
+  const items = alertItems(), nT = items.filter(x => x.hit).length; $('drCntA').textContent = (items.length - nT) || ''; $('drCntT').textContent = nT || ''; $('drCntH').textContent = (state.notifLog || []).length || '';
+  const body = $('drBody'), foot = $('drFoot'), y = body.scrollTop;
+  if (drawer.tab !== 'history') {
+    const pc = v => `${v >= 0 ? '+' : '−'}${Math.abs(v) < 10 ? Math.abs(v).toFixed(1) : Math.round(Math.abs(v))}%`;
+    const row = it => {
+      const { sym, ln, pair, dist } = it;
+      const lvl = pair ? pair.map(x => fmtPrice(x.p)).join(' – ') : drawer.editing === ln.id ? `<input class="ar-in" id="arIn" inputmode="decimal" value="${ln.p}">` : `<button class="ar-lv" data-ar-edit title="Change the level">${fmtPrice(ln.p)}</button>`;
+      const sub = pair ? `Follow ±${fmtStep(ln.s)}` : `${KN[ln.k]}${it.hit ? ` · <span class="hit">${ln.k === 'alert' ? 'fired' : 'reached'} ${new Date(ln.hit).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>` : dist != null ? ` · ${pc(dist)} away` : ''}`;
+      return `<div class="ar${it.hit ? ' done' : ''}" data-sym="${esc(sym)}" data-id="${ln.id}"><span class="ar-b ${ln.k}">${ALERT_TAG[ln.k]}</span>`
+        + `<div class="ar-m"><div class="ar-1"><button class="ar-t" data-ar-go title="Open chart">${esc(short(sym))}</button>${lvl}</div>`
+        + `<div class="ar-2"><span>${sub}</span><select class="ar-snd" data-ar-snd title="Sound">${sndOptions(ln.snd, ln.k)}</select></div></div>`
+        + `<div class="ar-a">${it.hit ? `<button class="dr-ib" data-ar-rearm title="Re-arm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>` : ''}<button class="dr-ib" data-ar-rm title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>`;
+    };
+    const list = drawer.tab === 'triggered' ? items.filter(x => x.hit).sort((a, b) => b.ln.hit - a.ln.hit) : items.filter(x => !x.hit).sort((a, b) => Math.abs(a.dist ?? 0) - Math.abs(b.dist ?? 0));
+    body.innerHTML = list.length ? list.map(row).join('') : drawer.tab === 'triggered' ? '<div class="dr-empty">Nothing triggered.<br>Fired alerts and reached buy / sell points wait here until you re-arm or remove them.</div>'
+      : '<div class="dr-empty">No active alerts.<br>Right-click the chart → Horizontal ray, or a row → Alerts….</div>';
+    foot.hidden = true;
+    const inp = $('arIn'); if (inp) { inp.focus(); inp.select(); }
+  } else {
+    const L = state.notifLog || [], d = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), tm = t => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    body.innerHTML = L.length ? L.map(e => { const k = String(e.kind || '').trim(); return `<button class="hr-row ${esc(k)}" data-hist="${esc(e.sym)}"><span class="ar-b ${esc(k)}">${ALERT_TAG[k] || (k === 'earn' || k === 'beat' || k === 'miss' ? 'E' : '•')}</span><span class="hr-m"><span class="hr-1"><b>${esc(short(e.sym))}</b>${esc(e.msg)}</span><small>${esc(e.sub || '')}</small></span><time>${d(e.t)}<br>${tm(e.t)}</time></button>`; }).join('')
+      : '<div class="dr-empty">No notifications yet.<br>Fired alerts, reached buy / sell points, follow alerts and earnings results show up here.</div>';
+    foot.hidden = !L.length; foot.innerHTML = `<button class="dr-link" data-hist-clear>${drawer.armed ? 'Tap again to clear' : 'Clear history'}</button>`;
+  }
+  body.scrollTop = y;
+}
+// keep the alerts tab current (distances move with the price); not under an open editor or picker
+function drawerTick() {
+  const ae = document.activeElement; if (!drawer.open || drawer.tab !== 'active' || drawer.editing || (ae?.tagName === 'SELECT' && $('drawer').contains(ae))) return;
+  if (Date.now() - drawer.at > 3000) paintDrawer();
+}
+(() => {
+  const dr = $('drawer'), at = el => { const r = el.closest('[data-id]'); if (!r) return {}; const sym = r.dataset.sym; return { sym, ln: symRays(sym).find(x => x.id === r.dataset.id) }; };
+  const goTo = sym => { if (isPhone()) closeDrawer(); if (sym !== state.symbol) selectSymbol(sym, false); };
   const commit = () => {
-    const inp = $('alpIn'); if (!inp) return; const { sym, ln } = at(inp); editing = null;
+    const inp = $('arIn'); if (!inp) return; const { sym, ln } = at(inp); drawer.editing = null;
     const v = parseFloat(inp.value.replace(',', '.')); if (ln && isFinite(v) && v > 0 && v !== ln.p) { ln.p = v; armRay(sym, ln); setRays(sym, [...symRays(sym)]); }
-    paint();
+    paintDrawer();
   };
-  body.onclick = e => {
+  dr.addEventListener('click', e => {
+    const tab = e.target.closest('[data-dtab]'); if (tab) { drawer.tab = tab.dataset.dtab; drawer.editing = null; $('drBody').scrollTop = 0; paintDrawer(); return; }
+    if (e.target.closest('[data-hist-clear]')) { if (!drawer.armed) { drawer.armed = true; paintDrawer(); setTimeout(() => { drawer.armed = false; if (drawer.tab === 'history') paintDrawer(); }, 3000); return; } state.notifLog = []; drawer.armed = false; save(); paintDrawer(); return; }
+    const h = e.target.closest('[data-hist]'); if (h) { goTo(h.dataset.hist); return; }
     const { sym, ln } = at(e.target); if (!sym) return;
-    if (e.target.closest('[data-alp-go]')) { closeSheet(); if (sym !== state.symbol) selectSymbol(sym, false); return; }
+    if (e.target.closest('[data-ar-go]')) { goTo(sym); return; }
     if (!ln) return;
-    if (e.target.closest('[data-alp-edit]')) { editing = ln.id; paint(); return; }
-    if (e.target.closest('[data-alp-rearm]')) { armRay(sym, ln); setRays(sym, [...symRays(sym)]); paint(); return; }
-    if (e.target.closest('[data-alp-rm]')) { removeRay(ln.id, sym); paint(); }
-  };
-  body.onkeydown = e => { if (e.target.id !== 'alpIn') return; if (e.key === 'Enter') commit(); if (e.key === 'Escape') { e.stopPropagation(); editing = null; paint(); } };
-  body.onfocusout = e => { if (e.target.id === 'alpIn') setTimeout(() => { if (editing) commit(); }, 0); };
-  body.onchange = e => {
-    if (!e.target.matches('[data-alp-snd]')) return;
+    if (e.target.closest('[data-ar-edit]')) { drawer.editing = ln.id; paintDrawer(); return; }
+    if (e.target.closest('[data-ar-rearm]')) { armRay(sym, ln); setRays(sym, [...symRays(sym)]); return; }
+    if (e.target.closest('[data-ar-rm]')) removeRay(ln.id, sym);
+  });
+  dr.addEventListener('keydown', e => { if (e.target.id !== 'arIn') return; if (e.key === 'Enter') commit(); if (e.key === 'Escape') { e.stopPropagation(); drawer.editing = null; paintDrawer(); } });
+  dr.addEventListener('focusout', e => { if (e.target.id === 'arIn') setTimeout(() => { if (drawer.editing) commit(); }, 0); });
+  dr.addEventListener('change', e => {
+    if (!e.target.matches('[data-ar-snd]')) return;
     const { sym, ln } = at(e.target); if (!ln) return;
     for (const x of ln.k === 'follow' ? followPair(sym, ln.g) : [ln]) { if (e.target.value) x.snd = e.target.value; else delete x.snd; }   // a follow pair shares one sound
-    setRays(sym, [...symRays(sym)]);
+    e.target.blur(); setRays(sym, [...symRays(sym)]);
     chime(ln.d && ln.d < 0 ? -1 : 1, e.target.value || defaultSound(ln.k));   // preview
-  };
-}
-function openHistory() {
-  let armed = false;
-  const paint = () => {
-    const L = state.notifLog || [], d = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), tm = t => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    $('shBody').innerHTML = L.length ? `<div class="hist">${L.map(e => { const k = String(e.kind || '').trim(); return `<button class="hrow ${esc(k)}" data-hist="${esc(e.sym)}"><span class="ni">${ALERT_TAG[k] || (k === 'earn' || k === 'beat' || k === 'miss' ? 'E' : '•')}</span><span class="ht"><b>${esc(short(e.sym))}</b> · ${esc(e.msg)}<small>${esc(e.sub || '')}</small></span><time>${d(e.t)}<br>${tm(e.t)}</time></button>`; }).join('')}</div>`
-      + `<div class="hfoot"><button class="nall" data-hist-clear>${armed ? 'Tap again to clear' : 'Clear history'}</button></div>`
-      : '<div class="empty">No notifications yet. Fired alerts, reached buy / sell points, follow alerts and earnings results show up here.</div>';
-  };
-  openSheet('history', 'Notifications', ''); paint();
-  $('shBody').onclick = e => {
-    if (e.target.closest('[data-hist-clear]')) { if (!armed) { armed = true; paint(); setTimeout(() => { armed = false; if (sheetKind === 'history') paint(); }, 3000); return; } state.notifLog = []; save(); paint(); return; }
-    const r = e.target.closest('[data-hist]'); if (r) { closeSheet(); if (r.dataset.hist !== state.symbol) selectSymbol(r.dataset.hist, false); }
-  };
-}
+  });
+})();
 // Run on every quote batch: a level whose crossing happened fires (once; a follow pair moves on instead).
 function checkAlerts() {
   let fired = 0;
@@ -2752,7 +2801,7 @@ function renderQuotes() {
   if (state.sort && Date.now() - lastSortRender > 3000 && !press && $('sheet').hidden) renderRows();
   else patchRows(true);
   if (!press) { updateEarnings(); updatePoints(); }
-  checkAlerts(); renderNotes();
+  checkAlerts(); renderNotes(); drawerTick();
   patchChips();
   renderHeader();
   renderDetails();
@@ -2998,7 +3047,7 @@ function openIntervalPicker() {
   $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { setChartInterval(b.dataset.iv); closeSheet(); } };
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeSheet(); closeChartMenu(); closeMarketPop(); closeRowCtx(); if (own.meas || own.measuring) { own.meas = null; own.measuring = false; paintTools(); ownMeasure(); } if (own.rayTool || own.raySel) { own.rayTool = false; own.raySel = null; paintTools(); ownRays(); } return; }
+  if (e.key === 'Escape') { closeDrawer(); closeSheet(); closeChartMenu(); closeMarketPop(); closeRowCtx(); if (own.meas || own.measuring) { own.meas = null; own.measuring = false; paintTools(); ownMeasure(); } if (own.rayTool || own.raySel) { own.rayTool = false; own.raySel = null; paintTools(); ownRays(); } return; }
   if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   if (own.raySel && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); removeRay(own.raySel); return; }
   if (!isPhone() && /^[1-8]$/.test(e.key) && ($('sheet').hidden || sheetKind === 'interval')) {
@@ -3354,6 +3403,7 @@ document.addEventListener('click', e => {
     case 'add': openSearch(true); break;
     case 'history': openHistory(); break;
     case 'alerts-all': openAlertsPanel(); break;
+    case 'drawer-close': closeDrawer(); break;
     case 'dt-fold': state.dtOpen = { ...state.dtOpen, [el.dataset.k]: !state.dtOpen?.[el.dataset.k] }; save(); renderDetails(); break;
     case 'sort': state.sort = state.sort === el.dataset.by ? null : el.dataset.by; save(); render(); break;
     case 'lists': openListManager(); break;
