@@ -789,7 +789,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '12.4';  // bump on every push to main
+const APP_VERSION = '12.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2006,7 +2006,7 @@ function followFire(sym, ln, p) {
   if (up0) while (p >= c + s) c += s; else while (p <= c - s) c -= s;
   for (const x of followPair(sym, ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; }
   // dedupe across devices: same pair, same level, same minute
-  logNote({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(Date.now() / 60000)}`, t: Date.now(), sym, kind: 'follow', note: true,
+  logNote({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(Date.now() / 60000)}`, t: Date.now(), sym, kind: 'follow', note: true, dir: up0 ? 1 : -1,
     msg: `Follow ±${fmtStep(s)}: crossed ${up0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(p)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
 }
 // Notification history (state.notifLog, synced, newest first, 100 kept): every note once — fired alerts, reached points,
@@ -2102,10 +2102,11 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
 // Sound + system notification for a new note (the system one only where the browser allows it).
 let actx = null;
 addEventListener('pointerdown', () => { try { actx ||= new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (_) {} }, true);   // audio unlocks on a gesture
-function chime() {
+// dir > 0 (crossed upwards, a beat): rising notes; dir < 0 (crossed downwards, a miss): the same notes falling.
+function chime(dir = 1) {
   if (!actx) return;
-  const t0 = actx.currentTime;
-  [880, 1175, 1568].forEach((f, i) => {
+  const t0 = actx.currentTime, notes = [880, 1175, 1568];
+  (dir < 0 ? notes.reverse() : notes).forEach((f, i) => {
     const o = actx.createOscillator(), g = actx.createGain(), t = t0 + i * 0.16;
     o.type = 'sine'; o.frequency.value = f;
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
@@ -2123,17 +2124,17 @@ function noteItems() {
   for (const sym of alertSyms()) for (const ln of state.lines[sym]) {
     if (!ln.k || !ln.hit || ln.ack) continue;
     const what = ln.k === 'buy' ? 'Buy point reached' : ln.k === 'sell' ? 'Sell point reached' : `Alert: crossed ${ln.d > 0 ? 'above' : 'below'}`;
-    out.push({ key: 'l:' + sym + ':' + ln.id, sym, at: ln.hit, cls: ln.k, icon: ALERT_TAG[ln.k],
+    out.push({ key: 'l:' + sym + ':' + ln.id, sym, at: ln.hit, cls: ln.k, icon: ALERT_TAG[ln.k], dir: ln.d || (ln.k === 'buy' ? -1 : 1),
       title: `<b>${esc(short(sym))}</b> · ${what} ${fmtPrice(ln.p)}`, sub: `${ln.at != null ? 'at ' + fmtPrice(ln.at) + ' · ' : ''}${new Date(ln.hit).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
       text: `${short(sym)}: ${what} ${fmtPrice(ln.p)}`, msg: `${what} ${fmtPrice(ln.p)}` });
   }
   for (const e of state.notifLog || []) if (e.kind === 'follow' && e.note && !e.ack)
-    out.push({ key: e.key, sym: e.sym, at: e.t, cls: 'follow', icon: ALERT_TAG.follow, title: `<b>${esc(short(e.sym))}</b> · ${esc(e.msg)}`, sub: esc(e.sub), text: `${short(e.sym)}: ${e.msg}`, msg: e.msg });
+    out.push({ key: e.key, sym: e.sym, at: e.t, cls: 'follow', icon: ALERT_TAG.follow, dir: e.dir || 1, title: `<b>${esc(short(e.sym))}</b> · ${esc(e.msg)}`, sub: esc(e.sub), text: `${short(e.sym)}: ${e.msg}`, msg: e.msg });
   for (const sym of new Set(state.lists.flatMap(flatSymbols))) {
     if (!reportedRecently(sym) || resultsPending(sym)) continue;
     const e = earnResult(sym); if (!e || e.eps == null && !e.rev || state.seen?.[sym] === e.t) continue;
     const bits = [e.eps != null ? `EPS ${num(e.eps, 2)} vs ${e.epsE != null ? num(e.epsE, 2) : '–'}${surp(e.epsS)}` : '', e.rev ? `Rev ${fmtBig(e.rev)} vs ${e.revE ? fmtBig(e.revE) : '–'}${surp(e.revS)}` : ''].filter(Boolean);
-    out.push({ key: 'e:' + sym + ':' + e.t, sym, at: e.t * 1000, cls: 'earn ' + (e.beat == null ? '' : e.beat ? 'beat' : 'miss'), icon: 'E',
+    out.push({ key: 'e:' + sym + ':' + e.t, sym, at: e.t * 1000, cls: 'earn ' + (e.beat == null ? '' : e.beat ? 'beat' : 'miss'), icon: 'E', dir: e.beat === false ? -1 : 1,
       title: `<b>${esc(short(sym))}</b> · Earnings ${e.beat == null ? 'out' : e.beat ? 'beat' : 'miss'}`, sub: bits.join(' · '),
       text: `${short(sym)} earnings ${e.beat == null ? 'out' : e.beat ? 'beat' : 'miss'}`, msg: `Earnings ${e.beat == null ? 'out' : e.beat ? 'beat' : 'miss'}` });
   }
@@ -2146,7 +2147,7 @@ function renderNotes() {
   const fresh = items.filter(n => !notesKnown.has(n.key)); fresh.forEach(n => notesKnown.add(n.key));
   // every note goes into the history once (plain text: the sub line loses its colored spans)
   if (fresh.map(n => logNote({ key: n.key, t: n.at, sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, '') })).some(Boolean)) save();
-  if (fresh.length && Date.now() - pageStart > 15000) { chime(); fresh.forEach(n => sysNotify(n.text, '')); }
+  if (fresh.length && Date.now() - pageStart > 15000) { chime(fresh.sort((a, b) => b.at - a.at)[0].dir); fresh.forEach(n => sysNotify(n.text, '')); }   // the newest note sets the chime's direction
   const shown = notesOpen ? items : items.slice(0, 2);   // two at a time; the rest behind "+N more"
   const html = shown.map(n => `<div class="note ${n.cls}"><span class="ni">${n.icon}</span><button class="nt" data-note-sym="${esc(n.sym)}">${n.title}<small>${n.sub}</small></button><button class="nx" data-note-x="${esc(n.key)}" title="Dismiss">✕</button></div>`).join('')
     + (items.length > 2 ? `<div class="nfoot"><button class="nall" data-note-more>${notesOpen ? 'Show less' : `+${items.length - 2} more`}</button><button class="nall" data-note-all>Dismiss all</button></div>` : '');
