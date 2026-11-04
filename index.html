@@ -299,9 +299,13 @@
   .ar-b svg { width: 13px !important; height: 13px !important; vertical-align: 0 !important; }
   .ar-b.buy, .ar-b.beat { --c: #089981; } .ar-b.sell, .ar-b.miss { --c: #f23645; } .ar-b.follow { --c: #b06cff; } .ar-b.earn { --c: var(--pre); }
   .ar.done .ar-b { opacity: .55; }
+  /* the kind badge carries the ticker: icon + symbol in one fixed-width tag so the text column lines up */
+  .ar-tag { width: auto; min-width: 88px; max-width: 124px; height: 26px; padding: 0 8px; display: flex; align-items: center; gap: 6px; border: 0; font: 700 12px var(--font, inherit); letter-spacing: .2px; text-align: left; }
+  .ar-tag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button.ar-tag { cursor: pointer; } button.ar-tag:hover { filter: brightness(1.12); }
+  .ar-k { font-size: 13px; font-weight: 500; }
   .ar-m { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .ar-1, .ar-2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
-  .ar-t { padding: 0; border: 0; background: none; color: var(--text); font: 600 14px var(--font, inherit); cursor: pointer; } .ar-t:hover { color: var(--accent); }
   .ar-1 { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .ar-lv { padding: 1px 6px; margin-right: -6px; border: 0; border-radius: 5px; background: none; color: var(--text); font: 600 14px var(--font, inherit); font-variant-numeric: tabular-nums; cursor: text; } .ar-lv:hover { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--line); }
   .ar-in { width: 110px; height: 26px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: var(--text); font: 600 14px var(--font, inherit); text-align: right; outline: none; }
@@ -314,7 +318,7 @@
   .hr-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
   .hr-row:first-child { border-top: 0; } .hr-row:hover { background: var(--bg3); }
   .hr-m { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .hr-1 { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .hr-1 b { font-weight: 600; margin-right: 6px; }
+  .hr-1 { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hr-m small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hr-row time { flex-shrink: 0; font-size: 11px; line-height: 1.35; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
@@ -843,7 +847,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '13.2';  // bump on every push to main
+const APP_VERSION = '13.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2104,6 +2108,7 @@ function closeDrawer() {
   $('drawer').classList.remove('in'); $('drScrim').hidden = true; setTimeout(() => { if (!drawer.open) $('drawer').hidden = true; }, 200);
 }
 const KN = { alert: 'Alert', buy: 'Buy point', sell: 'Sell point', follow: 'Follow' };
+const arTag = (k, sym, attrs = '') => { const tag = attrs ? 'button' : 'span'; return `<${tag} class="ar-b ar-tag ${esc(k)}"${attrs}>${ALERT_TAG[k] || (k === 'earn' || k === 'beat' || k === 'miss' ? 'E' : '•')}<span>${esc(short(sym || ''))}</span></${tag}>`; };
 function alertItems() {
   const out = [];
   for (const sym of alertSyms()) {
@@ -2112,7 +2117,8 @@ function alertItems() {
       if (!ln.k) continue;
       if (ln.k === 'follow') { if (seen.has(ln.g)) continue; seen.add(ln.g); }
       const pair = ln.k === 'follow' ? followPair(sym, ln.g) : null;
-      out.push({ sym, ln, pair, hit: !pair && !!ln.hit, dist: !pair && p ? (ln.p - p) / p * 100 : null });
+      const lv = pair && p ? pair.reduce((a, x) => Math.abs(x.p - p) < Math.abs(a - p) ? x.p : a, pair[0].p) : ln.p;
+      out.push({ sym, ln, pair, hit: !pair && !!ln.hit, dist: p ? (lv - p) / p * 100 : null });
     }
   }
   return out;
@@ -2128,9 +2134,9 @@ function paintDrawer() {
     const row = it => {
       const { sym, ln, pair, dist } = it;
       const lvl = pair ? pair.map(x => fmtPrice(x.p)).join(' – ') : drawer.editing === ln.id ? `<input class="ar-in" id="arIn" inputmode="decimal" value="${ln.p}">` : `<button class="ar-lv" data-ar-edit title="Change the level">${fmtPrice(ln.p)}</button>`;
-      const sub = pair ? `Follow ±${fmtStep(ln.s)}` : `${KN[ln.k]}${it.hit ? ` · <span class="hit">${ln.k === 'alert' ? 'fired' : 'reached'} ${new Date(ln.hit).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>` : dist != null ? ` · ${pc(dist)} away` : ''}`;
-      return `<div class="ar${it.hit ? ' done' : ''}" data-sym="${esc(sym)}" data-id="${ln.id}"><span class="ar-b ${ln.k}">${ALERT_TAG[ln.k]}</span>`
-        + `<div class="ar-m"><div class="ar-1"><button class="ar-t" data-ar-go title="Open chart">${esc(short(sym))}</button>${lvl}</div>`
+      const sub = it.hit ? `<span class="hit">${ln.k === 'alert' ? 'Fired' : 'Reached'} ${new Date(ln.hit).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>` : dist != null ? `${pc(dist)} away` : '';
+      return `<div class="ar${it.hit ? ' done' : ''}" data-sym="${esc(sym)}" data-id="${ln.id}">${arTag(ln.k, sym, ' data-ar-go title="Open chart"')}`
+        + `<div class="ar-m"><div class="ar-1"><span class="ar-k">${pair ? `Follow ±${fmtStep(ln.s)}` : KN[ln.k]}</span>${lvl}</div>`
         + `<div class="ar-2"><span>${sub}</span><select class="ar-snd" data-ar-snd title="Sound">${sndOptions(ln.snd, ln.k)}</select></div></div>`
         + `<div class="ar-a">${it.hit ? `<button class="dr-ib" data-ar-rearm title="Re-arm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>` : ''}<button class="dr-ib" data-ar-rm title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>`;
     };
@@ -2141,7 +2147,7 @@ function paintDrawer() {
     const inp = $('arIn'); if (inp) { inp.focus(); inp.select(); }
   } else {
     const L = state.notifLog || [], d = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), tm = t => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    body.innerHTML = L.length ? L.map(e => { const k = String(e.kind || '').trim(); return `<button class="hr-row ${esc(k)}" data-hist="${esc(e.sym)}"><span class="ar-b ${esc(k)}">${ALERT_TAG[k] || (k === 'earn' || k === 'beat' || k === 'miss' ? 'E' : '•')}</span><span class="hr-m"><span class="hr-1"><b>${esc(short(e.sym))}</b>${esc(e.msg)}</span><small>${esc(e.sub || '')}</small></span><time>${d(e.t)}<br>${tm(e.t)}</time></button>`; }).join('')
+    body.innerHTML = L.length ? L.map(e => { const k = String(e.kind || '').trim(); return `<button class="hr-row ${esc(k)}" data-hist="${esc(e.sym)}">${arTag(k, e.sym)}<span class="hr-m"><span class="hr-1">${esc(e.msg)}</span><small>${esc(e.sub || '')}</small></span><time>${d(e.t)}<br>${tm(e.t)}</time></button>`; }).join('')
       : '<div class="dr-empty">No notifications yet.<br>Fired alerts, reached buy / sell points, follow alerts and earnings results show up here.</div>';
     foot.hidden = !L.length; foot.innerHTML = `<button class="dr-link" data-hist-clear>${drawer.armed ? 'Tap again to clear' : 'Clear history'}</button>`;
   }
