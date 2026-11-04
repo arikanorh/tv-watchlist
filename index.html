@@ -206,7 +206,8 @@
   .cmenu .csep { height: 1px; margin: 4px 0; background: var(--line); }
   .cmenu .subw.rayw { margin-top: 0; padding-top: 0; border-top: 0; } .cmenu .subw.rayw .submenu { top: 0; bottom: auto; }
   .cmenu .rk { width: 16px; height: 16px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 10px; font-weight: 700; color: #fff; }
-  .cmenu .rk.buy { background: #089981; } .cmenu .rk.sell { background: #f23645; } .cmenu .rk.alert { background: #f7a600; }
+  .cmenu .rk.buy { background: #089981; } .cmenu .rk.sell { background: #f23645; } .cmenu .rk.alert { background: #f7a600; } .cmenu .rk.follow { background: #b06cff; }
+  .cmenu .rk svg { width: 10px; height: 10px; }
   .cmenu .rk svg { width: 10px !important; height: 10px !important; color: #fff !important; }
   .cmenu .subw { position: relative; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
   .cmenu .ci.sub .cv { margin-left: auto; font-size: 12px; color: var(--muted); }
@@ -269,13 +270,25 @@
   .alr i.pt b { font-weight: 700; padding: 0 0 0 3px; } .alr i.pt.in b { padding: 0 3px; }
   .alr i.pt span { padding-right: 3px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
   .alr i.bell { border: 0; } .alr i.bell svg { width: 13px; height: 13px; }
+  .alr i.fol { --c: #b06cff; border: 0; color: var(--c); } .alr i.fol svg { width: 13px; height: 13px; } .alr i.fol.hit { animation: ring .9s ease-in-out 4; }
+  /* notification history sheet */
+  .hist { display: flex; flex-direction: column; }
+  .hrow { --c: #f7a600; display: flex; align-items: center; gap: 10px; padding: 8px 4px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .hrow:hover { background: var(--bg3); }
+  .hrow.buy, .hrow.beat { --c: var(--up); } .hrow.sell, .hrow.miss { --c: var(--down); } .hrow.earn { --c: var(--pre); } .hrow.follow { --c: #b06cff; }
+  .hrow .ni { flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; background: var(--c); }
+  .hrow .ni svg { width: 13px; height: 13px; }
+  .hrow .ht { flex: 1; min-width: 0; font-size: 13px; } .hrow .ht small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .hrow time { flex-shrink: 0; font-size: 11px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .hfoot { display: flex; justify-content: flex-end; padding-top: 10px; }
+  .alm.fol .fl { flex: 0 0 122px; font-size: 13px; color: var(--muted); white-space: nowrap; } .lm.alm.fol .ast { flex: 1; font-size: 14px; color: var(--text); }
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
   /* Notes under the top bar: fired alerts, reached buy / sell points, fresh earnings — until dismissed */
   .notes { position: fixed; z-index: 45; top: calc(var(--safe-t, 0px) + 48px); left: 8px; right: 8px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; pointer-events: none; }
   .note { --c: #f7a600; pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 7px 6px 7px 10px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); border-left: 4px solid var(--c);
     box-shadow: 0 8px 24px rgba(0, 0, 0, .45); font-size: 13px; animation: noteIn .25s ease-out; }
-  .note.buy, .note.beat { --c: var(--up); } .note.sell, .note.miss { --c: var(--down); } .note.earn { --c: var(--pre); }
+  .note.buy, .note.beat { --c: var(--up); } .note.sell, .note.miss { --c: var(--down); } .note.earn { --c: var(--pre); } .note.follow { --c: #b06cff; }
   .note .ni { flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; background: var(--c); }
   .note .ni svg { width: 14px; height: 14px; }
   .note .nt { flex: 1; min-width: 0; text-align: left; color: var(--text); line-height: 1.35; }
@@ -303,12 +316,12 @@
   .hray::before { content: ''; position: absolute; left: 0; right: 0; top: 5px; border-top: 1px solid var(--c); }
   .hray i { display: none; position: absolute; left: -5px; top: 0; width: 11px; height: 11px; box-sizing: border-box; border-radius: 50%; background: var(--bg); border: 2px solid var(--c); }
   .hray.sel::before { border-top-width: 2px; top: 4.5px; } .hray.sel i { display: block; }
-  .hray[data-k="alert"] { --c: #f7a600; } .hray[data-k="buy"] { --c: #089981; } .hray[data-k="sell"] { --c: #f23645; }
+  .hray[data-k="alert"] { --c: #f7a600; } .hray[data-k="buy"] { --c: #089981; } .hray[data-k="sell"] { --c: #f23645; } .hray[data-k="follow"] { --c: #b06cff; }
   .hray.done { opacity: .5; } .hray.done::before { border-top-style: dashed; }   /* an alert that already fired */
   /* kind badge: at the start of the line (u) and right of the price on the axis tag (b em) */
   .hray u { display: none; position: absolute; left: 4px; top: -1px; height: 13px; min-width: 13px; padding: 0 2px; box-sizing: border-box; border-radius: 3px;
     align-items: center; justify-content: center; text-decoration: none; font-size: 9px; font-weight: 700; line-height: 13px; color: #fff; background: var(--c); }
-  .hray[data-k="buy"] u, .hray[data-k="sell"] u, .hray[data-k="alert"] u { display: inline-flex; }
+  .hray[data-k="buy"] u, .hray[data-k="sell"] u, .hray[data-k="alert"] u, .hray[data-k="follow"] u { display: inline-flex; }
   .hray.sel u { left: 10px; }   /* clear of the start handle */
   .hray u svg, .hray b em svg { width: 9px !important; height: 9px !important; vertical-align: -1px; }
   .hray b em { display: inline-flex; align-items: center; justify-content: center; min-width: 12px; height: 12px; margin-left: 4px; padding: 0 1px; box-sizing: border-box; border-radius: 3px;
@@ -733,6 +746,7 @@
     <div class="dock">
       <div class="chips" id="chips"></div>
       <div class="acts">
+        <button class="ib" data-act="history" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
         <button class="ib" data-act="lists" aria-label="Manage lists"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
         <button class="ib gear" data-act="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
       </div>
@@ -775,7 +789,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '12.2';  // bump on every push to main
+const APP_VERSION = '12.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -895,7 +909,7 @@ const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
 const syncShape = lists => lists.filter(l => l.auto !== 'points').map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
   groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols })) }));
-const syncJson = () => JSON.stringify({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null });
+const syncJson = () => JSON.stringify({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null, notifLog: state.notifLog || [] });
 const fmtCode = c => c.length === 12 ? c.replace(/(.{4})(?=.)/g, '$1-') : c;   // 12-character codes from v1.3–1.5 read in groups
 function newSyncCode() { const b = crypto.getRandomValues(new Uint8Array(4)); return [...b].map(x => SYNC_ALPHA[x & 31]).join(''); }
 // A free code: one nobody has stored lists under yet.
@@ -921,7 +935,7 @@ async function syncPush() {
   setSyncStatus('busy');
   try {
     const r = await fetch(syncApi() + code + '?name=' + encodeURIComponent(SYNC_NAME), { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client-Id': SYNC_CLIENT },   // name in the URL: no new CORS header for older workers
-      body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null }) });
+      body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null, notifLog: state.notifLog || [] }) });
     if (r.status === 409) { syncAdopt(await r.json()); return setSyncStatus('ok'); }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     setSyncStatus('ok');
@@ -1009,6 +1023,7 @@ function syncAdopt(remote, notify = true) {
   if (remote.lines && typeof remote.lines === 'object') state.lines = remote.lines;   // chart lines and alerts too
   if (remote.seen && typeof remote.seen === 'object') state.seen = remote.seen;   // dismissed earnings notes
   if (Array.isArray(remote.pins)) state.pins = remote.pins;   // pinned quick symbols
+  if (Array.isArray(remote.notifLog)) state.notifLog = remote.notifLog;   // notification history
   if (!state.lists.some(l => l.id === state.activeListId)) state.activeListId = state.lists[0].id;
   state.sync.updatedAt = remote.updatedAt;
   syncLast = syncJson();
@@ -1883,8 +1898,9 @@ function ownRays() {
 function removeRay(id, sym = own.want?.sym) {
   const list = symRays(sym), ln = list.find(x => x.id === id); if (!ln) return;
   if (own.raySel === id) own.raySel = null;
-  setRays(sym, list.filter(x => x !== ln));
-  undoable(`Line ${fmtPrice(ln.p)} removed`, () => { setRays(sym, [...symRays(sym), ln]); });
+  const gone = ln.k === 'follow' ? list.filter(x => x.k === 'follow' && x.g === ln.g) : [ln];   // a follow alert goes as a pair
+  setRays(sym, list.filter(x => !gone.includes(x)));
+  undoable(ln.k === 'follow' ? `Follow alert ±${fmtStep(ln.s)} removed` : `Line ${fmtPrice(ln.p)} removed`, () => { setRays(sym, [...symRays(sym), ...gone]); });
 }
 function initRays(el) {
   const pane = () => el.querySelector('.tv-lightweight-charts');
@@ -1910,16 +1926,18 @@ function initRays(el) {
     own.raySel = ln.id; ownRays();
     if (isPhone()) return;
     const x0 = e.clientX, y0 = e.clientY, p0 = ln.p, t0 = ln.t, g0 = priceAt(y0), i0 = rayIndex(t0), handle = !!e.target.closest('i'), ts = own.chart.timeScale();
+    const mates = ln.k === 'follow' ? symRays(sym).filter(x => x.k === 'follow' && x.g === ln.g && x !== ln).map(x => [x, x.p]) : [];   // a follow pair moves together
     let moved = false;
     const mv = ev => {
       if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 3) return; moved = true;
       const g = priceAt(ev.clientY); if (g != null) ln.p = +(handle ? g : p0 + (g - g0)).toPrecision(6);
+      for (const [m, mp] of mates) m.p = +(mp + ln.p - p0).toPrecision(6);
       const last = own.data.length - 1;
       let i = handle ? Math.round(ts.coordinateToLogical(ev.clientX - pane().getBoundingClientRect().left) ?? i0) : i0 >= 0 ? i0 + Math.round((ev.clientX - x0) / ts.options().barSpacing) : null;
       if (i != null && isFinite(i)) ln.t = own.data[Math.max(0, Math.min(last, i))].time;   // a start older than the loaded bars only moves in price
       ownRays();
     };
-    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved && (ln.p !== p0 || ln.t !== t0)) { if (ln.p !== p0) armRay(sym, ln); setRays(sym, [...symRays(sym)]); } };
+    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved && (ln.p !== p0 || ln.t !== t0)) { if (ln.p !== p0) { armRay(sym, ln); mates.forEach(([m]) => armRay(sym, m)); } setRays(sym, [...symRays(sym)]); } };
     addEventListener('pointermove', mv); addEventListener('pointerup', up);
   });
 }
@@ -1929,6 +1947,12 @@ function openRayCtx(id, x, y) {
   own.raySel = id; ownRays();
   const m = document.createElement('div'); m.className = 'cmenu rowctx flip'; m.id = 'rowctx';
   const sym = own.want.sym;
+  if (ln.k === 'follow') {   // a follow pair: edit in the Alerts sheet or remove (both lines)
+    const [lo, hi] = followPair(sym, ln.g);
+    m.innerHTML = `<div class="ch">${esc(short(sym))} · Follow ±${fmtStep(ln.s)}${lo && hi ? ` · ${fmtPrice(lo.p)} / ${fmtPrice(hi.p)}` : ''}</div>`
+      + `<button class="ci" data-o="all">${ICON.bell}All alerts of ${esc(short(sym))}…</button><button class="ci danger" data-o="rm">${ICON.rm}Remove follow alert</button>`;
+    m.addEventListener('click', e => { const b = e.target.closest('[data-o]'); if (!b) return; closeRowCtx(); if (b.dataset.o === 'rm') removeRay(id); else openAlerts(sym); });
+  } else {
   m.innerHTML = `<div class="ch">${esc(short(sym))} · ${fmtPrice(ln.p)}</div>`
     + ALERT_KINDS.map(([k, t]) => `<button class="ci r${(ln.k || '') === k ? ' on' : ''}" data-k="${k}"><i></i>${t}</button>`).join('')
     + (ln.k && ln.hit ? `<button class="ci" data-o="rearm">${ICON.bell}Re-arm</button>` : '')
@@ -1942,6 +1966,7 @@ function openRayCtx(id, x, y) {
     if (b.dataset.k != null) { if (b.dataset.k) ln.k = b.dataset.k; else delete ln.k; askNotify(); }
     armRay(sym, ln); setRays(sym, [...symRays(sym)]);
   });
+  }
   document.body.appendChild(m);
   const w = m.offsetWidth, h = m.offsetHeight;
   m.style.left = Math.max(4, Math.min(x, innerWidth - w - 4)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - h - 4)) + 'px';
@@ -1953,7 +1978,7 @@ function openRayCtx(id, x, y) {
 // from the live price whenever the level is (re)armed — created, moved, edited or re-typed; `hit` = when it fired,
 // `ack` = its note was dismissed. All of it rides in `state.lines`, so it syncs and any open device can fire it.
 const ALERT_KINDS = [['', 'Line only'], ['alert', 'Alert'], ['buy', 'Buy point'], ['sell', 'Sell point']];
-const ALERT_TAG = { buy: 'B', sell: 'S', alert: '<svg viewBox="0 0 24 24" fill="currentColor" style="width:10px;height:10px;vertical-align:-1px"><path d="M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5-6.7V3.5a2 2 0 0 0-4 0v.8A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>' };
+const ALERT_TAG = { buy: 'B', sell: 'S', follow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;vertical-align:-1px"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg>', alert: '<svg viewBox="0 0 24 24" fill="currentColor" style="width:10px;height:10px;vertical-align:-1px"><path d="M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5-6.7V3.5a2 2 0 0 0-4 0v.8A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>' };
 const livePrice = sym => { const q = quotes[sym]; return q ? (!regular && q.ep != null ? q.ep : q.p) : null; };
 const nowBarTime = () => Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;   // bar times are local-shifted
 function armRay(sym, ln) {
@@ -1964,12 +1989,53 @@ function armRay(sym, ln) {
 }
 const alertSyms = () => Object.keys(state.lines || {}).filter(s => state.lines[s].some(l => l.k));
 function alertsChanged() { wsSync(); updatePoints(); patchRows(false); renderNotes(); }
-// Run on every quote batch: a level whose crossing happened fires (once).
+// ---- Follow alerts ----
+// A pair of lines (k: 'follow', same group g, step s): one step below and one above a centre. Whichever is crossed fires a
+// note and the pair re-centres on that level — stepping on while the price is already past further levels — so it keeps
+// following the price: VIX 20 ±0.5 → 19.50 / 20.50; crossing 19.50 → 19.00 / 20.00. Never goes passive.
+const fmtStep = v => String(+(+v).toPrecision(6));   // 0.5, not 0.5000
+const followPair = (sym, g) => symRays(sym).filter(l => l.k === 'follow' && l.g === g).sort((a, b) => a.p - b.p);
+const niceStep = v => { const e = 10 ** Math.floor(Math.log10(v)), m = v / e; return +((m < 1.5 ? 1 : m < 2.2 ? 2 : m < 3.5 ? 2.5 : m < 7.5 ? 5 : 10) * e).toPrecision(6); };
+function addFollow(sym, center, step) {
+  const g = Date.now().toString(36), t = own.want?.sym === sym && own.data?.length ? own.data[own.data.length - 1].time : nowBarTime();
+  const lo = { id: g + 'l', g, s: step, k: 'follow', t, p: +(center - step).toPrecision(10), d: -1 }, hi = { id: g + 'h', g, s: step, k: 'follow', t, p: +(center + step).toPrecision(10), d: 1 };
+  setRays(sym, [...symRays(sym), lo, hi]); askNotify();
+}
+function followFire(sym, ln, p) {
+  const s = ln.s, lvl = ln.p, up0 = ln.d > 0; let c = lvl;
+  if (up0) while (p >= c + s) c += s; else while (p <= c - s) c -= s;
+  for (const x of followPair(sym, ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; }
+  // dedupe across devices: same pair, same level, same minute
+  logNote({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(Date.now() / 60000)}`, t: Date.now(), sym, kind: 'follow', note: true,
+    msg: `Follow ±${fmtStep(s)}: crossed ${up0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(p)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
+}
+// Notification history (state.notifLog, synced, newest first, 100 kept): every note once — fired alerts, reached points,
+// follow alerts, earnings results. Plain text only (it comes back through sync). Follow notes live only here (`note`, `ack`).
+function logNote(e) {
+  const L = state.notifLog || []; if (L.some(x => x.key === e.key)) return false;
+  state.notifLog = [{ ...e, msg: String(e.msg).slice(0, 140), sub: String(e.sub || '').slice(0, 160) }, ...L].slice(0, 100); return true;
+}
+function openHistory() {
+  let armed = false;
+  const paint = () => {
+    const L = state.notifLog || [], d = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), tm = t => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    $('shBody').innerHTML = L.length ? `<div class="hist">${L.map(e => { const k = String(e.kind || '').trim(); return `<button class="hrow ${esc(k)}" data-hist="${esc(e.sym)}"><span class="ni">${ALERT_TAG[k] || (k === 'earn' || k === 'beat' || k === 'miss' ? 'E' : '•')}</span><span class="ht"><b>${esc(short(e.sym))}</b> · ${esc(e.msg)}<small>${esc(e.sub || '')}</small></span><time>${d(e.t)}<br>${tm(e.t)}</time></button>`; }).join('')}</div>`
+      + `<div class="hfoot"><button class="nall" data-hist-clear>${armed ? 'Tap again to clear' : 'Clear history'}</button></div>`
+      : '<div class="empty">No notifications yet. Fired alerts, reached buy / sell points, follow alerts and earnings results show up here.</div>';
+  };
+  openSheet('history', 'Notifications', ''); paint();
+  $('shBody').onclick = e => {
+    if (e.target.closest('[data-hist-clear]')) { if (!armed) { armed = true; paint(); setTimeout(() => { armed = false; if (sheetKind === 'history') paint(); }, 3000); return; } state.notifLog = []; save(); paint(); return; }
+    const r = e.target.closest('[data-hist]'); if (r) { closeSheet(); if (r.dataset.hist !== state.symbol) selectSymbol(r.dataset.hist, false); }
+  };
+}
+// Run on every quote batch: a level whose crossing happened fires (once; a follow pair moves on instead).
 function checkAlerts() {
   let fired = 0;
   for (const sym of alertSyms()) for (const ln of state.lines[sym]) {
     if (!ln.k || ln.hit || !ln.d) continue;
     const p = livePrice(sym); if (p == null) continue;
+    if (ln.k === 'follow') { if (ln.d > 0 ? p >= ln.p : p <= ln.p) { followFire(sym, ln, p); fired++; clog('info', 'follow fired', { sym, p: ln.p, at: p }); } continue; }
     if (ln.d > 0 ? p >= ln.p : p <= ln.p) { ln.hit = Date.now(); ln.at = p; fired++; clog('info', 'alert fired', { sym, k: ln.k, p: ln.p, at: p }); }
   }
   if (fired) { save(); ownRays(); alertsChanged(); }
@@ -1991,18 +2057,23 @@ function alertIcons(sym, only) {   // only: 'buy' / 'sell' — the tag for that 
   };
   const al = pick('alert'), ring = al.filter(l => l.hit && !l.ack), armed = al.filter(l => !l.hit);
   const bell = ring.length || armed.length ? `<i class="bell${ring.length ? ' hit' : ''}" title="${ring.length ? 'Alert fired at ' + ring.map(l => fmtPrice(l.p)).join(', ') : 'Alert at ' + armed.map(l => fmtPrice(l.p)).join(', ')}">${ICON.bell}</i>` : '';
-  return near() + bell;
+  const fol = pick('follow'), folHit = (state.notifLog || []).some(e => e.kind === 'follow' && e.note && !e.ack && e.sym === sym);
+  const folTag = fol.length ? `<i class="fol${folHit ? ' hit' : ''}" title="Follow ${[...new Set(fol.map(l => l.g))].map(g => followPair(sym, g).map(l => fmtPrice(l.p)).join(' / ')).join(', ')}">${ALERT_TAG.follow}</i>` : '';
+  return near() + bell + folTag;
 }
 // Alerts of one symbol: a sheet on every device (row menu → Alerts, or the line's menu). Edit type / price, remove, add.
-function openAlerts(sym) {
+function openAlerts(sym, around) {   // around: a price to centre a new follow alert on (chart right-click)
   closeRowCtx();
   const status = ln => !ln.k ? '' : ln.hit ? `<span class="ast hit">${ln.k === 'alert' ? 'fired' : 'reached'} ${new Date(ln.hit).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>` : `<span class="ast">${ln.d > 0 ? '↑ above' : '↓ below'}</span>`;
   const kinds = (sel, attr) => `<select class="field ak" ${attr}>${ALERT_KINDS.map(([k, t]) => `<option value="${k}"${sel === k ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
   const paint = () => {
     const now = livePrice(sym);
-    $('shBody').innerHTML = `<div class="shint">Last ${now != null ? fmtPrice(now) : '–'}. An alert switches off once the price crosses it; a buy / sell point keeps its icon next to the ticker. Lines drawn on the chart show here too.</div>`
-      + symRays(sym).map(ln => `<div class="lm alm" data-id="${ln.id}">${kinds(ln.k || '', 'data-ak')}<input class="field" data-ap inputmode="decimal" value="${ln.p}">${status(ln)}<button class="ib del" data-ad title="Remove">✕</button></div>`).join('')
-      + `<div class="lmnew alm">${kinds('alert', 'id="anK"')}<input class="field" id="anP" inputmode="decimal" placeholder="Price" value="${now != null ? +now.toPrecision(6) : ''}"><button id="anAdd">Add</button></div>`;
+    const groups = [...new Set(symRays(sym).filter(l => l.k === 'follow').map(l => l.g))], c0 = around ?? now;
+    $('shBody').innerHTML = `<div class="shint">Last ${now != null ? fmtPrice(now) : '–'}. An alert switches off once the price crosses it; a buy / sell point keeps its icon next to the ticker; a follow alert sits one step below and above and moves with the price each time one is crossed. Lines drawn on the chart show here too.</div>`
+      + groups.map(g => { const [lo, hi] = followPair(sym, g); return `<div class="lm alm fol" data-g="${esc(g)}"><span class="fl">Follow ±${fmtStep(lo.s)}</span><span class="ast">${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}</span><button class="ib del" data-fd title="Remove">✕</button></div>`; }).join('')
+      + symRays(sym).filter(ln => ln.k !== 'follow').map(ln => `<div class="lm alm" data-id="${ln.id}">${kinds(ln.k || '', 'data-ak')}<input class="field" data-ap inputmode="decimal" value="${ln.p}">${status(ln)}<button class="ib del" data-ad title="Remove">✕</button></div>`).join('')
+      + `<div class="lmnew alm">${kinds('alert', 'id="anK"')}<input class="field" id="anP" inputmode="decimal" placeholder="Price" value="${now != null ? +now.toPrecision(6) : ''}"><button id="anAdd">Add</button></div>`
+      + `<div class="lmnew alm fol"><span class="fl">Follow ±</span><input class="field" id="afS" inputmode="decimal" placeholder="Step" value="${c0 ? niceStep(c0 * 0.025) : ''}"><input class="field" id="afC" inputmode="decimal" placeholder="Around" value="${c0 != null ? +c0.toPrecision(6) : ''}" title="Centre"><button id="afAdd">Add</button></div>`;
   };
   openSheet('alerts', `Alerts · ${short(sym)}`, ''); paint();
   const parseP = v => { const x = parseFloat(String(v).replace(',', '.')); return isFinite(x) && x > 0 ? x : null; };
@@ -2015,6 +2086,11 @@ function openAlerts(sym) {
     armRay(sym, ln); setRays(sym, [...symRays(sym)]); paint();
   };
   body.onclick = e => {
+    if (e.target.closest('#afAdd')) {
+      const st = parseP($('afS').value), c = parseP($('afC').value); if (st == null) { $('afS').focus(); return; } if (c == null) { $('afC').focus(); return; }
+      addFollow(sym, c, st); paint(); return;
+    }
+    const fg = e.target.closest('[data-fd]')?.closest('[data-g]'); if (fg) { const ln = followPair(sym, fg.dataset.g)[0]; if (ln) removeRay(ln.id, sym); paint(); return; }
     if (e.target.closest('#anAdd')) {
       const p = parseP($('anP').value); if (p == null) { $('anP').focus(); return; }
       const ln = { id: Date.now().toString(36), t: own.want?.sym === sym && own.data?.length ? own.data[own.data.length - 1].time : nowBarTime(), p };
@@ -2023,7 +2099,7 @@ function openAlerts(sym) {
     }
     const row = e.target.closest('[data-ad]')?.closest('[data-id]'); if (row) { removeRay(row.dataset.id, sym); paint(); }
   };
-  body.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('#anP')) $('anAdd').click(); else if (e.key === 'Enter' && e.target.matches('[data-ap]')) e.target.blur(); };
+  body.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('#afS, #afC')) $('afAdd').click(); else if (e.key === 'Enter' && e.target.matches('#anP')) $('anAdd').click(); else if (e.key === 'Enter' && e.target.matches('[data-ap]')) e.target.blur(); };
 }
 // Sound + system notification for a new note (the system one only where the browser allows it).
 let actx = null;
@@ -2051,15 +2127,17 @@ function noteItems() {
     const what = ln.k === 'buy' ? 'Buy point reached' : ln.k === 'sell' ? 'Sell point reached' : `Alert: crossed ${ln.d > 0 ? 'above' : 'below'}`;
     out.push({ key: 'l:' + sym + ':' + ln.id, sym, at: ln.hit, cls: ln.k, icon: ALERT_TAG[ln.k],
       title: `<b>${esc(short(sym))}</b> · ${what} ${fmtPrice(ln.p)}`, sub: `${ln.at != null ? 'at ' + fmtPrice(ln.at) + ' · ' : ''}${new Date(ln.hit).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
-      text: `${short(sym)}: ${what} ${fmtPrice(ln.p)}` });
+      text: `${short(sym)}: ${what} ${fmtPrice(ln.p)}`, msg: `${what} ${fmtPrice(ln.p)}` });
   }
+  for (const e of state.notifLog || []) if (e.kind === 'follow' && e.note && !e.ack)
+    out.push({ key: e.key, sym: e.sym, at: e.t, cls: 'follow', icon: ALERT_TAG.follow, title: `<b>${esc(short(e.sym))}</b> · ${esc(e.msg)}`, sub: esc(e.sub), text: `${short(e.sym)}: ${e.msg}`, msg: e.msg });
   for (const sym of new Set(state.lists.flatMap(flatSymbols))) {
     if (!reportedRecently(sym) || resultsPending(sym)) continue;
     const e = earnResult(sym); if (!e || e.eps == null && !e.rev || state.seen?.[sym] === e.t) continue;
     const bits = [e.eps != null ? `EPS ${num(e.eps, 2)} vs ${e.epsE != null ? num(e.epsE, 2) : '–'}${surp(e.epsS)}` : '', e.rev ? `Rev ${fmtBig(e.rev)} vs ${e.revE ? fmtBig(e.revE) : '–'}${surp(e.revS)}` : ''].filter(Boolean);
     out.push({ key: 'e:' + sym + ':' + e.t, sym, at: e.t * 1000, cls: 'earn ' + (e.beat == null ? '' : e.beat ? 'beat' : 'miss'), icon: 'E',
       title: `<b>${esc(short(sym))}</b> · Earnings ${e.beat == null ? 'out' : e.beat ? 'beat' : 'miss'}`, sub: bits.join(' · '),
-      text: `${short(sym)} earnings ${e.beat == null ? 'out' : e.beat ? 'beat' : 'miss'}` });
+      text: `${short(sym)} earnings ${e.beat == null ? 'out' : e.beat ? 'beat' : 'miss'}`, msg: `Earnings ${e.beat == null ? 'out' : e.beat ? 'beat' : 'miss'}` });
   }
   return out.sort((a, b) => b.at - a.at);
 }
@@ -2068,6 +2146,8 @@ function renderNotes() {
   const items = noteItems();
   // New ones after the first seconds (not what was waiting when the app opened) ring and, in the background, notify.
   const fresh = items.filter(n => !notesKnown.has(n.key)); fresh.forEach(n => notesKnown.add(n.key));
+  // every note goes into the history once (plain text: the sub line loses its colored spans)
+  if (fresh.map(n => logNote({ key: n.key, t: n.at, sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, '') })).some(Boolean)) save();
   if (fresh.length && Date.now() - pageStart > 15000) { chime(); fresh.forEach(n => sysNotify(n.text, '')); }
   const shown = notesOpen ? items : items.slice(0, 2);   // two at a time; the rest behind "+N more"
   const html = shown.map(n => `<div class="note ${n.cls}"><span class="ni">${n.icon}</span><button class="nt" data-note-sym="${esc(n.sym)}">${n.title}<small>${n.sub}</small></button><button class="nx" data-note-x="${esc(n.key)}" title="Dismiss">✕</button></div>`).join('')
@@ -2077,6 +2157,7 @@ function renderNotes() {
 }
 function ackNote(key) {
   const [t, sym, id] = [key.slice(0, 1), ...key.slice(2).split(/:(?=[^:]+$)/)];
+  if (t === 'f') { const e = state.notifLog?.find(x => x.key === key); if (e) e.ack = true; return; }
   if (t === 'l') { const ln = state.lines?.[sym]?.find(x => x.id === id); if (ln) ln.ack = true; }
   else state.seen = { ...(state.seen || {}), [sym]: +id };
 }
@@ -2102,10 +2183,12 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
     return l != null && p != null ? { i: Math.max(0, Math.min(own.data.length - 1, Math.round(l))), p: +p.toPrecision(6) } : null; })() : null;
   const paint = () => { const o = chartOpts(); m.innerHTML = (ray ? `<div class="subw rayw"><button class="ci sub" data-ray-add="">${CHART_TOOLS.find(t => t[0] === 'ray')[2]}Horizontal ray at ${fmtPrice(ray.p)}<span class="cv">${m.classList.contains('flip') ? '▸' : '◂'}</span></button><div class="submenu">`
       + [['buy', 'Buy point', 'B'], ['sell', 'Sell point', 'S'], ['alert', 'Alert', ALERT_TAG.alert]].map(([k, t, g]) => `<button class="ci" data-ray-add="${k}"><span class="rk ${k}">${g}</span>${t}</button>`).join('')
+      + `<button class="ci" data-follow-add><span class="rk follow">${ALERT_TAG.follow}</span>Follow alert…</button>`
       + `</div></div><div class="csep"></div>` : '') + CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join('')
     + `<div class="subw"><button class="ci sub">◂ Session<span class="cv">${SESSION_OPTS.find(x => x[0] === o.session)?.[1] || ''}</span></button><div class="submenu">${SESSION_OPTS.map(([v, t]) => `<button class="ci r${o.session === v ? ' on' : ''}" data-cs="${v}"><i></i>${t}</button>`).join('')}</div></div>`; };
   paint();
   m.addEventListener('click', e => {
+    if (e.target.closest('[data-follow-add]')) { const sym = own.want.sym; closeChartMenu(); openAlerts(sym, ray.p); setTimeout(() => $('afS')?.focus(), 50); return; }
     const ra = e.target.closest('[data-ray-add]');
     if (ra) {   // the item itself: a plain line; its flyout: the same line as a buy / sell point or an alert
       const sym = own.want.sym, ln = { id: Date.now().toString(36), t: own.data[ray.i].time, p: ray.p };
@@ -3139,6 +3222,7 @@ document.addEventListener('click', e => {
     case 'view': setView(el.dataset.view); break;
     case 'search': openSearch(false); break;
     case 'add': openSearch(true); break;
+    case 'history': openHistory(); break;
     case 'dt-fold': state.dtOpen = { ...state.dtOpen, [el.dataset.k]: !state.dtOpen?.[el.dataset.k] }; save(); renderDetails(); break;
     case 'sort': state.sort = state.sort === el.dataset.by ? null : el.dataset.by; save(); render(); break;
     case 'lists': openListManager(); break;
