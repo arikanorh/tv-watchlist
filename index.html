@@ -813,7 +813,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '12.9';  // bump on every push to main
+const APP_VERSION = '13.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1497,7 +1497,8 @@ async function showOwnChart(sym) {
       timeScale: { borderColor: cssVar('--line'), timeVisible: true, secondsVisible: false, rightOffset: 2, rightBarStaysOnScroll: true },   // wheel zoom like TradingView: the right edge stays put
       crosshair: { mode: L.CrosshairMode.Normal, horzLine: { labelVisible: false } },   // the price label is ours (#xlabel), above the other axis tags
     });
-    own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false });
+    own.series = own.chart.addCandlestickSeries({ upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', lastValueVisible: false,
+      autoscaleInfoProvider: orig => { const r = orig(), ex = rayExtent(); if (r?.priceRange && ex) { r.priceRange.minValue = Math.min(r.priceRange.minValue, ex[0]); r.priceRange.maxValue = Math.max(r.priceRange.maxValue, ex[1]); } return r; } });
     own.vol = own.chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol', lastValueVisible: false, priceLineVisible: false });
     own.chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });   // bottom fifth, no axis
     new ResizeObserver(() => { const r = el.getBoundingClientRect(), tb = toolW(); if (r.width && r.height) own.chart.applyOptions({ width: r.width - tb, height: r.height }); ownCountdown(); }).observe(el);
@@ -1895,6 +1896,12 @@ function ownMeasure() {
 // `state.lines` ({sym: [{id, t, p}]}, t = bar time in seconds) and synced, so they show on every device and interval
 // (on another interval the ray starts at the bar containing t). Drag to move, right-click or Delete to remove.
 const symRays = sym => state.lines?.[sym] || [];
+// Auto-scale keeps these lines in view: follow pairs always, armed alerts / points within 10% of the price (a far-off
+// buy point would squash the candles). Returns [min, max] or null.
+function rayExtent() {
+  const last = own.last?.close, ps = symRays(own.want?.sym).filter(l => l.k === 'follow' || (l.k && !l.hit && last && Math.abs(l.p - last) / last <= .1)).map(l => l.p);
+  return ps.length ? [Math.min(...ps), Math.max(...ps)] : null;
+}
 function setRays(sym, list) { state.lines = { ...(state.lines || {}) }; if (list.length) state.lines[sym] = list; else delete state.lines[sym]; save(); ownRays(); alertsChanged(); }
 const rayIndex = t => { const d = own.data; if (t < d[0].time) return -1e9; let lo = 0, hi = d.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (d[m].time <= t) lo = m; else hi = m - 1; } return lo; };
 function ownRays() {
