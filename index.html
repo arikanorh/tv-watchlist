@@ -485,12 +485,7 @@
   /* Details: a bottom sheet on phones (rendered into the sheet), a column between list and chart on desktop */
   .detailspane { display: none; }
   .dt-head { padding: 2px 16px 12px; }
-  .dt-head .dsc { font-size: 13px; color: var(--muted); }
-  .dt-px { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; font-variant-numeric: tabular-nums; }
-  .dt-px b { font-size: 26px; font-weight: 600; }
-  .dt-px span { font-size: 15px; }
-  .dt-px small { font-size: 12px; color: var(--muted); }
-  .dt-ext { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dt-head .dsc { font-size: 15px; font-weight: 600; color: var(--text); }
   .dt-sec { padding: 10px 16px 12px; border-top: 1px solid var(--line); flex-shrink: 0; }
   .news .nit { padding: 8px 0; border-top: 1px solid var(--line); cursor: pointer; }
   .news .nit:first-of-type { border-top: 0; }
@@ -508,6 +503,16 @@
   .ana .tone.up { color: var(--up); background: rgba(8, 153, 129, .15); } .ana .tone.down { color: var(--down); background: rgba(242, 54, 69, .15); }
   .ana .tone.neu { color: var(--muted); background: var(--bg3); }
   .dt-sec h4 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .dt-sec.fold h4 { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; user-select: none; }
+  .dt-sec.fold.open h4 { margin-bottom: 6px; }
+  .dt-sec.fold h4:hover { color: var(--text); }
+  .dt-sec.fold .hint { margin-left: auto; font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text); font-variant-numeric: tabular-nums; }
+  .dt-sec.fold .cv { font-style: normal; font-size: 10px; transition: transform .15s; }
+  .dt-sec.fold:not(:has(.hint)) .cv { margin-left: auto; }
+  .dt-sec.fold.open .cv { transform: rotate(90deg); }
+  .co-about { margin: 0 0 6px; font-size: 13px; line-height: 1.45; color: var(--text); }
+  .co-about .lnk { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
+  .kv a { color: var(--accent); text-decoration: none; }
   .kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14px; font-variant-numeric: tabular-nums; }
   .kv > span:first-child { color: var(--muted); white-space: nowrap; }
   .kv > span:last-child { text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -571,7 +576,6 @@
     .detailspane .dt-top { position: absolute; top: 6px; right: 6px; z-index: 2; }   /* just the close button in the corner; no title row */
     .detailspane #dbody .dt-head { padding: 10px 14px 8px; } .detailspane #dbody .dt-head .dsc { padding-right: 32px; }
     /* compact column: tighter sections and rows */
-    .detailspane .dt-px { margin-top: 3px; } .detailspane .dt-px b { font-size: 24px; }
     .detailspane .dt-sec { padding: 7px 14px 8px; }
     .detailspane .dt-sec h4 { margin-bottom: 4px; }
     .detailspane .kv { padding: 2px 0; font-size: 13px; }
@@ -583,7 +587,6 @@
     .detailspane #dbody { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }   /* scrolls, no visible bar */
     .detailspane #dbody::-webkit-scrollbar { display: none; }
     .kv { font-size: 13px; padding: 3px 0; }
-    .dt-px b { font-size: 24px; }
     body.chart-hidden .listpane { border-right: 0; }
     .row { height: 36px; font-size: 14px; }
     .addrow { padding: 8px 14px 12px; }
@@ -772,7 +775,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '12.1';  // bump on every push to main
+const APP_VERSION = '12.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1222,7 +1225,7 @@ const QUOTE_FIELDS = ['lp', 'ch', 'chp', 'rtc', 'rch', 'rchp', 'current_session'
   'open_price', 'high_price', 'low_price', 'prev_close_price', 'volume', 'average_volume', 'price_52_week_high', 'price_52_week_low', 'all_time_high',
   'price_percent_change_1_week', 'price_percent_change_52_week', 'market_cap_basic', 'price_earnings_ttm', 'price_earnings_fy', 'earnings_per_share_diluted_ttm',
   'price_sales_current', 'price_book_ratio', 'dividends_yield_current', 'beta_1_year', 'total_revenue', 'net_margin_ttm', 'sector', 'industry', 'country',
-  'price_target_average', 'currency_code'];
+  'price_target_average', 'currency_code', 'business_description', 'web_site_url', 'number_of_employees', 'founded', 'location'];
 const raw = {}, quotes = {};
 let ws = null, wsSubscribed = [], wsRetry = 0, wsTimer = null, wsEverOpen = false, lastPulse = 0, lastData = 0;
 const WS_DIRECT = 'wss://data.tradingview.com/socket.io/websocket?from=chart%2F&type=chart';
@@ -2556,38 +2559,55 @@ function rangeBar(lo, hi, v) {
   const x = Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
   return `<div class="rb"><div class="rbt"><i style="left:${x.toFixed(1)}%"></i></div><div class="rbl"><span>${fmtPrice(lo)}</span><span>${fmtPrice(hi)}</span></div></div>`;
 }
+// Most important first: name → the day's analysis + the earnings take and results → company (what it does) → the
+// numbers (Today, 52 weeks, Valuation: collapsed by default, one line each with a key figure; state.dtOpen, local) → news.
+// No live price here: the row already shows it.
+const DT_SECS = ['today', 'year', 'val'];
+function dtSec(k, title, hint, body) {
+  if (!body) return '';
+  const open = !!state.dtOpen?.[k];
+  return `<div class="dt-sec fold${open ? ' open' : ''}"><h4 data-act="dt-fold" data-k="${k}">${title}${!open && hint ? `<span class="hint">${hint}</span>` : ''}<i class="cv">▸</i></h4>${open ? body : ''}</div>`;
+}
+function aboutHtml(r) {   // TradingView's business description: the first two sentences, the rest behind "more"
+  const d = (r.business_description || '').trim(); if (!d) return '';
+  const parts = d.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g) || [d], short2 = parts.slice(0, 2).join('').trim(), more = d.length > short2.length + 5;
+  const open = more && state.dtOpen?.about;
+  return `<p class="co-about">${esc(open ? d : short2)}${more ? ` <button class="lnk" data-act="dt-fold" data-k="about">${open ? 'less' : 'more'}</button>` : ''}</p>`;
+}
 function detailsHtml(sym) {
   const r = raw[sym], q = quotes[sym];
   if (!r || !q) return '<div class="dt-empty">Waiting for data…</div>';
-  const desc = r.description && r.description.toUpperCase() !== short(sym) ? r.description : '';
-  const ext = !regular && q.ep != null ? `<div class="dt-ext"><i class="ss ${q.ss}"></i>${{ pre: 'Pre-market', post: 'Post-market', night: 'Overnight' }[q.ss] || 'Extended'} ${fmtPrice(q.ep)} ${signed(q.e)}</div>` : '';
-  const ch = r.ch ?? (r.prev_close_price != null ? r.lp - r.prev_close_price : null);
-  let h = `<div class="dt-head">${desc ? `<div class="dsc">${esc(desc)}</div>` : ''}
-    <div class="dt-px"><b>${fmtPrice(r.lp)}</b><span class="${dir(q.c)}">${ch != null ? (ch > 0 ? '+' : '') + fmtPrice(ch) + ' ' : ''}${pct(q.c)}</span><small>${esc(r.currency_code || '')}</small></div>${ext}</div>`;
-  const vol = r.volume != null ? fmtBig(r.volume) + (r.average_volume ? ` <small class="${r.volume >= r.average_volume ? 'up' : ''}">${(r.volume / r.average_volume).toFixed(1)}× avg</small>` : '') : null;
-  const today = rangeBar(r.low_price, r.high_price, r.lp) + kv('Open', fmtPrice(r.open_price)) + kv('Prev close', fmtPrice(r.prev_close_price)) + kv('Volume', vol);
-  h += analysisHtml(sym);   // the day's analysis first, right under the price
-  if (today) h += `<div class="dt-sec"><h4>Today</h4>${today}</div>`;
-  const fromAth = r.all_time_high ? (r.lp - r.all_time_high) / r.all_time_high * 100 : null;
-  const year = rangeBar(r.price_52_week_low, r.price_52_week_high, r.lp) + kv('1 week', signed(r.price_percent_change_1_week)) + kv('52 weeks', signed(r.price_percent_change_52_week))
-    + kv('From all-time high', fromAth != null ? signed(fromAth) : null);
-  if (year) h += `<div class="dt-sec"><h4>52 weeks</h4>${year}</div>`;
-  const pe = r.price_earnings_ttm ?? r.price_earnings_fy;
-  const val = kv('Market cap', fmtBig(r.market_cap_basic)) + kv('P/E', num(pe, 1)) + kv('EPS (TTM)', num(r.earnings_per_share_diluted_ttm))
-    + kv('P/S', num(r.price_sales_current, 1)) + kv('P/B', num(r.price_book_ratio, 1))
-    + kv('Dividend yield', r.dividends_yield_current ? num(r.dividends_yield_current) + '%' : null) + kv('Beta (1Y)', num(r.beta_1_year));
-  if (val) h += `<div class="dt-sec"><h4>Valuation</h4>${val}</div>`;
+  const desc = r.description && r.description.toUpperCase() !== short(sym) ? r.description : short(sym);
+  let h = `<div class="dt-head"><div class="dsc">${esc(desc)}</div></div>`;
+  h += analysisHtml(sym);   // the day's analysis (+ the earnings take) first
+  const er = earnResult(sym), erh = er && earnResultHtml(sym);
+  if (erh) h += `<div class="dt-sec dt-earn"><h4>Last earnings · ${new Date(er.t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</h4>${erh}</div>`;
   const e = r.earnings_release_next_date, days = e ? Math.round((e * 1000 - Date.now()) / 864e5) : null;
   const tgt = r.price_target_average ? fmtPrice(r.price_target_average) + ` <small class="${dir(r.price_target_average - r.lp)}">${pct((r.price_target_average - r.lp) / r.lp * 100)}</small>` : null;
-  const co = kv('Sector', esc(r.sector || '')) + kv('Industry', esc(r.industry || '')) + kv('Country', esc(r.country || ''))
+  const site = r.web_site_url ? r.web_site_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') : '';
+  const co = aboutHtml(r)
+    + kv('Sector', esc(r.sector || '')) + kv('Industry', esc(r.industry || ''))
+    + kv('Based in', esc([r.location, r.country].filter(Boolean).join(', ')))
+    + kv('Founded', r.founded ? String(r.founded) : null) + kv('Employees', r.number_of_employees ? fmtBig(r.number_of_employees) : null)
     + kv('Revenue (TTM)', fmtBig(r.total_revenue)) + kv('Net margin', r.net_margin_ttm != null ? num(r.net_margin_ttm, 1) + '%' : null)
     + kv('Next earnings', days != null && days >= 0 ? new Date(e * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
       + earnTimingIcon(sym)
       + (days <= 7 ? ` <i class="earn${days <= 1 ? ' soon' : ''}">${days === 0 ? 'today' : days + 'd'}</i>` : `, in ${days}d`) : null)   // same tag as the row within a week
-    + kv('Analyst target', tgt);
+    + kv('Analyst target', tgt)
+    + kv('Website', site ? `<a href="${esc(r.web_site_url)}" target="_blank" rel="noopener">${esc(site)}</a>` : null);
   if (co) h += `<div class="dt-sec"><h4>Company</h4>${co}</div>`;
-  const er = earnResult(sym), erh = er && earnResultHtml(sym);
-  if (erh) h += `<div class="dt-sec dt-earn"><h4>Last earnings · ${new Date(er.t * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</h4>${erh}</div>`;
+  const vol = r.volume != null ? fmtBig(r.volume) + (r.average_volume ? ` <small class="${r.volume >= r.average_volume ? 'up' : ''}">${(r.volume / r.average_volume).toFixed(1)}× avg</small>` : '') : null;
+  h += dtSec('today', 'Today', r.volume != null && r.average_volume ? `Vol ${(r.volume / r.average_volume).toFixed(1)}× avg` : '',
+    rangeBar(r.low_price, r.high_price, r.lp) + kv('Open', fmtPrice(r.open_price)) + kv('Prev close', fmtPrice(r.prev_close_price)) + kv('Volume', vol));
+  const fromAth = r.all_time_high ? (r.lp - r.all_time_high) / r.all_time_high * 100 : null;
+  h += dtSec('year', '52 weeks', r.price_percent_change_52_week != null ? signed(r.price_percent_change_52_week) : '',
+    rangeBar(r.price_52_week_low, r.price_52_week_high, r.lp) + kv('1 week', signed(r.price_percent_change_1_week)) + kv('52 weeks', signed(r.price_percent_change_52_week))
+    + kv('From all-time high', fromAth != null ? signed(fromAth) : null));
+  const pe = r.price_earnings_ttm ?? r.price_earnings_fy;
+  h += dtSec('val', 'Valuation', [r.market_cap_basic ? fmtBig(r.market_cap_basic) : '', pe != null ? 'P/E ' + num(pe, 1) : r.price_sales_current != null ? 'P/S ' + num(r.price_sales_current, 1) : ''].filter(Boolean).join(' · '),
+    kv('Market cap', fmtBig(r.market_cap_basic)) + kv('P/E', num(pe, 1)) + kv('EPS (TTM)', num(r.earnings_per_share_diluted_ttm))
+    + kv('P/S', num(r.price_sales_current, 1)) + kv('P/B', num(r.price_book_ratio, 1))
+    + kv('Dividend yield', r.dividends_yield_current ? num(r.dividends_yield_current) + '%' : null) + kv('Beta (1Y)', num(r.beta_1_year)));
   return h + newsHtml(sym);
 }
 // ---- News: TradingView headlines for the symbol (direct on localhost, through the relay elsewhere), cached 2 minutes.
@@ -3119,6 +3139,7 @@ document.addEventListener('click', e => {
     case 'view': setView(el.dataset.view); break;
     case 'search': openSearch(false); break;
     case 'add': openSearch(true); break;
+    case 'dt-fold': state.dtOpen = { ...state.dtOpen, [el.dataset.k]: !state.dtOpen?.[el.dataset.k] }; save(); renderDetails(); break;
     case 'sort': state.sort = state.sort === el.dataset.by ? null : el.dataset.by; save(); render(); break;
     case 'lists': openListManager(); break;
     case 'settings': openSettings(); break;

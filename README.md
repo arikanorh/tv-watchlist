@@ -20,7 +20,7 @@ This file is the map: what the app does, where each piece of data comes from, an
 **Quotes**
 - Live last / change / extended-hours change for every symbol of every list, with session awareness: pre-market, regular, post-market and overnight (Blue Ocean, 20:00–04:00 ET) — the header is tinted by session.
 - Sentiment: each list's average day move (equities only; TR → XU100, crypto → USDT pairs), shown on every list chip and charted over time (Today / 1h / 4h / 24h) with a zero line.
-- Details panel: day range, open, prev close, volume vs average, 52-week range, 1W / 52W / from-ATH moves, valuation, company, next earnings, analyst target.
+- Details panel, most important first: daily analysis (+ earnings analysis), last earnings results, company (what it does, sector, size, next earnings, analyst target), then Today / 52 weeks / Valuation folded to one line each, then news.
 - Browser tab title = symbol, day change and extended change.
 
 **Chart**
