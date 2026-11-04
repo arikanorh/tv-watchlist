@@ -184,7 +184,7 @@
   .chartpane { position: relative; }
   .charea { position: relative; flex: 1; min-height: 0; }
   #tv_chart, #ownChart { position: absolute; inset: 0; }
-  #ownChart { z-index: 2; background: var(--bg); }
+  #ownChart { z-index: 2; background: var(--bg); -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }   /* phones: long press = our menu, not iOS selection */
   .sessbg { position: absolute; left: var(--tb, 0px); top: 0; bottom: 27px; right: 70px; z-index: 1; pointer-events: none; overflow: hidden; }
   .sessbg i { position: absolute; top: 0; bottom: 0; }
   .sessbg i.pre { background: rgba(247, 166, 0, .07); } .sessbg i.post { background: rgba(41, 98, 255, .08); } .sessbg i.night { background: rgba(156, 39, 176, .09); }
@@ -429,6 +429,7 @@
   .sh-foot button { width: 100%; height: 46px; border-radius: 12px; background: var(--bg3); font-weight: 600; }
   .opt { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 0 16px; border-top: 1px solid var(--line); text-align: left; font-size: 16px; flex-shrink: 0; }
   .opt .c { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .opt .ar-b { width: 24px; height: 24px; margin-left: -3px; border-radius: 6px; } .opt .ar-b svg { color: #fff; }   /* kind badge in the chart long-press sheets */
   .opt.on { color: var(--accent); } .opt.danger { color: var(--down); }
   /* search */
   .sres { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -844,7 +845,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '13.9';  // bump on every push to main
+const APP_VERSION = '14.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1543,7 +1544,7 @@ async function showOwnChart(sym) {
       else if (k === 'clear') { own.meas = null; ownMeasure(); }
       else setChartOpt(k, !chartOpts()[k]);
     });
-    initMeasure(el); initRays(el); paintTools();
+    initMeasure(el); initRays(el); initLongPress(el); paintTools();
     el.insertAdjacentHTML('afterbegin', '<div class="sessbg" id="sessbg"></div><button class="ownlogo" data-act="chart-kind" title="Switch to the TradingView chart"><img src="icons/icon-192.png" alt=""></button>');
     // Legend under the ticker panel (TradingView style): one row per study, click toggles it.
     el.insertAdjacentHTML('beforeend', `<div class="legs${state.legsCollapsed ? ' collapsed' : ''}" id="legs"><button class="legt" data-legt title="Collapse / expand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>${LEGS.map(([k, name]) => `<button class="vleg" data-leg="${k}" title="Show / hide ${name}"><span>${name}</span><b></b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>`).join('')}</div>`);
@@ -1554,7 +1555,7 @@ async function showOwnChart(sym) {
     own.sma = SMAS.map(([, , color]) => own.chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
     own.chart.subscribeCrosshairMove(p => { own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); ownCrossLabel(p); });
     el.insertAdjacentHTML('beforeend', '<div class="xlabel" id="xlabel" hidden></div>');
-    el.addEventListener('contextmenu', e => { if (isPhone()) return; e.preventDefault(); const r = e.target.closest('[data-ray]'); if (r) { openRayCtx(r.dataset.ray, e.clientX, e.clientY); return; } const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
+    el.addEventListener('contextmenu', e => { e.preventDefault(); if (isPhone()) return; /* phones: the long press (initLongPress) instead */ const r = e.target.closest('[data-ray]'); if (r) { openRayCtx(r.dataset.ray, e.clientX, e.clientY); return; } const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
     const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
     el.insertAdjacentHTML('beforeend', '<button class="copts" data-act="chart-opts" title="Chart settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>');
     own.chart.timeScale().subscribeVisibleLogicalRangeChange(ownCountdown);
@@ -2034,6 +2035,62 @@ function openRayCtx(id, x, y) {
   const w = m.offsetWidth, h = m.offsetHeight;
   m.style.left = Math.max(4, Math.min(x, innerWidth - w - 4)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - h - 4)) + 'px';
   setTimeout(() => document.addEventListener('pointerdown', closeRowCtxOutside), 0);
+}
+// Phones: a long press on the own chart stands in for the right-click — near a line it opens that line's sheet,
+// elsewhere a sheet that puts an alert / buy / sell point / follow alert / plain line at the pressed price.
+function initLongPress(el) {
+  let timer = 0, x0 = 0, y0 = 0;
+  const cancel = () => { clearTimeout(timer); timer = 0; };
+  el.addEventListener('pointerdown', e => {
+    cancel();
+    if (!isPhone() || e.pointerType === 'mouse' || !own.data?.length || e.target.closest('button, .legs, .cmenu')) return;
+    x0 = e.clientX; y0 = e.clientY;
+    timer = setTimeout(() => { timer = 0; const b = el.getBoundingClientRect(); openChartPress(x0 - b.left, y0 - b.top); }, 500);
+  });
+  el.addEventListener('pointermove', e => { if (timer && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) cancel(); });   // a pan or pinch, not a press
+  for (const t of ['pointerup', 'pointercancel']) el.addEventListener(t, cancel);
+}
+function openChartPress(x, y) {
+  const sym = own.want?.sym, p0 = own.series.coordinateToPrice(y), l = own.chart.timeScale().coordinateToLogical(x - toolW());
+  if (!sym || p0 == null) return;
+  navigator.vibrate?.(10);
+  const near = symRays(sym).map(ln => ({ ln, d: Math.abs((own.series.priceToCoordinate(ln.p) ?? -1e9) - y) })).filter(o => o.d <= 16).sort((a, b) => a.d - b.d)[0];
+  if (near) { openRaySheet(near.ln.id); return; }
+  const p = +p0.toPrecision(6), i = Math.max(0, Math.min(own.data.length - 1, Math.round(l ?? own.data.length - 1)));
+  openSheet('press', `${short(sym)} · ${fmtPrice(p)}`, [['alert', 'Alert'], ['buy', 'Buy point'], ['sell', 'Sell point']].map(([k, t]) => `<button class="opt" data-k="${k}"><span class="ar-b ${k}">${ALERT_TAG[k]}</span>${t} at ${fmtPrice(p)}</button>`).join('')
+    + `<button class="opt" data-k="follow"><span class="ar-b follow">${ALERT_TAG.follow}</span>Follow alert around ${fmtPrice(p)}…</button>`
+    + `<button class="opt" data-k="">${CHART_TOOLS.find(t => t[0] === 'ray')[2]}Line only</button>`
+    + (symRays(sym).some(x => x.k) ? `<button class="opt" data-k="all">${ICON.bell}All alerts of ${esc(short(sym))}…</button>` : ''));
+  $('shBody').onclick = e => {
+    const k = e.target.closest('[data-k]')?.dataset.k; if (k == null) return;
+    if (k === 'follow') { openAlerts(sym, p); return; }
+    if (k === 'all') { openAlerts(sym); return; }
+    closeSheet();
+    const ln = { id: Date.now().toString(36), t: own.data[i].time, p };
+    if (k) { ln.k = k; armRay(sym, ln); askNotify(); }
+    own.raySel = ln.id; setRays(sym, [...symRays(sym), ln]);
+  };
+}
+// The line's right-click menu as a sheet (phones)
+function openRaySheet(id) {
+  const sym = own.want.sym, ln = symRays(sym).find(q => q.id === id); if (!ln) return;
+  own.raySel = id; ownRays();
+  const all = `<button class="opt" data-o="all">${ICON.bell}All alerts of ${esc(short(sym))}…</button>`;
+  if (ln.k === 'follow') {
+    const [lo, hi] = followPair(sym, ln.g);
+    openSheet('ray', `${short(sym)} · Follow ±${fmtStep(ln.s)}${lo && hi ? ` · ${fmtPrice(lo.p)} / ${fmtPrice(hi.p)}` : ''}`, all + `<button class="opt danger" data-o="rm">${ICON.rm}Remove follow alert</button>`);
+  } else {
+    openSheet('ray', `${short(sym)} · ${fmtPrice(ln.p)}`, ALERT_KINDS.map(([k, t]) => `<button class="opt${(ln.k || '') === k ? ' on' : ''}" data-k="${k}">${k ? `<span class="ar-b ${k}">${ALERT_TAG[k]}</span>` : CHART_TOOLS.find(x => x[0] === 'ray')[2]}${t}</button>`).join('')
+      + (ln.k && ln.hit ? `<button class="opt" data-o="rearm">${ICON.bell}Re-arm</button>` : '') + all + `<button class="opt danger" data-o="rm">${ICON.rm}Remove line</button>`);
+  }
+  $('shBody').onclick = e => {
+    const b = e.target.closest('[data-k], [data-o]'); if (!b) return;
+    if (b.dataset.o === 'all') { openAlerts(sym); return; }
+    closeSheet();
+    if (b.dataset.o === 'rm') { removeRay(id); return; }
+    if (b.dataset.k != null) { if (b.dataset.k) ln.k = b.dataset.k; else delete ln.k; askNotify(); }
+    armRay(sym, ln); setRays(sym, [...symRays(sym)]);
+  };
 }
 // ---- Alerts ----
 // A ray can carry a kind: 'alert' (fires once when the price crosses it, then goes passive), 'buy' / 'sell' (a point:
