@@ -845,7 +845,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '14.0';  // bump on every push to main
+const APP_VERSION = '14.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1553,7 +1553,7 @@ async function showOwnChart(sym) {
       const b = e.target.closest('[data-leg]'); if (!b) return; e.stopPropagation(); setChartOpt(b.dataset.leg, !chartOpts()[b.dataset.leg]);
     });
     own.sma = SMAS.map(([, , color]) => own.chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
-    own.chart.subscribeCrosshairMove(p => { own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); ownCrossLabel(p); });
+    own.chart.subscribeCrosshairMove(p => { own.cross = p?.point || null; own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); ownCrossLabel(p); });
     el.insertAdjacentHTML('beforeend', '<div class="xlabel" id="xlabel" hidden></div>');
     el.addEventListener('contextmenu', e => { e.preventDefault(); if (isPhone()) return; /* phones: the long press (initLongPress) instead */ const r = e.target.closest('[data-ray]'); if (r) { openRayCtx(r.dataset.ray, e.clientX, e.clientY); return; } const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
     const cd = document.createElement('div'); cd.className = 'plabel'; cd.id = 'plabel'; cd.hidden = true; cd.innerHTML = '<span class="pr"></span><span class="pc"></span><span class="pt"></span>'; el.appendChild(cd);
@@ -2036,16 +2036,18 @@ function openRayCtx(id, x, y) {
   m.style.left = Math.max(4, Math.min(x, innerWidth - w - 4)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - h - 4)) + 'px';
   setTimeout(() => document.addEventListener('pointerdown', closeRowCtxOutside), 0);
 }
-// Phones: a long press on the own chart stands in for the right-click — near a line it opens that line's sheet,
-// elsewhere a sheet that puts an alert / buy / sell point / follow alert / plain line at the pressed price.
+// Phones: a long press on the own chart stands in for the right-click. The first one is the library's: it brings up the
+// crosshair (tracking mode; drag to place it). A long press while the crosshair is up opens the sheet for the crosshair's
+// price, not the finger's — near a line that line's sheet, elsewhere one that puts an alert / buy / sell point / follow
+// alert / plain line there.
 function initLongPress(el) {
   let timer = 0, x0 = 0, y0 = 0;
   const cancel = () => { clearTimeout(timer); timer = 0; };
   el.addEventListener('pointerdown', e => {
     cancel();
-    if (!isPhone() || e.pointerType === 'mouse' || !own.data?.length || e.target.closest('button, .legs, .cmenu')) return;
+    if (!isPhone() || e.pointerType === 'mouse' || !own.data?.length || !own.cross || e.target.closest('button, .legs, .cmenu')) return;
     x0 = e.clientX; y0 = e.clientY;
-    timer = setTimeout(() => { timer = 0; const b = el.getBoundingClientRect(); openChartPress(x0 - b.left, y0 - b.top); }, 500);
+    timer = setTimeout(() => { timer = 0; const c = own.cross; if (c) openChartPress(c.x + toolW(), c.y); }, 500);
   });
   el.addEventListener('pointermove', e => { if (timer && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) cancel(); });   // a pan or pinch, not a press
   for (const t of ['pointerup', 'pointercancel']) el.addEventListener(t, cancel);
