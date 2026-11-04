@@ -423,6 +423,8 @@
   .sh-title { flex-shrink: 0; padding: 4px 16px 10px; font-size: 13px; font-weight: 600; color: var(--muted); }
   .sh-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
   .sh-foot { flex-shrink: 0; padding: 8px 12px 0; }
+  .sh-x { display: none; position: absolute; top: 4px; right: 6px; width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 10px; color: var(--muted); }
+  .sh-x svg { width: 20px; height: 20px; } .sh-x:active { background: var(--bg3); color: var(--text); }
   .sh-foot button { width: 100%; height: 46px; border-radius: 12px; background: var(--bg3); font-weight: 600; }
   .opt { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 0 16px; border-top: 1px solid var(--line); text-align: left; font-size: 16px; flex-shrink: 0; }
   .opt .c { margin-left: auto; font-size: 12px; color: var(--muted); }
@@ -478,11 +480,12 @@
     .ivbtn svg { width: 15px; height: 15px; color: var(--muted); }
     .cbar .infobtn { order: 3; width: 42px; height: 42px; }
     /* Search opens from the top on phones, so the field stays above the keyboard */
-    .sheet.top { top: calc(var(--safe-t) + 6px); bottom: auto; height: calc(100% - var(--safe-t) - var(--kb, 0px) - 12px); max-height: none; border-radius: 0 0 16px 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); padding-bottom: 8px; }
-    .sheet.top::before { display: none; }
-    .sheet.top .sh-title { padding-top: 12px; }
-    .sheet.top .sform { order: -1; padding: 0 12px 8px; }
-    .sheet.top .sh-foot { display: none; }
+    .sheet.ontop { top: calc(var(--safe-t) + 6px); bottom: auto; height: calc(100% - var(--safe-t) - var(--kb, 0px) - 12px); max-height: none; border-radius: 0 0 16px 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); padding-bottom: 8px; }
+    .sheet.ontop::before { display: none; }
+    .sheet.ontop .sh-title { padding-top: 12px; }
+    .sheet.ontop .sform { order: -1; padding: 0 12px 8px; }
+    .sheet.ontop .sh-foot { display: none; }
+    .sheet.ontop .sh-x { display: flex; }   /* no Close row at the bottom (the keyboard sits there): ✕ in the title row */
   }
   .about a { color: var(--muted); text-decoration: underline; }
   .about { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
@@ -831,6 +834,7 @@
 <div class="scrim" id="scrim" hidden data-act="sheet-close"></div>
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
   <div class="sh-title" id="shTitle"></div>
+  <button class="sh-x" data-act="sheet-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   <div class="sh-body" id="shBody"></div>
   <div class="sh-foot"><button data-act="sheet-close">Close</button></div>
 </div>
@@ -838,7 +842,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '13.5';  // bump on every push to main
+const APP_VERSION = '13.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -3026,7 +3030,7 @@ function moveSymbol(sym, from, to, index) {
 let sheetKind = null;
 function openSheet(kind, title, body) {
   sheetKind = kind;
-  $('sheet').classList.toggle('top', kind === 'search' && isPhone());   // phones: search hangs from the top, clear of the keyboard
+  $('sheet').classList.toggle('ontop', kind === 'search' && isPhone());   // phones: search hangs from the top, clear of the keyboard
   $('shTitle').textContent = title;
   $('shBody').innerHTML = body;
   $('shBody').onclick = $('shBody').onchange = $('shBody').onkeydown = $('shBody').onfocusout = null;
