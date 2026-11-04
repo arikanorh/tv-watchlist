@@ -51,7 +51,8 @@
   body.sess-post .top { background: var(--sess-post); } body.sess-night .top { background: var(--sess-night); }
   .hl, .hs { display: flex; align-items: baseline; gap: 10px; min-width: 0; font-variant-numeric: tabular-nums; }
   .hl b, .hs b { font-size: 17px; font-weight: 700; white-space: nowrap; }
-  .hl .v { font-size: 15px; font-weight: 600; }
+  .hl { flex-direction: column; align-items: flex-start; gap: 0; }   /* list name, its sentiment % under it */
+  .hl b { line-height: 1.2; } .hl .v { font-size: 13px; font-weight: 600; line-height: 1.2; }
   .hs { text-align: left; }
   .hs .px { font-size: 15px; font-weight: 600; white-space: nowrap; }
   .hs .chg { font-size: 13px; white-space: nowrap; }
@@ -842,7 +843,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '13.6';  // bump on every push to main
+const APP_VERSION = '13.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
