@@ -423,6 +423,8 @@
   .setrow b { font-size: 14px; font-weight: 600; }
   .setrow small { font-size: 12px; color: var(--muted); }
   .setrow input { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+  .setrow.snd { cursor: default; } .setrow.snd select { flex: 0 0 auto; width: 128px; height: 34px; } .setrow.snd .ib { width: 30px; height: 30px; font-size: 11px; color: var(--muted); }
+  .setrow.snd [data-snd="1"]:hover { color: var(--up); } .setrow.snd [data-snd="-1"]:hover { color: var(--down); }
   .setrow select { width: auto; flex: none; height: 32px; padding: 0 8px; }
   .tseg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--bg3); flex-shrink: 0; }
   .tseg button { width: 36px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
@@ -789,7 +791,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '12.5';  // bump on every push to main
+const APP_VERSION = '12.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2102,15 +2104,40 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
 // Sound + system notification for a new note (the system one only where the browser allows it).
 let actx = null;
 addEventListener('pointerdown', () => { try { actx ||= new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (_) {} }, true);   // audio unlocks on a gesture
-// dir > 0 (crossed upwards, a beat): rising notes; dir < 0 (crossed downwards, a miss): the same notes falling.
-function chime(dir = 1) {
-  if (!actx) return;
-  const t0 = actx.currentTime, notes = [880, 1175, 1568];
-  (dir < 0 ? notes.reverse() : notes).forEach((f, i) => {
-    const o = actx.createOscillator(), g = actx.createGain(), t = t0 + i * 0.16;
-    o.type = 'sine'; o.frequency.value = f;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
-    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.45);
+// Alert sounds (Settings → Alert sound, state.alertSound, per device). up = notes (Hz) for an upward cross / a beat; the
+// downward one plays `down`, else the same notes reversed. step = seconds between notes, dur = how long each rings.
+const SOUNDS = [
+  { id: 'A', name: 'Chime', up: [880, 1175, 1568], step: .16, dur: .4, voice: 'sine' },
+  { id: 'B', name: 'Don din din', up: [784, 1175, 1175], down: [1175, 784, 784], step: .17, dur: .38, voice: 'tri' },
+  { id: 'C', name: 'Doorbell', up: [1047, 1319], step: .28, dur: .9, voice: 'bell' },
+  { id: 'D', name: 'Arpeggio', up: [1047, 1319, 1568, 2093], step: .085, dur: .3, voice: 'sine' },
+  { id: 'E', name: 'Marimba', up: [659, 784, 988], step: .13, dur: .35, voice: 'marimba' },
+  { id: 'F', name: 'Crystal', up: [1568, 2093], step: .22, dur: 1.4, voice: 'fm' },
+  { id: 'G', name: 'Glide', up: [600, 1400], step: 0, dur: .45, voice: 'glide' },
+  { id: 'H', name: 'Double tick', up: [1760, 1760], down: [440, 440], step: .11, dur: .12, voice: 'sine' },
+];
+function chime(dir = 1, id = state.alertSound || 'A') {
+  const snd = SOUNDS.find(x => x.id === id); if (!actx || !snd) return;   // id 'off' → silent
+  const a = actx, t0 = a.currentTime + .02, P = .22;
+  const env = (g, t, peak, d) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + .015); g.gain.exponentialRampToValueAtTime(0.0001, t + d); };
+  const osc = (type, f, t, d, peak) => { const o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.value = f; env(g, t, peak, d); o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + .05); };
+  const seq = dir > 0 ? snd.up : snd.down || [...snd.up].reverse();
+  if (snd.voice === 'glide') {
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(seq[0], t0); o.frequency.exponentialRampToValueAtTime(seq[1], t0 + snd.dur * .8);
+    env(g, t0, P, snd.dur); o.connect(g).connect(a.destination); o.start(t0); o.stop(t0 + snd.dur + .05); return;
+  }
+  seq.forEach((f, i) => {
+    const t = t0 + i * snd.step, d = snd.dur;
+    if (snd.voice === 'sine') osc('sine', f, t, d, P);
+    else if (snd.voice === 'tri') osc('triangle', f, t, d, P * 1.1);
+    else if (snd.voice === 'bell') { osc('sine', f, t, d, P); osc('sine', f * 2, t, d * .5, P * .18); }
+    else if (snd.voice === 'marimba') { osc('sine', f, t, d, P * 1.2); osc('sine', f * 4, t, d * .25, P * .3); }
+    else if (snd.voice === 'fm') {   // a simple FM bell: the modulator fades with the note
+      const c = a.createOscillator(), m = a.createOscillator(), mg = a.createGain(), g = a.createGain();
+      c.frequency.value = f; m.frequency.value = f * 2.76; mg.gain.setValueAtTime(f * 1.4, t); mg.gain.exponentialRampToValueAtTime(1, t + d);
+      m.connect(mg).connect(c.frequency); env(g, t, P * .8, d); c.connect(g).connect(a.destination); [c, m].forEach(o => { o.start(t); o.stop(t + d + .05); });
+    }
   });
 }
 function askNotify() { try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (_) {} }
@@ -3060,10 +3087,13 @@ function refreshSearch() {
 function openSettings() {
   openSheet('settings', 'Settings', `<div class="sync" id="syncBox"></div>
     <div class="setrow theme"><span><b>Theme</b><small>Colors for the whole app and both charts.</small></span><div class="tseg" data-theme-seg><button data-theme="dark" title="Dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button><button data-theme="light" title="Light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></div></div>
+    <div class="setrow snd"><span><b>Alert sound</b><small>Rising for an upward cross, falling for a downward one.</small></span><select class="field" id="sndSel">${SOUNDS.map(x => `<option value="${x.id}"${(state.alertSound || 'A') === x.id ? ' selected' : ''}>${x.name}</option>`).join('')}<option value="off"${state.alertSound === 'off' ? ' selected' : ''}>Off</option></select><button class="ib" data-snd="1" title="Play upward">▲</button><button class="ib" data-snd="-1" title="Play downward">▼</button></div>
     <label class="setrow"><span><b>Own chart for all symbols</b><small>Draw every chart ourselves (TradingView data, Lightweight Charts) instead of the TradingView widget. Lighter and faster; no drawing tools or indicators.</small></span><input type="checkbox" id="ownAll"${state.ownChart ? ' checked' : ''}></label>
     <div class="about"><span>tv-watchlist v${APP_VERSION} · charts by <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></span><button class="btn link" data-act="reconnect">Reconnect quotes</button></div>`);
   renderSyncBox();
   paintTheme();
+  $('sndSel').addEventListener('change', e => { state.alertSound = e.target.value; save(); chime(1); });
+  $('shBody').addEventListener('click', e => { const b = e.target.closest('[data-snd]'); if (b) chime(+b.dataset.snd, $('sndSel').value); });
   $('ownAll').addEventListener('change', e => {
     state.ownChart = e.target.checked; save();
     if (!state.ownChart && !$('tv_chart').querySelector('iframe')) mountChart();
