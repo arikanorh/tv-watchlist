@@ -281,7 +281,7 @@
   .hrow .ht { flex: 1; min-width: 0; font-size: 13px; } .hrow .ht small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
   .hrow time { flex-shrink: 0; font-size: 11px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   .hfoot { display: flex; justify-content: flex-end; padding-top: 10px; }
-  .alm.fol .fl { flex: 0 0 122px; font-size: 13px; color: var(--muted); white-space: nowrap; } .lm.alm.fol .ast { flex: 1; font-size: 14px; color: var(--text); }
+  .alm.fol .flab { flex: 0 0 122px; font-size: 14px; color: var(--text); white-space: nowrap; padding-left: 4px; } .lmnew.alm .field.st { flex: 0 0 84px; } .lm.alm.fol .ast { flex: 1; font-size: 14px; color: var(--muted); }
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
   /* Notes under the top bar: fired alerts, reached buy / sell points, fresh earnings — until dismissed */
@@ -789,7 +789,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '12.3';  // bump on every push to main
+const APP_VERSION = '12.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2062,23 +2062,24 @@ function alertIcons(sym, only) {   // only: 'buy' / 'sell' — the tag for that 
   return near() + bell + folTag;
 }
 // Alerts of one symbol: a sheet on every device (row menu → Alerts, or the line's menu). Edit type / price, remove, add.
-function openAlerts(sym, around) {   // around: a price to centre a new follow alert on (chart right-click)
+function openAlerts(sym, around) {   // around: a price to centre a new follow alert on (chart right-click → Follow alert…)
   closeRowCtx();
   const status = ln => !ln.k ? '' : ln.hit ? `<span class="ast hit">${ln.k === 'alert' ? 'fired' : 'reached'} ${new Date(ln.hit).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>` : `<span class="ast">${ln.d > 0 ? '↑ above' : '↓ below'}</span>`;
-  const kinds = (sel, attr) => `<select class="field ak" ${attr}>${ALERT_KINDS.map(([k, t]) => `<option value="${k}"${sel === k ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+  const kinds = (sel, attr, fol) => `<select class="field ak" ${attr}>${[...ALERT_KINDS, ...(fol ? [['follow', 'Follow ±']] : [])].map(([k, t]) => `<option value="${k}"${sel === k ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
   const paint = () => {
     const now = livePrice(sym);
-    const groups = [...new Set(symRays(sym).filter(l => l.k === 'follow').map(l => l.g))], c0 = around ?? now;
+    const groups = [...new Set(symRays(sym).filter(l => l.k === 'follow').map(l => l.g))], c0 = around ?? now, fol = around != null;
     $('shBody').innerHTML = `<div class="shint">Last ${now != null ? fmtPrice(now) : '–'}. An alert switches off once the price crosses it; a buy / sell point keeps its icon next to the ticker; a follow alert sits one step below and above and moves with the price each time one is crossed. Lines drawn on the chart show here too.</div>`
-      + groups.map(g => { const [lo, hi] = followPair(sym, g); return `<div class="lm alm fol" data-g="${esc(g)}"><span class="fl">Follow ±${fmtStep(lo.s)}</span><span class="ast">${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}</span><button class="ib del" data-fd title="Remove">✕</button></div>`; }).join('')
+      + groups.map(g => { const [lo, hi] = followPair(sym, g); return `<div class="lm alm fol" data-g="${esc(g)}"><span class="flab">Follow ±${fmtStep(lo.s)}</span><span class="ast">${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}</span><button class="ib del" data-fd title="Remove">✕</button></div>`; }).join('')
       + symRays(sym).filter(ln => ln.k !== 'follow').map(ln => `<div class="lm alm" data-id="${ln.id}">${kinds(ln.k || '', 'data-ak')}<input class="field" data-ap inputmode="decimal" value="${ln.p}">${status(ln)}<button class="ib del" data-ad title="Remove">✕</button></div>`).join('')
-      + `<div class="lmnew alm">${kinds('alert', 'id="anK"')}<input class="field" id="anP" inputmode="decimal" placeholder="Price" value="${now != null ? +now.toPrecision(6) : ''}"><button id="anAdd">Add</button></div>`
-      + `<div class="lmnew alm fol"><span class="fl">Follow ±</span><input class="field" id="afS" inputmode="decimal" placeholder="Step" value="${c0 ? niceStep(c0 * 0.025) : ''}"><input class="field" id="afC" inputmode="decimal" placeholder="Around" value="${c0 != null ? +c0.toPrecision(6) : ''}" title="Centre"><button id="afAdd">Add</button></div>`;
+      // one add row; "Follow ±step" shows a step field and the price becomes the centre
+      + `<div class="lmnew alm">${kinds(fol ? 'follow' : 'alert', 'id="anK"', true)}<input class="field" id="anP" inputmode="decimal" placeholder="${fol ? 'Around' : 'Price'}" value="${c0 != null ? +c0.toPrecision(6) : ''}"><input class="field st" id="anS" inputmode="decimal" placeholder="± step" title="Step" value="${c0 ? niceStep(c0 * 0.025) : ''}"${fol ? '' : ' hidden'}><button id="anAdd">Add</button></div>`;
   };
   openSheet('alerts', `Alerts · ${short(sym)}`, ''); paint();
   const parseP = v => { const x = parseFloat(String(v).replace(',', '.')); return isFinite(x) && x > 0 ? x : null; };
   const body = $('shBody');
   body.onchange = e => {
+    if (e.target.matches('#anK')) { const f = e.target.value === 'follow'; $('anS').hidden = !f; $('anP').placeholder = f ? 'Around' : 'Price'; return; }
     const row = e.target.closest('[data-id]'); if (!row) return;
     const ln = symRays(sym).find(x => x.id === row.dataset.id); if (!ln) return;
     if (e.target.matches('[data-ak]')) { if (e.target.value) ln.k = e.target.value; else delete ln.k; askNotify(); }
@@ -2086,20 +2087,17 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
     armRay(sym, ln); setRays(sym, [...symRays(sym)]); paint();
   };
   body.onclick = e => {
-    if (e.target.closest('#afAdd')) {
-      const st = parseP($('afS').value), c = parseP($('afC').value); if (st == null) { $('afS').focus(); return; } if (c == null) { $('afC').focus(); return; }
-      addFollow(sym, c, st); paint(); return;
-    }
     const fg = e.target.closest('[data-fd]')?.closest('[data-g]'); if (fg) { const ln = followPair(sym, fg.dataset.g)[0]; if (ln) removeRay(ln.id, sym); paint(); return; }
     if (e.target.closest('#anAdd')) {
       const p = parseP($('anP').value); if (p == null) { $('anP').focus(); return; }
+      if ($('anK').value === 'follow') { const st = parseP($('anS').value); if (st == null) { $('anS').focus(); return; } addFollow(sym, p, st); paint(); return; }
       const ln = { id: Date.now().toString(36), t: own.want?.sym === sym && own.data?.length ? own.data[own.data.length - 1].time : nowBarTime(), p };
       const k = $('anK').value; if (k) ln.k = k;
       armRay(sym, ln); setRays(sym, [...symRays(sym), ln]); askNotify(); paint(); return;
     }
     const row = e.target.closest('[data-ad]')?.closest('[data-id]'); if (row) { removeRay(row.dataset.id, sym); paint(); }
   };
-  body.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('#afS, #afC')) $('afAdd').click(); else if (e.key === 'Enter' && e.target.matches('#anP')) $('anAdd').click(); else if (e.key === 'Enter' && e.target.matches('[data-ap]')) e.target.blur(); };
+  body.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('#anP, #anS')) $('anAdd').click(); else if (e.key === 'Enter' && e.target.matches('[data-ap]')) e.target.blur(); };
 }
 // Sound + system notification for a new note (the system one only where the browser allows it).
 let actx = null;
@@ -2188,7 +2186,7 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
     + `<div class="subw"><button class="ci sub">◂ Session<span class="cv">${SESSION_OPTS.find(x => x[0] === o.session)?.[1] || ''}</span></button><div class="submenu">${SESSION_OPTS.map(([v, t]) => `<button class="ci r${o.session === v ? ' on' : ''}" data-cs="${v}"><i></i>${t}</button>`).join('')}</div></div>`; };
   paint();
   m.addEventListener('click', e => {
-    if (e.target.closest('[data-follow-add]')) { const sym = own.want.sym; closeChartMenu(); openAlerts(sym, ray.p); setTimeout(() => $('afS')?.focus(), 50); return; }
+    if (e.target.closest('[data-follow-add]')) { const sym = own.want.sym; closeChartMenu(); openAlerts(sym, ray.p); setTimeout(() => $('anS')?.focus(), 50); return; }
     const ra = e.target.closest('[data-ray-add]');
     if (ra) {   // the item itself: a plain line; its flyout: the same line as a buy / sell point or an alert
       const sym = own.want.sym, ln = { id: Date.now().toString(36), t: own.data[ray.i].time, p: ray.p };
