@@ -46,6 +46,8 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 
 **Themes** — `THEMES` (dark, light; a segmented moon/sun control at the toolbar's right on desktop (the version label stays rightmost), in Settings on phones; `[data-theme-seg]`, `paintTheme`) are variable overrides on `html[data-theme]` (`applyTheme`, `state.theme`, local); session tints, cover and grid are variables too (`--sess-*`, `--cover`, `--grid`). Both charts read the variables: the own chart via `ownTheme()`/`cssVar`, the widget at mount (`theme`, `backgroundColor`, `gridColor`), so a theme change remounts it.
 
+**Symbol history** — back / forward through the symbols the chart showed, like a browser (`symHist` `{back, fwd}`, this tab only, not saved, 50 kept; `symNav(±1)`, `paintSymHist`): every `selectSymbol` that changes the symbol pushes the old one and clears forward (`nav = true` from `symNav` skips that). ‹ › buttons (`#chist`) sit left of the search box — in the chart cover on desktop, at the start of the chart bar on phones (`placeTools` moves them with the search box); disabled when there's nowhere to go, tooltip names the target. Desktop also Alt+← / Alt+→ and the mouse's side buttons (3 / 4, `mouseup`, default prevented).
+
 **PWA / iOS** — `fitStandalone()` drops the bottom dock's home-indicator padding when iOS stops the web view short of the screen (`body.ios-gap`); `unshift()` snaps the document back after keyboard use (otherwise taps land off target); `trackKeyboard()` keeps bottom sheets above the keyboard (`--kb`).
 
 **Tab title** — `renderHeader` sets `document.title` to the chart symbol and its chg%, plus the extended-hours chg% outside regular hours (e.g. `CRWV -15.46% · ext +0.80%`).

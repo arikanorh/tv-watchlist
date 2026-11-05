@@ -381,6 +381,10 @@
   .copts:hover { color: var(--text); background: var(--bg3); }
   .copts svg { width: 15px; height: 15px; }
   .cbar { position: relative; flex-shrink: 0; display: flex; gap: 8px; padding: 8px 10px; background: var(--bg2); }
+  /* back / forward through the symbols the chart showed (symNav) */
+  .chist { flex-shrink: 0; display: flex; gap: 4px; }
+  .chist button { width: 36px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--bg3); color: var(--text); }
+  .chist button:disabled { color: var(--muted); opacity: .4; } .chist svg { width: 18px; height: 18px; }
   .sbtn { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 12px; background: var(--bg3); color: var(--muted); }
   .sbtn svg { width: 18px; height: 18px; flex-shrink: 0; }
   .sbtn .q { display: none; }
@@ -479,6 +483,7 @@
     .ctools .seg, .ctools .tseg-top, .ctools .ltog { display: none; }
     .cbar { display: contents; }
     .cbar .sbtn { order: 1; height: 42px; }
+    .chist { order: 0; } .chist button { height: 42px; }
     .ivbtn { order: 2; display: flex; align-items: center; gap: 4px; height: 42px; padding: 0 10px 0 14px; border-radius: 12px; background: var(--bg3); font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
     .ivbtn svg { width: 15px; height: 15px; color: var(--muted); }
     .cbar .infobtn { order: 3; width: 42px; height: 42px; }
@@ -687,6 +692,7 @@
     .ohlc span b { margin-left: 3px; font-weight: 500; } .ohlc b.up { color: var(--up); } .ohlc b.down { color: var(--down); }
     .cover { position: absolute; left: calc(var(--tb, 0px) + 8px); top: 8px; z-index: 5; display: flex; flex-wrap: wrap; row-gap: 4px; max-width: calc(100% - var(--tb, 0px) - 96px); align-items: center; gap: 6px; padding: 4px; border-radius: 9px; background: var(--cover); backdrop-filter: blur(4px); }
     .cover .sbtn { flex: none; height: 32px; padding: 0 10px; border-radius: 6px; gap: 8px; background: var(--bg3); }
+    .cover .chist { gap: 2px; } .cover .chist button { width: 26px; height: 32px; border-radius: 6px; } .cover .chist button:not(:disabled):hover { background: var(--line); }
     .cover .sbtn:hover { color: var(--text); }
     .cover .seg { display: flex; align-items: stretch; gap: 1px; padding: 0; height: 32px; }
     .mkt, .cinfo { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--muted); }
@@ -815,6 +821,7 @@
     <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="pins" id="pins"></div>
     <div class="cbar">
+      <span class="chist" id="chist"><button data-act="sym-back" id="symBack" disabled aria-label="Previous symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button><button data-act="sym-fwd" id="symFwd" disabled aria-label="Next symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button></span>
       <button class="sbtn" id="sbtn" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="q"><b id="cbSym"></b><span class="q2"><span class="px" id="cbPx"></span><span class="chg" id="cbChg"></span></span></span><span class="ph">Search</span></button>
       <button class="infobtn" data-act="details" aria-label="Details" title="Details"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button>
     </div>
@@ -845,7 +852,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '14.1';  // bump on every push to main
+const APP_VERSION = '14.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -3033,8 +3040,8 @@ function placeTools() {   // the session/tick/toggle block stays in the header (
   if (pins.parentElement !== pdest) pdest.insertBefore(pins, before);
   // desktop: the search box and the interval buttons float over the chart's top-left corner
   const cover = $('cover'), sb = $('sbtn'), seg = $('seg');
-  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend(sb); cover.append(seg, $('ohlc')); } }   // order: search, market dot, details, intervals, OHLC
-  else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend(sb); document.querySelector('.ctools').prepend(seg); } }
+  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend($('chist'), sb); cover.append(seg, $('ohlc')); } }   // order: back / forward, search, market dot, details, intervals, OHLC
+  else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend($('chist'), sb); document.querySelector('.ctools').prepend(seg); } }
   // the list dock: last row of the list pane on desktop (CSS lifts it above the list), the page's bottom bar on phones
   const dock = document.querySelector('.dock'), ddest = isPhone() ? document.body : document.querySelector('.listpane');
   if (dock.parentElement !== ddest) { if (isPhone()) document.querySelector('.main').after(dock); else ddest.append(dock); }
@@ -3052,13 +3059,28 @@ function applyChartHidden() {
   placeTools();
   if (!state.chartHidden && chart.hiddenAtMount && !isPhone()) mountChart();
 }
-function selectSymbol(sym, openChart = true) {
+function selectSymbol(sym, openChart = true, nav = false) {
   if (sym === state.symbol) { if (openChart && isPhone()) setView('chart'); return; }   // same row again: don't reload the chart
-  state.symbol = sym; save();
+  if (!nav && state.symbol) { symHist.back.push(state.symbol); if (symHist.back.length > 50) symHist.back.shift(); symHist.fwd = []; }
+  state.symbol = sym; save(); paintSymHist();
   $('rows').querySelectorAll('.row').forEach(r => r.classList.toggle('on', r.dataset.sym === sym));
   showSymbol(); renderHeader(); renderDetails();
   if (openChart && isPhone()) setView('chart');
 }
+// Back / forward through the symbols the chart showed, like a browser's history (this tab only, not saved): ‹ › beside
+// the search box, Alt+← / Alt+→ and the mouse's side buttons on desktop.
+const symHist = { back: [], fwd: [] };
+function symNav(dir) {
+  const from = dir < 0 ? symHist.back : symHist.fwd, sym = from.pop(); if (!sym) return;
+  (dir < 0 ? symHist.fwd : symHist.back).push(state.symbol);
+  selectSymbol(sym, false, true);
+}
+function paintSymHist() {
+  for (const [id, a, t] of [['symBack', symHist.back, 'Back to'], ['symFwd', symHist.fwd, 'Forward to']]) {
+    const b = $(id), s = a[a.length - 1]; b.disabled = !s; b.title = s ? `${t} ${short(s)}${isPhone() ? '' : ` (Alt+${id === 'symBack' ? '←' : '→'})`}` : '';
+  }
+}
+document.addEventListener('mouseup', e => { if (e.button === 3 || e.button === 4) { e.preventDefault(); symNav(e.button === 3 ? -1 : 1); } });
 
 // ================= List edits =================
 function addSymbol(sym) {
@@ -3118,6 +3140,7 @@ function openIntervalPicker() {
 }
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeDrawer(); closeSheet(); closeChartMenu(); closeMarketPop(); closeRowCtx(); if (own.meas || own.measuring) { own.meas = null; own.measuring = false; paintTools(); ownMeasure(); } if (own.rayTool || own.raySel) { own.rayTool = false; own.raySel = null; paintTools(); ownRays(); } return; }
+  if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.target.closest?.('input, textarea, select, [contenteditable]')) { e.preventDefault(); symNav(e.key === 'ArrowLeft' ? -1 : 1); return; }
   if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   if (own.raySel && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); removeRay(own.raySel); return; }
   if (!isPhone() && /^[1-8]$/.test(e.key) && ($('sheet').hidden || sheetKind === 'interval')) {
@@ -3479,6 +3502,8 @@ document.addEventListener('click', e => {
     case 'lists': openListManager(); break;
     case 'settings': openSettings(); break;
     case 'dock-menu': openDockMenu(); break;
+    case 'sym-back': symNav(-1); break;
+    case 'sym-fwd': symNav(1); break;
     case 'reconnect': refreshQuotes(); break;
     case 'details': toggleDetails(); break;
     case 'hist-range': state.histRange = el.dataset.r; save(); renderSentiment(); break;
