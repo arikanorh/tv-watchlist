@@ -183,6 +183,11 @@
   /* Chart pane */
   .chartpane { position: relative; }
   .charea { position: relative; flex: 1; min-height: 0; }
+  /* full-screen chart (toggleChartFull): the chart area covers the page; the button sits at the plot's bottom-right, mirroring the chart-kind button */
+  body.chart-full .charea { position: fixed; inset: var(--safe-t) 0 var(--safe-b) 0; z-index: 40; background: var(--bg); }
+  .cfull { position: absolute; bottom: 36px; right: calc(var(--axw, 64px) + 10px); z-index: 5; width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    background: var(--cover); color: var(--muted); backdrop-filter: blur(4px); }
+  .cfull:hover { color: var(--text); background: var(--bg3); } .cfull svg { width: 18px; height: 18px; }
   #tv_chart, #ownChart { position: absolute; inset: 0; }
   #ownChart { z-index: 2; background: var(--bg); -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }   /* phones: long press = our menu, not iOS selection */
   .sessbg { position: absolute; left: var(--tb, 0px); top: 0; bottom: 27px; right: 70px; z-index: 1; pointer-events: none; overflow: hidden; }
@@ -815,7 +820,7 @@
     <div id="dbody"></div>
   </aside>
   <section class="pane chartpane" id="chartWrap" aria-label="Chart">
-    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button><button class="cinfo" data-act="details" title="Details panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button><span class="ohlc" id="ohlc" hidden></span></div><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
+    <div class="charea"><div id="tv_chart"></div><div id="ownChart" hidden></div><div class="cover" id="cover"><button class="mkt" id="mkt" data-act="market" title="Market hours"><i></i></button><button class="cinfo" data-act="details" title="Details panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button><span class="ohlc" id="ohlc" hidden></span></div><span class="cload" id="cload" hidden title="Loading bars…"></span><button class="cfull" id="cfull" data-act="chart-full"></button><button class="ownlogo tvsw" id="tvSwitch" data-act="chart-kind" title="Switch to our chart">TV</button></div>
     <div class="ctools">
     <div class="seg" id="seg" role="group" aria-label="Chart interval"></div>
     <button class="ivbtn" id="ivBtn" data-act="interval" title="Interval (or press 1–8)"><span id="ivLbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -852,7 +857,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '14.2';  // bump on every push to main
+const APP_VERSION = '14.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1699,6 +1704,7 @@ function ownCountdown() {
   }
   cd.style.top = (y - 9) + 'px'; cd.style.width = own.chart.priceScale('right').width() + 'px';
   const g = $('ownChart').querySelector('.copts'); if (g) g.style.width = cd.style.width;
+  document.querySelector('.charea').style.setProperty('--axw', cd.style.width);   // the full-screen button keeps clear of the axis
   cd.classList.toggle('up', b.close >= b.open); cd.hidden = false;
   ownSessions(); ownHiLo(); ownVolLegend(); ownMeasure(); ownEarnings(); ownRays();
 }
@@ -3022,6 +3028,20 @@ function renderDetails() {
   if (document.body.classList.contains('details-open')) $('dbody').innerHTML = detailsHtml(state.symbol);
 }
 
+// Full-screen chart: the chart area covers the whole page (body.chart-full, works on iPhone too); where the browser allows
+// it (desktop, Android) the page also enters real full screen, and leaving that (Esc) leaves this mode.
+const FULL_ICON = ['<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>'];
+function toggleChartFull(on = !document.body.classList.contains('chart-full')) {
+  document.body.classList.toggle('chart-full', on);
+  const b = $('cfull'); b.innerHTML = FULL_ICON[+on]; b.title = on ? 'Exit full screen (Esc)' : 'Full screen'; b.setAttribute('aria-label', b.title);
+  const de = document.documentElement;
+  if (on && !document.fullscreenElement && de.requestFullscreen) de.requestFullscreen().catch(() => {});
+  if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  window.dispatchEvent(new Event('resize'));
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('chart-full')) toggleChartFull(false); });
+
 // ================= Views =================
 function setView(v) {
   state.view = v; save();
@@ -3139,7 +3159,7 @@ function openIntervalPicker() {
   $('shBody').onclick = e => { const b = e.target.closest('[data-iv]'); if (b) { setChartInterval(b.dataset.iv); closeSheet(); } };
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeDrawer(); closeSheet(); closeChartMenu(); closeMarketPop(); closeRowCtx(); if (own.meas || own.measuring) { own.meas = null; own.measuring = false; paintTools(); ownMeasure(); } if (own.rayTool || own.raySel) { own.rayTool = false; own.raySel = null; paintTools(); ownRays(); } return; }
+  if (e.key === 'Escape') { if ($('sheet').hidden && !drawer.open && !$('cmenu') && document.body.classList.contains('chart-full')) toggleChartFull(false); closeDrawer(); closeSheet(); closeChartMenu(); closeMarketPop(); closeRowCtx(); if (own.meas || own.measuring) { own.meas = null; own.measuring = false; paintTools(); ownMeasure(); } if (own.rayTool || own.raySel) { own.rayTool = false; own.raySel = null; paintTools(); ownRays(); } return; }
   if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.target.closest?.('input, textarea, select, [contenteditable]')) { e.preventDefault(); symNav(e.key === 'ArrowLeft' ? -1 : 1); return; }
   if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   if (own.raySel && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); removeRay(own.raySel); return; }
@@ -3502,6 +3522,7 @@ document.addEventListener('click', e => {
     case 'lists': openListManager(); break;
     case 'settings': openSettings(); break;
     case 'dock-menu': openDockMenu(); break;
+    case 'chart-full': toggleChartFull(); break;
     case 'sym-back': symNav(-1); break;
     case 'sym-fwd': symNav(1); break;
     case 'reconnect': refreshQuotes(); break;
@@ -3693,7 +3714,7 @@ renderSession();
 setInterval(renderSession, 30000);
 render();
 applyTheme(state.theme);
-applyChartHidden(); applyListHidden();
+applyChartHidden(); applyListHidden(); toggleChartFull(false);
 applyDetails();
 window.addEventListener('resize', () => { if (document.body.classList.contains('details-open') !== (!!state.detailsOpen && !isPhone())) applyDetails(); });
 window.addEventListener('resize', placeTools);
