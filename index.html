@@ -862,7 +862,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '14.9';  // bump on every push to main
+const APP_VERSION = '15.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -978,13 +978,100 @@ function save() {
 // ================= Sync across devices =================
 // The lists (names, groups, symbols, sentiment flag, order) live under a 4-character sync code (12 in v1.3–1.5) in the relay worker's KV
 // (GET/PUT /state/<code>; live updates over the /sync/<code> websocket). Per-device things stay local: active list, symbol, view, interval, collapsed groups.
-// Last edit wins: every local edit stamps state.sync.updatedAt; the worker refuses a PUT older than what it holds (409).
+// Every local edit stamps state.sync.updatedAt and pushes the whole doc with `base` = the stored version this device last
+// saw (`syncBase`, kept in localStorage). If another device wrote since, the worker answers 409 + its copy and this device
+// merges three ways (base / local / remote, `syncMerge`: per list symbol adds and removals, per line, per note…) and
+// pushes the merge — so a device that wakes with an old copy can no longer overwrite other devices' edits.
 var syncTimer = null, syncStatus = { st: 'idle', at: 0, msg: '' }, syncLast = null;
 const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
 const syncShape = lists => lists.filter(l => l.auto !== 'points').map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
   groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols })) }));
-const syncJson = () => JSON.stringify({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null, notifLog: state.notifLog || [] });
+const syncDoc = () => ({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null, notifLog: state.notifLog || [] });
+const syncJson = () => JSON.stringify(syncDoc());
+// ---- three-way merge ----
+const SYNC_BASE_KEY = 'tvwl.syncBase.v1';
+let syncBase = (() => { try { return JSON.parse(localStorage.getItem(SYNC_BASE_KEY)); } catch (_) { return null; } })();   // { code, updatedAt, doc }
+const stableJson = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(y => [y, x[y]])) : x);
+const sameJ = (a, b) => stableJson(a ?? null) === stableJson(b ?? null);
+const docPart = d => ({ lists: d.lists, flags: d.flags || {}, sort: d.sort ?? null, lines: d.lines || {}, seen: d.seen || {}, pins: d.pins ?? null, notifLog: d.notifLog || [] });
+function setSyncBase(doc, updatedAt) { syncBase = { code: state.sync?.code, updatedAt, doc: JSON.parse(JSON.stringify(docPart(doc))) };   /* a copy: state shares arrays with docs and edits them in place */ try { localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(syncBase)); } catch (_) {} }
+const baseOk = () => syncBase && syncBase.code === state.sync?.code;
+const localDirty = () => !baseOk() || !sameJ(syncDoc(), syncBase.doc);
+// one value: whichever side changed it; both → `tie(l, r)`
+const m3 = (b, l, r, tie = (l, r) => l) => sameJ(l, b) ? r : sameJ(r, b) || sameJ(l, r) ? l : tie(l, r);
+// objects key by key (flags, seen, lines per symbol); a key gone on one side and untouched on the other is gone
+function m3obj(b = {}, l = {}, r = {}, tie) {
+  const out = {};
+  for (const k of new Set([...Object.keys(b), ...Object.keys(l), ...Object.keys(r)])) { const v = m3(b[k], l[k], r[k], tie); if (v !== undefined && v !== null) out[k] = v; }
+  return out;
+}
+// arrays of items with an id: added on either side kept, removed on either side dropped, changed on both → tie; order: remote's, local additions after
+function m3ids(b = [], l = [], r = [], id, tie) {
+  const B = new Map(b.map(x => [id(x), x])), L = new Map(l.map(x => [id(x), x])), R = new Map(r.map(x => [id(x), x])), out = [];
+  for (const k of [...R.keys(), ...[...L.keys()].filter(k => !R.has(k))]) {
+    const v = m3(B.get(k), L.get(k), R.get(k), (lx, rx) => !lx || !rx ? lx || rx : tie(lx, rx));   // gone on one side, changed on the other: keep it
+    if (v !== undefined) out.push(v);
+  }
+  return out;
+}
+// a list edited on both sides: symbols added / removed per side; groups by name (remote's layout, local new groups after)
+function mergeList(b, l, r) {
+  if (!b) return l;   // can't tell (same new id on both): keep local
+  const out = { ...r, name: m3(b.name, l.name, r.name), summary: m3(b.summary, l.summary, r.summary) };
+  const syms = x => new Set(x.groups.flatMap(g => g.symbols)), bs = syms(b), ls = syms(l), rs = syms(r);
+  const gone = new Set([...bs].filter(x => !ls.has(x) || !rs.has(x)));
+  const groups = (sameJ(l.groups.map(g => g.name), b.groups.map(g => g.name)) ? r : l).groups.map(g => ({ name: g.name, symbols: [] }));
+  const order = (sameJ(l.groups, b.groups) ? r : l).groups;   // whose arrangement to start from
+  const placed = new Set();
+  const put = (gname, sym, gi) => { if (gone.has(sym) || placed.has(sym)) return; const g = groups.find(x => x.name === gname) || groups[Math.min(gi, groups.length - 1)]; if (g) { g.symbols.push(sym); placed.add(sym); } };
+  order.forEach((g, gi) => g.symbols.forEach(sym => put(g.name, sym, gi)));
+  for (const side of [l, r]) side.groups.forEach((g, gi) => g.symbols.forEach(sym => { if (!bs.has(sym)) put(g.name, sym, gi); }));   // new on either side
+  out.groups = groups;
+  return out;
+}
+function mergeLines(b = {}, l = {}, r = {}, tie) {   // per symbol, then per line id
+  const out = {};
+  for (const sym of new Set([...Object.keys(b), ...Object.keys(l), ...Object.keys(r)])) {
+    const v = m3(b[sym], l[sym], r[sym], (L, R) => m3ids(b[sym] || [], L || [], R || [], x => x.id, tie));
+    if (v && v.length) out[sym] = v;
+  }
+  return out;
+}
+function syncMerge(b, l, r) {
+  const lineTie = (lx, rx) => lx.hit && !rx.hit ? lx : rx;   // a line changed on both: the remote copy, unless only ours fired
+  const notes = new Map();
+  for (const e of [...(r.notifLog || []), ...(l.notifLog || [])]) { const o = notes.get(e.key); notes.set(e.key, o ? { ...o, ...(e.ack || o.ack ? { ack: e.ack || o.ack } : {}) } : e); }
+  const bNotes = new Set((b.notifLog || []).map(e => e.key)), lNotes = new Set((l.notifLog || []).map(e => e.key)), rNotes = new Set((r.notifLog || []).map(e => e.key));
+  for (const k of bNotes) if (!lNotes.has(k) || !rNotes.has(k)) notes.delete(k);   // cleared on one side
+  return {
+    lists: m3(b.lists, l.lists, r.lists, (L, R) => m3ids(b.lists, L, R, x => x.id, (lx, rx) => mergeList(b.lists.find(x => x.id === lx.id), lx, rx))),
+    flags: m3obj(b.flags, l.flags, r.flags),
+    seen: m3obj(b.seen, l.seen, r.seen),
+    sort: m3(b.sort, l.sort, r.sort),
+    pins: m3(b.pins, l.pins, r.pins),
+    lines: mergeLines(b.lines, l.lines, r.lines, lineTie),
+    notifLog: [...notes.values()].sort((a, c) => (c.t || 0) - (a.t || 0)).slice(0, 100),
+  };
+}
+// A copy from the room (websocket, pull or a 409): adopt it, push ours, or merge both and push the merge.
+function syncMergeIn(remote) {
+  if (!remote || !Array.isArray(remote.lists)) return;
+  if (!baseOk()) {   // first contact (new version / new code): the old rule, then remember the base
+    const local = state.sync?.updatedAt || 0;
+    if (remote.updatedAt > local || !localDirtyVs(remote)) syncAdopt(remote); else syncPush(true);
+    return;
+  }
+  if (remote.updatedAt === syncBase.updatedAt) { if (localDirty()) syncPush(); return; }
+  if (!localDirty()) { syncAdopt(remote); return; }
+  const merged = syncMerge(syncBase.doc, syncDoc(), docPart(remote));
+  clog('info', 'sync merged', { base: syncBase.updatedAt, remote: remote.updatedAt });
+  syncAdopt({ ...remote, ...merged }, true, remote);
+  state.sync.updatedAt = Date.now(); syncLast = syncJson();
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
+  if (!sameJ(merged, docPart(remote))) syncPush();
+}
+const localDirtyVs = remote => !sameJ(syncDoc(), docPart(remote));
 const fmtCode = c => c.length === 12 ? c.replace(/(.{4})(?=.)/g, '$1-') : c;   // 12-character codes from v1.3–1.5 read in groups
 function newSyncCode() { const b = crypto.getRandomValues(new Uint8Array(4)); return [...b].map(x => SYNC_ALPHA[x & 31]).join(''); }
 // A free code: one nobody has stored lists under yet.
@@ -1005,16 +1092,33 @@ function syncNoteChange() {
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
   if (state.sync.code) { clearTimeout(syncTimer); syncTimer = setTimeout(syncPush, 500); }
 }
-async function syncPush() {
+// One push at a time (a second one waits for the first, so its base is the version the first produced).
+let syncPushing = null, syncPushAgain = false;
+async function syncPush(force) {
   const code = state.sync?.code; if (!code) return;
+  if (syncPushing) { syncPushAgain = true; return syncPushing; }
   setSyncStatus('busy');
-  try {
-    const r = await fetch(syncApi() + code + '?name=' + encodeURIComponent(SYNC_NAME), { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client-Id': SYNC_CLIENT },   // name in the URL: no new CORS header for older workers
-      body: JSON.stringify({ updatedAt: state.sync.updatedAt || Date.now(), lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null, notifLog: state.notifLog || [] }) });
-    if (r.status === 409) { syncAdopt(await r.json()); return setSyncStatus('ok'); }
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    setSyncStatus('ok');
-  } catch (e) { setSyncStatus('err', 'Couldn\'t reach the sync service. Retrying on the next change.'); }
+  let retry = null;
+  const run = syncPushing = (async () => {
+    try {
+      const doc = JSON.parse(JSON.stringify(syncDoc())), body = { updatedAt: state.sync.updatedAt || Date.now(), ...doc };   // a snapshot: edits during the request stay unsent
+      if (baseOk() && !force) body.base = syncBase.updatedAt;
+      const r = await fetch(syncApi() + code + '?name=' + encodeURIComponent(SYNC_NAME), { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client-Id': SYNC_CLIENT },   // name in the URL: no new CORS header for older workers
+        body: JSON.stringify(body) });
+      if (r.status === 409) { retry = await r.json(); return; }   // merged and pushed again once this one is done
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const at = (await r.json().catch(() => ({}))).updatedAt ?? body.updatedAt;
+      setSyncBase(doc, at);
+      if (!localDirty()) { state.sync.updatedAt = at; try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {} }
+      setSyncStatus('ok');
+    } catch (e) { setSyncStatus('err', 'Couldn\'t reach the sync service. Retrying on the next change.'); }
+    finally {
+      if (syncPushing === run) syncPushing = null;
+      if (retry) { syncPushAgain = false; syncMergeIn(retry); setSyncStatus('ok'); }
+      else if (syncPushAgain) { syncPushAgain = false; if (localDirty()) syncPush(); }
+    }
+  })();
+  return run;
 }
 async function syncPull() {
   const code = state.sync?.code; if (!code || press || document.hidden) return;
@@ -1023,9 +1127,8 @@ async function syncPull() {
     const r = await fetch(syncApi() + code, { cache: 'no-store' });
     if (r.status === 404) return syncPush();
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    const remote = await r.json(), local = state.sync.updatedAt || 0;
-    if (remote.updatedAt > local) syncAdopt(remote);
-    else if (remote.updatedAt < local) return syncPush();
+    syncMergeIn(await r.json());
+    syncFresh = true;
     setSyncStatus('ok');
     return true;
   } catch (e) { setSyncStatus('err', 'Couldn\'t reach the sync service.'); return false; }
@@ -1071,7 +1174,7 @@ function syncConnect() {
     if (m.type === 'peers') { syncPeers = m; renderSyncBox(); }
   };
   w.onclose = () => {
-    clearInterval(w._ping);
+    clearInterval(w._ping); syncFresh = false; syncStaleSince = Date.now();
     if (syncWs !== w) return;
     syncWs = null; syncPeers = null; renderSyncBox();
     if (state.sync?.code && !document.hidden) syncWsTimer = setTimeout(syncConnect, Math.min(30000, 1000 * 2 ** syncWsRetry++));
@@ -1079,13 +1182,14 @@ function syncConnect() {
 }
 function syncReceive(doc) {
   if (press) { setTimeout(() => syncReceive(doc), 800); return; }   // never swap the list under a finger
-  const local = state.sync?.updatedAt || 0;
-  if (doc.updatedAt > local) { syncAdopt(doc); setSyncStatus('ok'); }
-  else if (doc.updatedAt < local) syncPush();
-  else setSyncStatus('ok');
+  syncMergeIn(doc); syncFresh = true; setSyncStatus('ok');
 }
+// Alerts wait for the room's copy after a (re)connect: a device waking with an old copy would fire levels another device
+// already moved. Up to 30 s — without the room they fire anyway.
+var syncFresh = false, syncStaleSince = Date.now();
+const alertsHeld = () => !!state.sync?.code && !syncFresh && Date.now() - syncStaleSince < 30000;
 const syncLive = () => syncWs && syncWs.readyState === 1;
-function syncAdopt(remote, notify = true) {
+function syncAdopt(remote, notify = true, base = remote) {
   if (!remote || !Array.isArray(remote.lists) || !remote.lists.length) return;
   const changes = notify ? syncDiff(syncShape(state.lists), remote.lists) : [];
   const collapsed = new Set(state.lists.flatMap(l => l.groups.filter(g => g.collapsed).map(g => l.id + '|' + g.name)));
@@ -1101,6 +1205,7 @@ function syncAdopt(remote, notify = true) {
   if (Array.isArray(remote.notifLog)) state.notifLog = remote.notifLog;   // notification history
   if (!state.lists.some(l => l.id === state.activeListId)) state.activeListId = state.lists[0].id;
   state.sync.updatedAt = remote.updatedAt;
+  setSyncBase(base, base.updatedAt);
   syncLast = syncJson();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
   if (typeof render === 'function' && document.getElementById('rows')) {
@@ -2265,6 +2370,7 @@ function drawerTick() {
 })();
 // Run on every quote batch: a level whose crossing happened fires (once; a follow pair moves on instead).
 function checkAlerts() {
+  if (alertsHeld()) return;   // not before this device has the room's latest copy
   let fired = 0;
   for (const sym of alertSyms()) for (const ln of state.lines[sym]) {
     if (!ln.k || ln.hit || !ln.d) continue;
@@ -3762,16 +3868,21 @@ navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type ===
 syncPull();
 syncConnect();
 loadAnalysis(); setInterval(() => { if (!document.hidden) loadAnalysis(); }, 30 * 60e3);   // row tone strips + details; the routine refreshes it daily
-document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (!syncLive()) { syncConnect(); syncPull(); } });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { syncFresh = false; return; }   // back from the background: hold alerts until the room's copy is in
+  syncStaleSince = Date.now();
+  if (!syncLive()) syncConnect();
+  syncPull();
+});
 setInterval(() => { if (!document.hidden && !syncLive()) syncPull(); }, 60000);
 
 // Prod: GitHub Pages caches for 10 min and the PWA holds on to old pages; reload when a newer version is live.
 const IS_LAN = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
 const IS_DEV = IS_LOCAL || IS_LAN;
 // Service worker (sw.js): the page, tv.js, the chart library and icons come from its cache at once and refresh in the
-// background. Off on localhost/LAN (live reload) unless ?sw; ?nosw unregisters it.
+// background. Off on localhost/LAN (live reload) unless ?sw — a leftover one is dropped there; ?nosw unregisters it anywhere.
 const SW_CACHE = 'tvw-shell-v1', SW_ON = 'serviceWorker' in navigator && (!IS_DEV || /[?&]sw\b/.test(location.search));
-if ('serviceWorker' in navigator && /[?&]nosw\b/.test(location.search)) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).then(() => caches.delete(SW_CACHE)).catch(() => {});
+if ('serviceWorker' in navigator && (/[?&]nosw\b/.test(location.search) || !SW_ON)) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).then(() => caches.delete(SW_CACHE)).catch(() => {});
 else if (SW_ON) navigator.serviceWorker.register('sw.js').catch(e => clog('warn', 'sw register failed', { e: String(e) }));
 if (!IS_DEV) {
   const check = async () => {

@@ -26,8 +26,9 @@ const json = (body, status, headers) => new Response(JSON.stringify(body), { sta
 // One Durable Object per sync code (`SyncRoom`): it stores that code's lists and holds the websockets of the devices
 // using the code, so a save on one device reaches the others at once.
 //   GET  /state/<code>                → { updatedAt, lists } or 404
-//   PUT  /state/<code> { updatedAt, lists } → stored when not older than what is there (last edit wins), then pushed to
-//        the other connected devices; 409 + the stored copy when older (an old offline edit can't overwrite a newer one).
+//   PUT  /state/<code> { updatedAt, base, lists, … } → stored when `base` is the stored version (else 409 + the stored copy:
+//        the client merges and retries; without `base`, when not older — last edit wins), then pushed to the other
+//        connected devices; answers the stored `updatedAt` (never lower than before).
 //   GET  /sync/<code>?client=<id> (websocket) → { type: 'state', doc } now and after every save from another device.
 // Codes saved before the rooms existed live in KV (`SYNC`); a room copies its code's state from there the first time.
 export class SyncRoom extends DurableObject {
@@ -104,11 +105,15 @@ export class SyncRoom extends DurableObject {
       let body; try { body = JSON.parse(text); } catch (_) { return json({ error: 'bad json' }, 400, cors); }
       if (!body || !Array.isArray(body.lists) || !body.lists.length || typeof body.updatedAt !== 'number') return json({ error: 'bad state' }, 400, cors);
       const cur = await this.doc(code);
-      if (cur && cur.updatedAt > body.updatedAt) return json(cur, 409, cors);
+      // `base` = the stored version the client last saw: someone else wrote since → 409 + the stored copy, and the client
+      // merges both sides' edits and retries. Clients without `base` (before v15.0): last edit wins by time.
+      const hasBase = typeof body.base === 'number';
+      if (cur && (hasBase ? body.base !== cur.updatedAt : cur.updatedAt > body.updatedAt)) return json(cur, 409, cors);
       // Extra fields (flags, and whatever later versions add) ride along; a client that doesn't know a field keeps what's stored.
       const extra = {};
-      for (const src of [cur || {}, body]) for (const [k, v] of Object.entries(src)) if (!['updatedAt', 'lists'].includes(k) && v !== undefined) extra[k] = v;
-      const d = { ...extra, updatedAt: body.updatedAt, lists: body.lists };
+      for (const src of [cur || {}, body]) for (const [k, v] of Object.entries(src)) if (!['updatedAt', 'lists', 'base'].includes(k) && v !== undefined) extra[k] = v;
+      // versions only go up, whatever the device clocks say (clients match on equality)
+      const d = { ...extra, updatedAt: cur ? Math.max(body.updatedAt, cur.updatedAt + 1) : body.updatedAt, lists: body.lists };
       await this.ctx.storage.put('doc', d);
       const from = request.headers.get('X-Client-Id') || '', msg = JSON.stringify({ type: 'state', doc: d });
       for (const ws of this.ctx.getWebSockets()) if (this.ctx.getTags(ws)[0] !== from) { try { ws.send(msg); } catch (_) {} }
