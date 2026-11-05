@@ -869,7 +869,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '15.2';  // bump on every push to main
+const APP_VERSION = '15.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2494,7 +2494,29 @@ function chime(dir = 1, id = defaultSound('alert')) {
     }
   });
 }
-function askNotify() { try { if ('Notification' in window && Notification.permission === 'default') return Notification.requestPermission().then(() => { if ($('ntfRow')) paintNotify(); }); } catch (_) {} }
+function askNotify() { try { if ('Notification' in window && Notification.permission === 'default') return Notification.requestPermission().then(() => { pushSubscribe(); if ($('ntfRow')) paintNotify(); }); } catch (_) {} }
+// Web Push through the relay: with permission, a service worker and a sync code, this device subscribes with the room's
+// VAPID key and registers at POST /push/<code>. The room pushes every new note (fired alert, reached point, follow move,
+// earnings result) to the other devices, and checks the alerts itself while no device is connected — so a closed app or a
+// locked phone still gets them. Re-registered on every start (cheap, keeps the room's copy current).
+let pushState = 'off';   // off | on | err
+const pushApi = () => syncApi().replace(/\/state\/$/, '/push/') + state.sync?.code;
+async function pushSubscribe() {
+  try {
+    if (!state.sync?.code || !('PushManager' in window) || !('Notification' in window) || Notification.permission !== 'granted') return false;
+    const reg = await navigator.serviceWorker?.getRegistration(); if (!reg?.active) return false;
+    const { key } = await (await fetch(pushApi(), { cache: 'no-store' })).json();
+    const raw = Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - key.length % 4) % 4)), c => c.charCodeAt(0));
+    let sub = await reg.pushManager.getSubscription();
+    const same = sub?.options?.applicationServerKey && new Uint8Array(sub.options.applicationServerKey).every((x, i) => x === raw[i]);
+    if (sub && !same) { await sub.unsubscribe(); sub = null; }   // another code's key
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
+    const r = await fetch(pushApi(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client: SYNC_CLIENT, name: SYNC_NAME, sub: sub.toJSON() }) });
+    pushState = r.ok ? 'on' : 'err';
+  } catch (e) { pushState = 'err'; clog('warn', 'push subscribe failed', { e: String(e) }); }
+  if ($('ntfRow')) paintNotify();
+  return pushState === 'on';
+}
 // System notification while the page is hidden (force: the Settings test). Through the service worker when it controls
 // the page — iOS home-screen apps only show them that way (no `new Notification`); a tap focuses the app on the symbol.
 async function sysNotify(title, body, sym, force) {
@@ -2510,7 +2532,7 @@ function paintNotify() {
   const row = $('ntfRow'); if (!row) return;
   const has = 'Notification' in window, perm = has ? Notification.permission : 'none';
   row.querySelector('small').textContent = !has ? (/iPhone|iPad/.test(navigator.userAgent) ? 'On iPhone: Share → Add to Home Screen, then open the app from there.' : 'Not supported in this browser.')
-    : perm === 'granted' ? 'On — alerts notify while the app is open or just in the background.' : perm === 'denied' ? 'Blocked — allow notifications for this app in the system settings.' : 'Off — alerts only ring inside the app.';
+    : perm === 'granted' ? (pushState === 'on' ? 'On — push: alerts arrive even when the app is closed.' : !state.sync?.code ? 'On while the app runs. Turn on sync to get them when it\'s closed too.' : pushState === 'err' ? 'On while the app runs; push couldn\'t be set up (see log).' : 'On — alerts notify while the app is open or just in the background.') : perm === 'denied' ? 'Blocked — allow notifications for this app in the system settings.' : 'Off — alerts only ring inside the app.';
   const b = row.querySelector('button'); b.hidden = !has || perm === 'denied'; b.textContent = perm === 'granted' ? 'Test' : 'Enable';
 }
 // Notes: every fired alert / reached point not yet dismissed, and every fresh earnings result (last 2 days) of a
@@ -3506,8 +3528,14 @@ function openSettings() {
   $('shBody').addEventListener('click', e => { const b = e.target.closest('[data-snd]'); if (b) chime(+b.dataset.snd, b.closest('.setrow').querySelector('select').value); });
   paintNotify();
   $('ntfRow').querySelector('button').addEventListener('click', async () => {
-    if (Notification.permission === 'granted') sysNotify('Test notification', 'Alerts will show like this.', state.symbol, true);
-    else { await Notification.requestPermission(); paintNotify(); }
+    if (Notification.permission !== 'granted') { await Notification.requestPermission(); paintNotify(); if (Notification.permission === 'granted') pushSubscribe(); return; }
+    // the whole push path when subscribed (the relay sends it), else a local one
+    if (pushState === 'on' || await pushSubscribe()) {
+      const r = await fetch(pushApi() + '/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client: SYNC_CLIENT }) }).catch(() => null);
+      if (r?.ok) return toast('Test push sent');
+      clog('warn', 'push test failed', { status: r?.status }); toast('Push failed — showing a local one');
+    }
+    sysNotify('Test notification', 'Alerts will show like this.', state.symbol, true);
   });
   $('ownAll').addEventListener('change', e => {
     state.ownChart = e.target.checked; save();
@@ -3615,11 +3643,11 @@ async function useSyncCode(code) {
     state.sync = { ...(state.sync || {}), code, lastCode: code, updatedAt: state.sync?.updatedAt || Date.now() }; save();
     await syncPush();
     if (syncStatus.st === 'err') { state.sync.code = null; save(); return false; }
-    syncConnect(); return true;
+    syncConnect(); pushSubscribe(); return true;
   }
   if (!r.ok) { setSyncStatus(r.status === 400 ? 'bad' : 'err', r.status === 400 ? 'The sync service doesn\'t accept that code. Use 4–12 letters or digits.' : 'Couldn\'t reach the sync service.'); return false; }
   state.sync = { ...(state.sync || {}), code, lastCode: code }; save();
-  syncAdopt(await r.json(), false); setSyncStatus('ok'); syncConnect();
+  syncAdopt(await r.json(), false); setSyncStatus('ok'); syncConnect(); pushSubscribe();
   toast(`Lists loaded from code ${fmtCode(code)}`); return true;
 }
 var pendingSyncCode = null, syncSuggest = null;
@@ -3899,7 +3927,7 @@ const IS_DEV = IS_LOCAL || IS_LAN;
 // background. Off on localhost/LAN (live reload) unless ?sw — a leftover one is dropped there; ?nosw unregisters it anywhere.
 const SW_CACHE = 'tvw-shell-v1', SW_ON = 'serviceWorker' in navigator && (!IS_DEV || /[?&]sw\b/.test(location.search));
 if ('serviceWorker' in navigator && (/[?&]nosw\b/.test(location.search) || !SW_ON)) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).then(() => caches.delete(SW_CACHE)).catch(() => {});
-else if (SW_ON) navigator.serviceWorker.register('sw.js').catch(e => clog('warn', 'sw register failed', { e: String(e) }));
+else if (SW_ON) navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => pushSubscribe()).catch(e => clog('warn', 'sw register failed', { e: String(e) }));
 if (!IS_DEV) {
   const check = async () => {
     try {

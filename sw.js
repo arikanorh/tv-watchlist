@@ -44,3 +44,10 @@ self.addEventListener('notificationclick', e => {
     await self.clients.openWindow(ROOT + (sym ? '#sym=' + encodeURIComponent(sym) : ''));
   })());
 });
+
+// A push from the relay (sync room): a fired alert / reached point / follow move / earnings note from another device or
+// from the room's own check. Always shown (iOS revokes push for silent ones).
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: e.data?.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'tv-watchlist', { body: d.body || '', icon: ROOT + 'icons/icon-192.png', tag: d.tag, data: { sym: d.sym } }));
+});

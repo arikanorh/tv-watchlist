@@ -23,3 +23,11 @@ Then set `RELAY_WS` in `index.html` to `wss://tv-watchlist-relay.<subdomain>.wor
 Add any new page origin to `ALLOWED_ORIGINS` in `worker.js`.
 
 - `GET /analysis/<code>` → `{ [sym]: { t, tone: 'pos'|'neg'|'neu', text, earn? } }`; `PUT /analysis/<code>` `{ items: { [sym]: { tone, text, earn? } }, drop?: [sym] }` merges (allowed Origin only). `earn` = `{ rt, tone, text }`, the analysis of the latest earnings report (`rt` = report time, unix s; text ≤ 800 chars): kept when an item comes without it, replaced when given, removed with `earn: null`. Stored in the code's SyncRoom; written daily by the cloud routine.
+
+## Web Push
+
+`GET /push/<code>` → `{ key }` (the room's VAPID public key, generated on first use and kept in the room), `POST /push/<code>`
+`{ client, name, sub }` registers a device's PushSubscription, `DELETE /push/<code>?client=` drops it, `POST /push/<code>/test`
+`{ client }` sends that device a test push. Every note that is new in an accepted PUT is pushed to the other subscribed devices.
+While no device is connected, a 20 s alarm checks the room's alerts against TradingView's scanner and pushes what fires.
+No secrets needed (keys live in Durable Object storage); encryption is RFC 8291 aes128gcm, auth RFC 8292 VAPID.

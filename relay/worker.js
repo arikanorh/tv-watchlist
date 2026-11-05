@@ -23,6 +23,92 @@ const SYNC_CODE = /^[A-Z0-9]{4,12}$/;
 const MAX_STATE = 100 * 1024;
 const json = (body, status, headers) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
+// ---- Web Push (RFC 8030 / 8291 aes128gcm / 8292 VAPID), WebCrypto only ----
+const enc = s => new TextEncoder().encode(s);
+const cat = (...a) => { const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let i = 0; for (const x of a) { o.set(x, i); i += x.length; } return o; };
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
+const VAPID_SUB = 'https://arikanorh.github.io/tv-watchlist/';
+async function hkdf(salt, ikm, info, len) {
+  const k = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, k, len * 8));
+}
+async function pushEncrypt(sub, text) {   // one aes128gcm record
+  const ua = unb64u(sub.keys.p256dh), auth = unb64u(sub.keys.auth);
+  const as = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', as.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', ua, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const ecdh = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, as.privateKey, 256));
+  const ikm = await hkdf(auth, ecdh, cat(enc('WebPush: info\0'), ua, asPub), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, enc('Content-Encoding: aes128gcm\0'), 16), nonce = await hkdf(salt, ikm, enc('Content-Encoding: nonce\0'), 12);
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, cat(enc(text), new Uint8Array([2]))));
+  const rs = new Uint8Array(4); new DataView(rs.buffer).setUint32(0, 4096);
+  return cat(salt, rs, new Uint8Array([asPub.length]), asPub, ct);
+}
+async function webPush(sub, text, vapid) {
+  const now = Math.floor(Date.now() / 1000);
+  const jwt = b64u(enc(JSON.stringify({ typ: 'JWT', alg: 'ES256' }))) + '.' + b64u(enc(JSON.stringify({ aud: new URL(sub.endpoint).origin, exp: now + 12 * 3600, sub: VAPID_SUB })));
+  const key = await crypto.subtle.importKey('jwk', vapid.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const sig = b64u(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc(jwt)));
+  return fetch(sub.endpoint, { method: 'POST', body: await pushEncrypt(sub, text),
+    headers: { Authorization: `vapid t=${jwt}.${sig}, k=${vapid.pub}`, 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '3600', Urgency: 'high' } });
+}
+
+// ---- Server-side alert check (the client's checkAlerts / followFire, for when no device is connected) ----
+const CHECK_MS = 20000, LIVE_MS = 100000;
+const US_EX = new Set(['NASDAQ', 'NYSE', 'AMEX', 'NYSEARCA', 'ARCA', 'BATS']);
+const NF2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtPrice = p => { const a = Math.abs(p); return a >= 1e12 ? (p / 1e12).toFixed(2) + 'T' : a >= 1e9 ? (p / 1e9).toFixed(2) + 'B' : a >= 1 || a === 0 ? NF2.format(p) : p.toFixed(Math.min(10, 3 - Math.floor(Math.log10(a)))); };
+const fmtStep = v => String(+(+v).toPrecision(6));
+const short = sym => sym.includes(':') ? sym.split(':')[1] : sym;
+function usPhase() {   // like the client's sessionPhase: closed / night / pre / open / post (New York time)
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  const m = +p.hour * 60 + +p.minute, wd = p.weekday;
+  if (wd === 'Sat' || (wd === 'Sun' && m < 1200) || (wd === 'Fri' && m >= 1200)) return 'closed';
+  return m < 240 || m >= 1200 ? 'night' : m < 570 ? 'pre' : m < 960 ? 'open' : 'post';
+}
+// Prices from TradingView's scanner (US stocks there are 15 min delayed; VIX, crypto, FX, yields are live). US stocks use
+// the pre / post-market price outside regular hours and are skipped overnight / at the weekend (the client uses BOATS then).
+async function scanPrices(syms) {
+  const cols = ['close', 'premarket_close', 'postmarket_close'];
+  const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify({ symbols: { tickers: syms }, columns: cols }) });
+  if (!r.ok) return null;
+  const ph = usPhase(), out = {};
+  for (const row of (await r.json()).data || []) {
+    const [close, pre, post] = row.d, us = US_EX.has(row.s.split(':')[0]);
+    const p = !us ? close : ph === 'open' ? close : ph === 'pre' ? pre ?? close : ph === 'post' ? post ?? close : null;
+    if (typeof p === 'number') out[row.s] = p;
+  }
+  return out;
+}
+function checkLines(doc, prices) {   // mutates doc: hits, follow moves, notifLog entries (same keys as the client's)
+  const now = Date.now(), log = doc.notifLog = Array.isArray(doc.notifLog) ? doc.notifLog : [];
+  const note = e => { if (!log.some(x => x.key === e.key)) log.unshift(e); };
+  let fired = 0;
+  for (const [sym, lines] of Object.entries(doc.lines || {})) {
+    const p = prices[sym]; if (p == null || !Array.isArray(lines)) continue;
+    for (const ln of lines) {
+      if (!ln.k || ln.hit || !ln.d || !(ln.d > 0 ? p >= ln.p : p <= ln.p)) continue;
+      fired++;
+      if (ln.k === 'follow') {
+        const s = ln.s, lvl = ln.p, up0 = ln.d > 0; let c = lvl;
+        if (up0) while (p >= c + s) c += s; else while (p <= c - s) c -= s;
+        for (const x of lines.filter(x => x.k === 'follow' && x.g === ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; }
+        note({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir: up0 ? 1 : -1, ...(ln.snd ? { snd: ln.snd } : {}),
+          msg: `Follow ±${fmtStep(s)}: crossed ${up0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(p)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
+      } else {
+        ln.hit = now; ln.at = p;
+        const what = ln.k === 'buy' ? 'Buy point reached' : ln.k === 'sell' ? 'Sell point reached' : `Alert: crossed ${ln.d > 0 ? 'above' : 'below'}`;
+        note({ key: 'l:' + sym + ':' + ln.id, t: now, sym, kind: ln.k, msg: `${what} ${fmtPrice(ln.p)}`, sub: `at ${fmtPrice(p)}` });
+      }
+    }
+  }
+  if (log.length > 100) log.length = 100;
+  return fired;
+}
+
 // One Durable Object per sync code (`SyncRoom`): it stores that code's lists and holds the websockets of the devices
 // using the code, so a save on one device reaches the others at once.
 //   GET  /state/<code>                → { updatedAt, lists } or 404
@@ -85,10 +171,36 @@ export class SyncRoom extends DurableObject {
       }
       return json(a, 200, cors);
     }
+    // Web Push for this code: GET → { key } (the room's VAPID public key), POST { client, name, sub } subscribes a device,
+    // DELETE ?client= drops it, POST …/test { client } sends that device a test push.
+    if (url.pathname.startsWith('/push/')) {
+      if (request.method === 'GET') return json({ key: (await this.vapid()).pub }, 200, cors);
+      if (request.method === 'DELETE') {
+        const subs = (await this.ctx.storage.get('subs')) || {}; delete subs[url.searchParams.get('client') || ''];
+        await this.ctx.storage.put('subs', subs); return json({ ok: true }, 200, cors);
+      }
+      if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
+      let body; try { body = JSON.parse(await request.text()); } catch (_) { return json({ error: 'bad json' }, 400, cors); }
+      const id = String(body?.client || '').slice(0, 40); if (!id) return json({ error: 'no client' }, 400, cors);
+      const subs = (await this.ctx.storage.get('subs')) || {};
+      if (url.pathname.endsWith('/test')) {
+        if (!subs[id]) return json({ error: 'not subscribed' }, 404, cors);
+        const r = await webPush(subs[id].sub, JSON.stringify({ title: 'Test notification', body: 'Push from the relay works.', tag: 'test' }), await this.vapid());
+        if (r.status === 404 || r.status === 410) { delete subs[id]; await this.ctx.storage.put('subs', subs); }
+        return json({ ok: r.ok, status: r.status }, r.ok ? 200 : 502, cors);
+      }
+      const sub = body.sub;
+      if (!sub || !/^https:\/\//.test(sub.endpoint || '') || !sub.keys?.p256dh || !sub.keys?.auth) return json({ error: 'bad subscription' }, 400, cors);
+      subs[id] = { sub: { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } }, name: String(body.name || '').slice(0, 40), at: Date.now() };
+      await this.ctx.storage.put('subs', subs);
+      await this.ensureAlarm();
+      return json({ ok: true }, 200, cors);
+    }
     if (request.headers.get('Upgrade') === 'websocket') {
       const [client, server] = Object.values(new WebSocketPair());
       const id = (url.searchParams.get('client') || '').slice(0, 40);
       this.ctx.acceptWebSocket(server, [id]);
+      server.serializeAttachment({ at: Date.now() });   // liveness: connect time, then the auto ping/pong time
       const d = await this.doc(code);
       if (d) server.send(JSON.stringify({ type: 'state', doc: d }));
       await this.touch(id, url.searchParams.get('name'));
@@ -118,15 +230,67 @@ export class SyncRoom extends DurableObject {
       const from = request.headers.get('X-Client-Id') || '', msg = JSON.stringify({ type: 'state', doc: d });
       for (const ws of this.ctx.getWebSockets()) if (this.ctx.getTags(ws)[0] !== from) { try { ws.send(msg); } catch (_) {} }
       await this.touch(from, url.searchParams.get('name') || request.headers.get('X-Client-Name'));
+      const sent = this.notify(cur, d, from).catch(() => {});   // new notes → push to the other devices
+      if (this.ctx.waitUntil) this.ctx.waitUntil(sent); else await sent;
+      await this.ensureAlarm();
       return json({ updatedAt: d.updatedAt }, 200, cors);
     }
     return json({ error: 'method' }, 405, cors);
+  }
+  async vapid() {   // this room's VAPID key pair, made on first use
+    let v = await this.ctx.storage.get('vapid'); if (v) return v;
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    v = { pub: b64u(await crypto.subtle.exportKey('raw', kp.publicKey)), jwk: await crypto.subtle.exportKey('jwk', kp.privateKey) };
+    await this.ctx.storage.put('vapid', v); return v;
+  }
+  // Notes that are new in this version of the doc (fired alerts, reached points, follow moves, earnings results — written by
+  // a device or by the check below) go to every subscribed device except the one that wrote them (it notified itself).
+  async notify(prev, d, from) {
+    const subs = (await this.ctx.storage.get('subs')) || {}, ids = Object.keys(subs).filter(id => id !== from); if (!ids.length) return;
+    const old = new Set((prev?.notifLog || []).map(e => e.key)), now = Date.now();
+    const fresh = (d.notifLog || []).filter(e => e && e.key && e.sym && !old.has(e.key) && now - (e.t || 0) < 12 * 36e5).slice(0, 5).reverse();
+    if (!fresh.length) return;
+    const vapid = await this.vapid(); let gone = false;
+    for (const e of fresh) {
+      const text = JSON.stringify({ title: `${short(e.sym)} · ${e.msg}`, body: e.sub || '', sym: e.sym, tag: e.key });
+      for (const id of ids) {
+        try { const r = await webPush(subs[id].sub, text, vapid); if (r.status === 404 || r.status === 410) { delete subs[id]; gone = true; } } catch (_) {}
+      }
+    }
+    if (gone) await this.ctx.storage.put('subs', subs);
+  }
+  // Devices that are really there: connected and answering the 30 s keep-alive (a frozen iPhone app keeps its socket open).
+  liveSockets() {
+    const cut = Date.now() - LIVE_MS;
+    return this.ctx.getWebSockets().filter(ws => ws.readyState === 1 && Math.max(this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() || 0, ws.deserializeAttachment()?.at || 0) > cut);
+  }
+  async ensureAlarm() {
+    const subs = await this.ctx.storage.get('subs'); if (!subs || !Object.keys(subs).length) return;
+    if (!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + CHECK_MS);
+  }
+  // Every 20 s while a device is subscribed and something is armed: with no live device, check the alerts here and push.
+  async alarm() {
+    const subs = (await this.ctx.storage.get('subs')) || {}; if (!Object.keys(subs).length) return;
+    const d0 = await this.ctx.storage.get('doc'), lines = d0?.lines || {};
+    const syms = Object.keys(lines).filter(s => Array.isArray(lines[s]) && lines[s].some(l => l.k && !l.hit && l.d)); if (!syms.length) return;
+    await this.ctx.storage.setAlarm(Date.now() + CHECK_MS);
+    if (this.liveSockets().length) return;   // a device is watching with live quotes; it fires and its notes push from the PUT
+    let prices; try { prices = await scanPrices(syms); } catch (_) { return; } if (!prices) return;
+    const d = await this.ctx.storage.get('doc'); if (!d) return;   // re-read: a PUT may have landed during the fetch
+    const next = structuredClone(d);
+    if (!checkLines(next, prices)) return;
+    next.updatedAt = Math.max(Date.now(), d.updatedAt + 1);
+    await this.ctx.storage.put('doc', next);
+    const msg = JSON.stringify({ type: 'state', doc: next });
+    for (const ws of this.ctx.getWebSockets()) { try { ws.send(msg); } catch (_) {} }
+    await this.notify(d, next, '');
   }
   async webSocketMessage(ws, msg) { if (msg === 'peers') await this.peers(); }   // a client asking who is here (ping/pong is automatic)
   async webSocketClose(ws, code) {
     try { ws.close(code === 1005 ? 1000 : code); } catch (_) {}
     await this.touch(this.ctx.getTags(ws)[0], null, false);
     await this.peers(ws);
+    await this.ensureAlarm();
   }
   // Devices seen on this code: client id → { name, seen }, kept 90 days. Every client learns who is live and who was here.
   async touch(id, name, create = true) {
@@ -161,6 +325,13 @@ export default {
     if (url.pathname.startsWith('/state/')) {
       if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
       const cors = { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-Client-Id, X-Client-Name' };
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+      return toRoom(request, env, url.pathname.split('/')[2] || '', cors);
+    }
+
+    if (url.pathname.startsWith('/push/')) {
+      if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
+      const cors = { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
       return toRoom(request, env, url.pathname.split('/')[2] || '', cors);
     }
