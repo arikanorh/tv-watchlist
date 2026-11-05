@@ -400,6 +400,13 @@
   /* Interval: segmented control. Phones: under the chart (thumb side). Desktop: on top of the chart. */
   .ctools { order: 2; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg2); border-top: 1px solid var(--line); }
   .ivbtn, .tver, .ltab, .tseg-top, .cover, .histbtn { display: none; }   /* desktop-only chrome */
+  @media (max-width: 767.98px) {   /* phones: the cover keeps only the OHLC readout, top-left over the plot */
+    .cover:has(.ohlc:not([hidden])) { display: flex; position: absolute; left: 6px; top: 6px; z-index: 5; max-width: calc(100% - var(--axw, 64px) - 12px); padding: 3px 7px; border-radius: 7px; background: var(--cover); backdrop-filter: blur(4px); pointer-events: none; }
+    .cover .mkt, .cover .cinfo { display: none; }
+    .ohlc { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 7px; font-size: 11px; line-height: 15px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ohlc[hidden] { display: none; }
+    .ohlc span b { margin-left: 2px; font-weight: 500; } .ohlc b.up { color: var(--up); } .ohlc b.down { color: var(--down); }
+  }
   /* Pinned symbols on phones: inside the header, one line between the list name and the clock (scrolls if tight) */
   .pins { flex: 1; min-width: 0; display: flex; justify-content: flex-start; gap: 0; overflow-x: auto; scrollbar-width: none; margin: 0 2px; }
   .pins::-webkit-scrollbar { display: none; }
@@ -862,7 +869,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '15.1';  // bump on every push to main
+const APP_VERSION = '15.2';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
