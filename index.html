@@ -857,7 +857,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '14.3';  // bump on every push to main
+const APP_VERSION = '14.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -952,6 +952,8 @@ function load() {
         s.lists.filter(l => l.id === 'abd').forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.filter(x => !drop.has(x)); }));
         s.migrated.push('abd-index-trim');
       }
+      // Phones on our chart: alert lines, long press and follow alerts exist only there (the widget is an iframe).
+      if (!s.migrated.includes('phone-own-chart')) { if (innerWidth < 768) s.ownChart = true; s.migrated.push('phone-own-chart'); }
       // Leftovers from the previous design (pinned tape, details panel, history chart, edit mode).
       for (const k of ['pinned', 'hudHidden', 'histRange', 'panelWidth', 'mview']) delete s[k];
       if (!['list', 'chart'].includes(s.view)) s.view = 'list';
@@ -960,7 +962,7 @@ function load() {
       return s;
     }
   } catch (_) {}
-  const s = seed(); s.flags = {}; ensureEarnings(s); ensurePoints(s); return s;
+  const s = seed(); s.flags = {}; s.ownChart = innerWidth < 768; s.migrated = ['phone-own-chart']; ensureEarnings(s); ensurePoints(s); return s;
 }
 let state = load();
 function save() {
@@ -1961,13 +1963,14 @@ function ownRays() {
     if ((n.dataset.k || '') !== (ln.k || '')) n.dataset.k = ln.k || '';
     n.classList.toggle('done', ln.k === 'alert' && !!ln.hit);
     n.classList.toggle('moved', (rayFlash.get(ln.id) || 0) > Date.now());
-    const y = own.series.priceToCoordinate(ln.p), x0 = ts.logicalToCoordinate(rayIndex(ln.t)), x = Math.max(0, x0 ?? 0);
+    // an alert / point / follow line that starts right of the view (scrolled back) keeps a stub + its axis tag at the right edge
+    const y = own.series.priceToCoordinate(ln.p), x0 = ts.logicalToCoordinate(rayIndex(ln.t)), x = Math.max(0, ln.k && x0 >= pw ? pw - 24 : x0 ?? 0);
     n.hidden = y == null || x0 == null || x >= pw || y < 0 || y > ph; if (n.hidden) continue;
     Object.assign(n.style, { left: x + 'px', top: y + 'px', width: pw - x + 'px' });
     const tag = ALERT_TAG[ln.k] || '', b = n.querySelector('b'), txt = fmtPrice(ln.p) + (tag ? `<em>${tag}</em>` : ''); if (b.dataset.h !== txt) { b.dataset.h = txt; b.innerHTML = txt; }
     n.style.setProperty('--aw', aw + 'px'); b.style.minWidth = aw + 'px';
     const u = n.querySelector('u') || n.insertBefore(document.createElement('u'), b); if (u.dataset.h !== tag) { u.dataset.h = tag; u.innerHTML = tag; }
-    n.querySelector('i').hidden = x0 < 0;   // the start handle only when the start is on screen
+    n.querySelector('i').hidden = x !== x0;   // the start handle only when the start is on screen
     n.classList.toggle('sel', own.raySel === ln.id);
   }
   for (const n of [...box.children]) if (!seen.has(n)) n.remove();
