@@ -862,7 +862,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '15.0';  // bump on every push to main
+const APP_VERSION = '15.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2084,6 +2084,15 @@ function ownRays() {
     n.classList.toggle('sel', own.raySel === ln.id);
   }
   for (const n of [...box.children]) if (!seen.has(n)) n.remove();
+  // Axis tags never cover each other or the last-price label: that label stays put, tags above it are pushed up and tags
+  // below it down, each clear of the one before. Only the tag moves; its line stays at the real price.
+  const H = 15, cd = $('plabel'), tags = [...box.children].filter(n => !n.hidden).map(n => ({ b: n.querySelector('b'), y: parseFloat(n.style.top) - 7 }));   // tag top: line y, -5 margin, -2 offset
+  const fix = cd && !cd.hidden ? { top: parseFloat(cd.style.top), bot: parseFloat(cd.style.top) + cd.offsetHeight } : null, mid = fix ? fix.top + 9 : Infinity;   // the price itself (the label's first row), not the label's middle
+  let lim = fix ? fix.top - 1 : Infinity;
+  for (const t of tags.filter(t => t.y + H / 2 < mid).sort((a, c) => c.y - a.y)) { t.at = Math.min(t.y, lim - H); lim = t.at - 1; }
+  lim = fix ? fix.bot + 1 : -Infinity;
+  for (const t of tags.filter(t => t.y + H / 2 >= mid).sort((a, c) => a.y - c.y)) { t.at = Math.max(t.y, lim); lim = t.at + H + 1; }
+  for (const t of tags) { const d = Math.round(t.at - t.y), v = d ? `translateY(${d}px)` : ''; if (t.b.style.transform !== v) t.b.style.transform = v; }
 }
 function removeRay(id, sym = own.want?.sym) {
   const list = symRays(sym), ln = list.find(x => x.id === id); if (!ln) return;
