@@ -10,6 +10,7 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 |---|---|
 | `README.md` | Feature overview, the five TradingView data channels with "if it breaks" notes, tricks worth knowing. Keep it current when a channel or trick changes. |
 | `index.html` | The whole app: CSS, markup, JS (~2100 lines). Only deliverable. |
+| `sw.js` | Service worker: instant start from cache (see Versioning). |
 | `manifest.webmanifest`, `icons/` | PWA (iOS home screen, standalone) and favicons (`icon-32`, `icon-192`). `background_color` = dock color. |
 | `relay/worker.js` | Cloudflare Worker: relays the TradingView quote websocket for non-localhost origins, proxies `/search`, keeps synced lists in a `SyncRoom` Durable Object per code (`/state/<code>` REST, `/sync/<code>` websocket push; legacy KV `tv-watchlist-sync` is read once). |
 | `relay/wrangler.toml`, `relay/README.md` | Worker config + deploy notes. |
@@ -55,6 +56,8 @@ Read `DATA-SOURCES.md` for the exact protocols (websocket framing, scanner paylo
 **Tab title** — `renderHeader` sets `document.title` to the chart symbol and its chg%, plus the extended-hours chg% outside regular hours (e.g. `CRWV -15.46% · ext +0.80%`).
 
 **Versioning** — `APP_VERSION` shows in Settings (phones) and at the right end of the chart toolbar (desktop, `#tver`; also in the header when the chart is hidden); bump it on every push to `main`. Off localhost the page re-fetches itself on load and on resume and reloads when the live version differs. On localhost/LAN it live-reloads on file change.
+
+**Instant start (service worker)** — `sw.js` (registered off localhost/LAN, or with `?sw`; `?nosw` unregisters it and deletes its cache) serves the page (scope root or `index.html`, query ignored, keyed by the scope URL), `tv.js`, icons and manifest from cache `tvw-shell-v1` at once and refreshes them in the background (stale-while-revalidate); the pinned Lightweight Charts build is cache-first; everything else (quotes, sync, relay, news) bypasses it. The version check's `no-store` fetch isn't a navigation, so it still sees the live page; on a new version it writes that HTML into the cache (`SW_CACHE`) before `location.replace`, so the reload can't serve the old page — once per version per tab (`sessionStorage` `tvw.reloadFor`), so a failing cache write can't loop. Bump the cache name in both files only to drop everything cached.
 
 ## Vocabulary
 
