@@ -369,7 +369,7 @@
   /* kind badge: at the start of the line (u) and right of the price on the axis tag (b em) */
   .hray u { display: none; position: absolute; left: 4px; top: -1px; height: 13px; min-width: 13px; padding: 0 2px; box-sizing: border-box; border-radius: 3px;
     align-items: center; justify-content: center; text-decoration: none; font-size: 9px; font-weight: 700; line-height: 13px; color: #fff; background: var(--c); }
-  .hray[data-k="buy"] u, .hray[data-k="sell"] u, .hray[data-k="alert"] u, .hray[data-k="follow"] u { display: inline-flex; }
+  .hray[data-k="buy"] u, .hray[data-k="sell"] u, .hray[data-k="alert"] u { display: inline-flex; }   /* follow lines: only the axis tag's ⇅ */
   .hray.sel u { left: 10px; }   /* clear of the start handle */
   .hray u svg, .hray b em svg { width: 9px !important; height: 9px !important; vertical-align: -1px; }
   .hray b em { display: inline-flex; align-items: center; justify-content: center; min-width: 12px; height: 12px; margin-left: 4px; padding: 0 1px; box-sizing: border-box; border-radius: 3px;
@@ -857,7 +857,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '14.5';  // bump on every push to main
+const APP_VERSION = '14.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2143,9 +2143,8 @@ function addFollow(sym, center, step) {
 function followFire(sym, ln, p) {
   const s = ln.s, lvl = ln.p, up0 = ln.d > 0; let c = lvl;
   if (up0) while (p >= c + s) c += s; else while (p <= c - s) c -= s;
-  // the pair also moves in time: both lines now start at the bar where it fired, and flash briefly on the chart
-  const t = own.want?.sym === sym && own.data?.length ? own.data[own.data.length - 1].time : nowBarTime();
-  for (const x of followPair(sym, ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; x.t = t; rayFlash.set(x.id, Date.now() + 2500); }
+  // only the price moves — the lines keep their start bar (t) — and they flash briefly on the chart
+  for (const x of followPair(sym, ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; rayFlash.set(x.id, Date.now() + 2500); }
   setTimeout(ownRays, 2600);
   // dedupe across devices: same pair, same level, same minute
   logNote({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(Date.now() / 60000)}`, t: Date.now(), sym, kind: 'follow', note: true, dir: up0 ? 1 : -1, ...(ln.snd ? { snd: ln.snd } : {}),
