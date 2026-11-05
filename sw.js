@@ -33,3 +33,14 @@ self.addEventListener('fetch', e => {
     return net;
   })());
 });
+
+// A tap on an alert notification: focus the open app and show that symbol, or open the app on it.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const sym = e.notification.data?.sym;
+  e.waitUntil((async () => {
+    const [c] = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (c) { await c.focus().catch(() => {}); if (sym) c.postMessage({ type: 'open-symbol', sym }); return; }
+    await self.clients.openWindow(ROOT + (sym ? '#sym=' + encodeURIComponent(sym) : ''));
+  })());
+});
