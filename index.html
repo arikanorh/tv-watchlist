@@ -857,7 +857,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '14.4';  // bump on every push to main
+const APP_VERSION = '14.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -952,8 +952,8 @@ function load() {
         s.lists.filter(l => l.id === 'abd').forEach(l => l.groups.forEach(g => { g.symbols = g.symbols.filter(x => !drop.has(x)); }));
         s.migrated.push('abd-index-trim');
       }
-      // Phones on our chart: alert lines, long press and follow alerts exist only there (the widget is an iframe).
-      if (!s.migrated.includes('phone-own-chart')) { if (innerWidth < 768) s.ownChart = true; s.migrated.push('phone-own-chart'); }
+      // Our chart by default everywhere: alert lines, long press and follow alerts exist only there (the widget is an iframe).
+      if (!s.migrated.includes('own-chart-default')) { s.ownChart = true; s.migrated.push('own-chart-default'); }
       // Leftovers from the previous design (pinned tape, details panel, history chart, edit mode).
       for (const k of ['pinned', 'hudHidden', 'histRange', 'panelWidth', 'mview']) delete s[k];
       if (!['list', 'chart'].includes(s.view)) s.view = 'list';
@@ -962,7 +962,7 @@ function load() {
       return s;
     }
   } catch (_) {}
-  const s = seed(); s.flags = {}; s.ownChart = innerWidth < 768; s.migrated = ['phone-own-chart']; ensureEarnings(s); ensurePoints(s); return s;
+  const s = seed(); s.flags = {}; s.ownChart = true; s.migrated = ['own-chart-default']; ensureEarnings(s); ensurePoints(s); return s;
 }
 let state = load();
 function save() {
