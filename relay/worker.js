@@ -83,6 +83,22 @@ async function scanPrices(syms) {
   }
   return out;
 }
+// Notification text: the client's noteText (index.html), kept in step — iOS cuts titles short, numbers go in the body.
+function pushText(e) {
+  const s = short(e.sym), f = fmtPrice, cross = (dir, lvl) => `${s} ${dir > 0 ? '▲ above' : '▼ below'} ${lvl}`;
+  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null)
+    return { title: cross(e.dir, f(e.lvl)), body: [e.px != null ? `Now ${f(e.px)}` : '', e.kind === 'follow' ? (e.lo != null ? `next ${f(e.lo)} / ${f(e.hi)}` : '') : 'alert done'].filter(Boolean).join(' · ') };
+  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) {
+    const d = e.px != null ? Math.abs(e.px - e.lvl) / e.lvl * 100 : null;
+    return { title: `${s} hit ${e.kind} point ${f(e.lvl)}`, body: e.px == null ? '' : `Now ${f(e.px)}${d >= 0.05 ? ` · ${d.toFixed(1)}% ${e.px < e.lvl ? 'below' : 'above'}` : ''}` };
+  }
+  const m = /^(?:Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
+  if (m) { const n = /^at (\S+)(?: · now (.+))?/.exec(e.sub || ''); return { title: cross(m[1] === 'above' ? 1 : -1, m[2]), body: n ? [`Now ${n[1]}`, n[2] ? `next ${n[2]}` : 'alert done'].join(' · ') : e.sub || '' }; }
+  const pt = /^(Buy|Sell) point reached (\S+)$/.exec(e.msg || '');
+  if (pt) return { title: `${s} hit ${pt[1].toLowerCase()} point ${pt[2]}`, body: (e.sub || '').replace(/^at /, 'Now ').replace(/ · \d\d:\d\d$/, '') };
+  if (/^Earnings /.test(e.msg || '')) return { title: `${s} earnings ${e.msg.slice(9)}`, body: e.sub || '' };
+  return { title: `${s} · ${e.msg}`, body: e.sub || '' };
+}
 function checkLines(doc, prices) {   // mutates doc: hits, follow moves, notifLog entries (same keys as the client's)
   const now = Date.now(), log = doc.notifLog = Array.isArray(doc.notifLog) ? doc.notifLog : [];
   const note = e => { if (!log.some(x => x.key === e.key)) log.unshift(e); };
@@ -96,12 +112,12 @@ function checkLines(doc, prices) {   // mutates doc: hits, follow moves, notifLo
         const s = ln.s, lvl = ln.p, up0 = ln.d > 0; let c = lvl;
         if (up0) while (p >= c + s) c += s; else while (p <= c - s) c -= s;
         for (const x of lines.filter(x => x.k === 'follow' && x.g === ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; }
-        note({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir: up0 ? 1 : -1, ...(ln.snd ? { snd: ln.snd } : {}),
+        note({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir: up0 ? 1 : -1, lvl, px: p, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(ln.snd ? { snd: ln.snd } : {}),
           msg: `Follow ±${fmtStep(s)}: crossed ${up0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(p)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
       } else {
         ln.hit = now; ln.at = p;
         const what = ln.k === 'buy' ? 'Buy point reached' : ln.k === 'sell' ? 'Sell point reached' : `Alert: crossed ${ln.d > 0 ? 'above' : 'below'}`;
-        note({ key: 'l:' + sym + ':' + ln.id, t: now, sym, kind: ln.k, msg: `${what} ${fmtPrice(ln.p)}`, sub: `at ${fmtPrice(p)}` });
+        note({ key: 'l:' + sym + ':' + ln.id, t: now, sym, kind: ln.k, dir: ln.d, lvl: ln.p, px: p, msg: `${what} ${fmtPrice(ln.p)}`, sub: `at ${fmtPrice(p)}` });
       }
     }
   }
@@ -252,7 +268,7 @@ export class SyncRoom extends DurableObject {
     if (!fresh.length) return;
     const vapid = await this.vapid(); let gone = false;
     for (const e of fresh) {
-      const text = JSON.stringify({ title: `${short(e.sym)} · ${e.msg}`, body: e.sub || '', sym: e.sym, tag: e.key });
+      const text = JSON.stringify({ ...pushText(e), sym: e.sym, tag: e.key });
       for (const id of ids) {
         try { const r = await webPush(subs[id].sub, text, vapid); if (r.status === 404 || r.status === 410) { delete subs[id]; gone = true; } } catch (_) {}
       }

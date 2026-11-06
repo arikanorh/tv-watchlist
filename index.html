@@ -869,7 +869,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '15.3';  // bump on every push to main
+const APP_VERSION = '15.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2273,7 +2273,7 @@ function followFire(sym, ln, p) {
   for (const x of followPair(sym, ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; rayFlash.set(x.id, Date.now() + 2500); }
   setTimeout(ownRays, 2600);
   // dedupe across devices: same pair, same level, same minute
-  logNote({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(Date.now() / 60000)}`, t: Date.now(), sym, kind: 'follow', note: true, dir: up0 ? 1 : -1, ...(ln.snd ? { snd: ln.snd } : {}),
+  logNote({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(Date.now() / 60000)}`, t: Date.now(), sym, kind: 'follow', note: true, dir: up0 ? 1 : -1, lvl, px: p, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(ln.snd ? { snd: ln.snd } : {}),
     msg: `Follow ±${fmtStep(s)}: crossed ${up0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(p)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
 }
 // Notification history (state.notifLog, synced, newest first, 100 kept): every note once — fired alerts, reached points,
@@ -2527,6 +2527,27 @@ async function sysNotify(title, body, sym, force) {
     if (reg) await reg.showNotification(title, opts); else new Notification(title, opts);
   } catch (e) { clog('warn', 'notify failed', { e: String(e) }); }
 }
+// System notification text (also the relay's pushText): iOS cuts titles short, so the title says what happened in a few
+// words and the body carries the numbers. Entries from v15.5 have them as fields (lvl, px, dir, lo / hi); older ones are parsed.
+//   follow  VIX ▼ below 26.68        Now 26.64 · next 26.18 / 27.18
+//   alert   US10Y ▲ above 4.87       Now 4.87 · alert done
+//   point   NBIS hit buy point 132.96   Now 132.74 · 0.2% below
+//   earn    APP earnings beat        EPS 4.30 vs 4.03 +6.6% · Rev …
+function noteText(e) {
+  const s = short(e.sym), f = fmtPrice, cross = (dir, lvl) => `${s} ${dir > 0 ? '▲ above' : '▼ below'} ${lvl}`;
+  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null)
+    return { title: cross(e.dir, f(e.lvl)), body: [e.px != null ? `Now ${f(e.px)}` : '', e.kind === 'follow' ? (e.lo != null ? `next ${f(e.lo)} / ${f(e.hi)}` : '') : 'alert done'].filter(Boolean).join(' · ') };
+  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) {
+    const d = e.px != null ? Math.abs(e.px - e.lvl) / e.lvl * 100 : null;
+    return { title: `${s} hit ${e.kind} point ${f(e.lvl)}`, body: e.px == null ? '' : `Now ${f(e.px)}${d >= 0.05 ? ` · ${d.toFixed(1)}% ${e.px < e.lvl ? 'below' : 'above'}` : ''}` };
+  }
+  const m = /^(?:Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
+  if (m) { const n = /^at (\S+)(?: · now (.+))?/.exec(e.sub || ''); return { title: cross(m[1] === 'above' ? 1 : -1, m[2]), body: n ? [`Now ${n[1]}`, n[2] ? `next ${n[2]}` : 'alert done'].join(' · ') : e.sub || '' }; }
+  const pt = /^(Buy|Sell) point reached (\S+)$/.exec(e.msg || '');
+  if (pt) return { title: `${s} hit ${pt[1].toLowerCase()} point ${pt[2]}`, body: (e.sub || '').replace(/^at /, 'Now ').replace(/ · \d\d:\d\d$/, '') };
+  if (/^Earnings /.test(e.msg || '')) return { title: `${s} earnings ${e.msg.slice(9)}`, body: e.sub || '' };
+  return { title: `${s} · ${e.msg}`, body: e.sub || '' };
+}
 // Settings row: state of the permission plus Enable / Test (iOS asks only from a tap, and only in the home-screen app).
 function paintNotify() {
   const row = $('ntfRow'); if (!row) return;
@@ -2544,12 +2565,12 @@ function noteItems() {
   for (const sym of alertSyms()) for (const ln of state.lines[sym]) {
     if (!ln.k || !ln.hit || ln.ack) continue;
     const what = ln.k === 'buy' ? 'Buy point reached' : ln.k === 'sell' ? 'Sell point reached' : `Alert: crossed ${ln.d > 0 ? 'above' : 'below'}`;
-    out.push({ key: 'l:' + sym + ':' + ln.id, sym, at: ln.hit, cls: ln.k, icon: ALERT_TAG[ln.k], dir: ln.d || (ln.k === 'buy' ? -1 : 1), snd: ln.snd,
+    out.push({ key: 'l:' + sym + ':' + ln.id, sym, at: ln.hit, cls: ln.k, icon: ALERT_TAG[ln.k], dir: ln.d || (ln.k === 'buy' ? -1 : 1), snd: ln.snd, nums: { lvl: ln.p, px: ln.at },
       title: `<b>${esc(short(sym))}</b> · ${what} ${fmtPrice(ln.p)}`, sub: `${ln.at != null ? 'at ' + fmtPrice(ln.at) + ' · ' : ''}${new Date(ln.hit).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
       text: `${short(sym)}: ${what} ${fmtPrice(ln.p)}`, msg: `${what} ${fmtPrice(ln.p)}` });
   }
   for (const e of state.notifLog || []) if (e.kind === 'follow' && e.note && !e.ack)
-    out.push({ key: e.key, sym: e.sym, at: e.t, cls: 'follow', icon: ALERT_TAG.follow, dir: e.dir || 1, snd: e.snd, title: `<b>${esc(short(e.sym))}</b> · ${esc(e.msg)}`, sub: esc(e.sub), text: `${short(e.sym)}: ${e.msg}`, msg: e.msg });
+    out.push({ key: e.key, sym: e.sym, at: e.t, cls: 'follow', icon: ALERT_TAG.follow, dir: e.dir || 1, snd: e.snd, nums: { lvl: e.lvl, px: e.px, lo: e.lo, hi: e.hi }, title: `<b>${esc(short(e.sym))}</b> · ${esc(e.msg)}`, sub: esc(e.sub), text: `${short(e.sym)}: ${e.msg}`, msg: e.msg });
   for (const sym of new Set(state.lists.flatMap(flatSymbols))) {
     if (!reportedRecently(sym) || resultsPending(sym)) continue;
     const e = earnResult(sym); if (!e || e.eps == null && !e.rev || state.seen?.[sym] === e.t) continue;
@@ -2566,8 +2587,8 @@ function renderNotes() {
   // New ones after the first seconds (not what was waiting when the app opened) ring and, in the background, notify.
   const fresh = items.filter(n => !notesKnown.has(n.key)); fresh.forEach(n => notesKnown.add(n.key));
   // every note goes into the history once (plain text: the sub line loses its colored spans)
-  if (fresh.map(n => logNote({ key: n.key, t: n.at, sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, '') })).some(Boolean)) save();
-  if (fresh.length && Date.now() - pageStart > 15000) { const n0 = fresh.sort((a, b) => b.at - a.at)[0]; chime(n0.dir, n0.snd || defaultSound(n0.cls === 'follow' ? 'follow' : 'alert')); fresh.forEach(n => sysNotify(n.text, n.sub.replace(/<[^>]+>/g, ''), n.sym)); }   // the newest note sets the chime: its direction and its alert's own sound
+  if (fresh.map(n => logNote({ key: n.key, t: n.at, sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), ...(n.nums?.lvl != null ? { ...n.nums, dir: n.dir } : {}) })).some(Boolean)) save();
+  if (fresh.length && Date.now() - pageStart > 15000) { const n0 = fresh.sort((a, b) => b.at - a.at)[0]; chime(n0.dir, n0.snd || defaultSound(n0.cls === 'follow' ? 'follow' : 'alert')); fresh.forEach(n => { const t = noteText({ sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), dir: n.dir, ...n.nums }); sysNotify(t.title, t.body, n.sym); }); }   // the newest note sets the chime: its direction and its alert's own sound
   const shown = notesOpen ? items : items.slice(0, 2);   // two at a time; the rest behind "+N more"
   const html = shown.map(n => `<div class="note ${n.cls}"><span class="ni">${n.icon}</span><button class="nt" data-note-sym="${esc(n.sym)}">${n.title}<small>${n.sub}</small></button><button class="nx" data-note-x="${esc(n.key)}" title="Dismiss">✕</button></div>`).join('')
     + (items.length > 2 ? `<div class="nfoot"><button class="nall" data-note-more>${notesOpen ? 'Show less' : `+${items.length - 2} more`}</button><button class="nall" data-note-all>Dismiss all</button></div>` : '');
