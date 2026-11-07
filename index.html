@@ -869,7 +869,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '15.5';  // bump on every push to main
+const APP_VERSION = '15.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1300,7 +1300,9 @@ function renderSession() {
     if (cls !== 'night') Object.keys(raw).filter(k => k.startsWith('BOATS:')).forEach(k => delete raw[k]);   // stale overnight prints
     for (const k of Object.keys(raw)) if (!k.startsWith('BOATS:')) onQuote(k, {});
   }
+  if (lastPhase !== cls && (cls === 'pre' || cls === 'open')) { for (const k in extFill) delete extFill[k]; extFillAt = 0; }
   lastPhase = cls;
+  if (cls === 'closed' || cls === 'night') extFillFetch();
   document.body.className = document.body.className.replace(/\bsess-\w+\b/g, '').replace(/\s+/g, ' ').trim() + ' sess-' + cls;
   const mk = $('mkt'); if (mk) { mk.className = 'mkt s-' + cls; mk.title = `US market: ${label} · click for hours`; }
   $('sessLabel').textContent = label;
@@ -1476,6 +1478,23 @@ function wsConnect() {
 const US_EX = new Set(['NASDAQ', 'NYSE', 'AMEX', 'NYSEARCA', 'ARCA', 'BATS']);
 const boatsOf = sym => { const [ex, t] = sym.split(':'); return t && US_EX.has(ex) && !NON_EQUITY.has(raw[sym]?.type) ? 'BOATS:' + t : null; };
 const overnightNow = () => sessionPhase()[0] === 'night';
+// After the post-market ends (weekday night without a Blue Ocean print, and the whole weekend) the quote socket sends
+// rtc/rchp as null, but the scanner still has the last post-market close: keep showing it in Ext (blue) until pre-market.
+const extFill = {};
+let extFillAt = 0;
+async function extFillFetch() {
+  if (Date.now() - extFillAt < 300000) return;
+  const tickers = allSymbols().filter(s => US_EX.has(s.split(':')[0]));
+  if (!tickers.length) return;
+  extFillAt = Date.now();
+  try {
+    const r = await fetch('https://scanner.tradingview.com/america/scan', { method: 'POST', body: JSON.stringify({ symbols: { tickers }, columns: ['postmarket_close', 'postmarket_change', 'postmarket_time', 'premarket_time'] }) });
+    for (const { s, d: [ep, e, pt, prt] } of (await r.json()).data || []) {
+      if (ep != null && e != null && (pt || 0) >= (prt || 0)) extFill[s] = { ep, e }; else delete extFill[s];
+      if (raw[s]) onQuote(s, {});
+    }
+  } catch (e) { extFillAt = 0; clog('warn', 'ext fill failed', { e: String(e) }); }
+}
 function wsSync() {
   if (quoteSource === 'poll') return pollNow();
   if (!ws || ws.readyState !== 1) return;
@@ -1493,9 +1512,11 @@ function onQuote(sym, v) {
   // Extended session: pre-market (amber), post-market (blue), overnight via BOATS (purple).
   const bo = overnightNow() && boatsOf(sym) ? raw[boatsOf(sym)] : null;
   const night = bo?.lp != null;
-  const ss = night ? 'night' : r.current_session === 'pre_market' ? 'pre' : r.current_session === 'post_market' ? 'post'
+  const ss0 = night ? 'night' : r.current_session === 'pre_market' ? 'pre' : r.current_session === 'post_market' ? 'post'
     : r.current_session !== 'market' && r.rtc != null ? 'night' : '';
-  const ep = night ? bo.lp : r.rtc ?? null, e = night ? (bo.lp - r.lp) / r.lp * 100 : r.rchp ?? null;
+  const xf = !night && r.rtc == null && (lastPhase === 'closed' || lastPhase === 'night') ? extFill[sym] : null;
+  const ss = xf ? 'post' : ss0;
+  const ep = night ? bo.lp : xf ? xf.ep : r.rtc ?? null, e = night ? (bo.lp - r.lp) / r.lp * 100 : xf ? xf.e : r.rchp ?? null;
   quotes[sym] = { p: r.lp, c: r.chp ?? 0, e, ep, ss };
   $('tickTime').textContent = new Date().toLocaleTimeString('en-GB');
   const now = Date.now();
