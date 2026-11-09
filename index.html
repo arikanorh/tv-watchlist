@@ -146,7 +146,6 @@
     font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; user-select: none; -webkit-user-select: none; }
   .gh .chev { color: var(--muted); font-size: 9px; transition: transform .15s; }
   .gh.collapsed .chev { transform: rotate(-90deg); }
-  .gh .gpin { display: flex; color: var(--muted); } .gh .gpin svg { width: 12px; height: 12px; }
   .gh .gc { margin-left: auto; color: var(--muted); font-weight: 400; letter-spacing: 0; }
   .gh.static { cursor: default; }
   .gh.drop-into { box-shadow: inset 0 0 0 1px var(--accent); }
@@ -872,7 +871,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '15.9';  // bump on every push to main
+const APP_VERSION = '16.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -996,7 +995,7 @@ var syncTimer = null, syncStatus = { st: 'idle', at: 0, msg: '' }, syncLast = nu
 const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
 const syncShape = lists => lists.filter(l => l.auto !== 'points').map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
-  groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols, ...(g.pin ? { pin: true } : {}) })) }));
+  groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols })) }));
 const syncDoc = () => ({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null, notifLog: state.notifLog || [] });
 const syncJson = () => JSON.stringify(syncDoc());
 // ---- three-way merge ----
@@ -1031,8 +1030,7 @@ function mergeList(b, l, r) {
   const out = { ...r, name: m3(b.name, l.name, r.name), summary: m3(b.summary, l.summary, r.summary) };
   const syms = x => new Set(x.groups.flatMap(g => g.symbols)), bs = syms(b), ls = syms(l), rs = syms(r);
   const gone = new Set([...bs].filter(x => !ls.has(x) || !rs.has(x)));
-  const pinOf = (x, n) => !!x.groups.find(g => g.name === n)?.pin;   // a section's pin: whichever side changed it
-  const groups = (sameJ(l.groups.map(g => g.name), b.groups.map(g => g.name)) ? r : l).groups.map(g => ({ name: g.name, symbols: [], ...(m3(pinOf(b, g.name), pinOf(l, g.name), pinOf(r, g.name)) ? { pin: true } : {}) }));
+  const groups = (sameJ(l.groups.map(g => g.name), b.groups.map(g => g.name)) ? r : l).groups.map(g => ({ name: g.name, symbols: [] }));
   const order = (sameJ(l.groups, b.groups) ? r : l).groups;   // whose arrangement to start from
   const placed = new Set();
   const put = (gname, sym, gi) => { if (gone.has(sym) || placed.has(sym)) return; const g = groups.find(x => x.name === gname) || groups[Math.min(gi, groups.length - 1)]; if (g) { g.symbols.push(sym); placed.add(sym); } };
@@ -1205,7 +1203,7 @@ function syncAdopt(remote, notify = true, base = remote) {
   const changes = notify ? syncDiff(syncShape(state.lists), remote.lists) : [];
   const collapsed = new Set(state.lists.flatMap(l => l.groups.filter(g => g.collapsed).map(g => l.id + '|' + g.name)));
   const autoGroups = state.lists.find(l => l.auto === 'earnings')?.groups.filter(g => g.auto) || [];
-  state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols, ...(g.pin ? { pin: true } : {}), collapsed: collapsed.has(l.id + '|' + g.name) })) }));
+  state.lists = remote.lists.map(l => ({ ...l, groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols, collapsed: collapsed.has(l.id + '|' + g.name) })) }));
   const el = ensureEarnings(state); for (const a of autoGroups) { const g = el.groups.find(x => x.auto === a.auto); if (g) g.symbols = a.symbols; }
   ensurePoints(state); updatePoints(false);
   if (remote.flags && typeof remote.flags === 'object') state.flags = remote.flags;
@@ -2790,7 +2788,6 @@ function earnsThisSession(t) {
 }
 const earnTimingIcon = sym => { const k = raw[sym]?.earnings_release_next_time; return EARN_ICON[k] ? `<i class="etm ${k === 1 ? 'amc' : 'bmo'}" title="${earnTiming(sym)}">${EARN_ICON[k]}</i>` : ''; };
 const ICON = {
-  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 4 4H6l4-4zM12 14v7"/></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h12l-2 4 2 4H5"/></svg>',
   details: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>',
@@ -2802,8 +2799,8 @@ const ICON = {
 };
 const groupMovable = gi => { const gs = activeList().groups, g = gs[gi]; return g && !g.auto && gs.filter(x => !x.auto).length > 1; };
 const dividerDraggable = gi => groupMovable(gi) && activeList().groups.findIndex(g => !g.auto) !== gi;
-const ghHtml = (name, n, gi, collapsed, isStatic, pin) => {
-  return `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span>${pin ? `<i class="gpin" title="Pinned: stays on top when the list is sorted">${ICON.pin}</i>` : ''}<span class="gc">${n}</span></div>`;
+const ghHtml = (name, n, gi, collapsed, isStatic) => {
+  return `<div class="gh${collapsed ? ' collapsed' : ''}${isStatic ? ' static' : ''}"${gi != null ? ` data-act="group" data-g="${gi}"` : ''}>${isStatic ? '' : '<span class="chev">▼</span>'}<span>${esc(name)}</span><span class="gc">${n}</span></div>`;
 };
 function moveGroup(from, to) {   // reorder sections; the Earnings "Upcoming" group stays first
   const gs = activeList().groups; if (!groupMovable(from) || to < 0 || to >= gs.length || gs[to]?.auto) return;
@@ -2854,7 +2851,6 @@ function openGroupCtx(gi, x, y) {
   const first = gs.findIndex(q => !q.auto), last = gs.length - 1, movable = groupMovable(gi), own = gs.filter(q => !q.auto).length;
   const m = document.createElement('div'); m.className = 'cmenu rowctx flip'; m.id = 'rowctx';
   m.innerHTML = `<form class="cname" id="gname"><input class="field" value="${esc(g.name)}" placeholder="Section name" aria-label="Section name" autocomplete="off"><button>Rename</button></form>
-    <button class="ci" data-o="pin">${ICON.pin}${g.pin ? 'Unpin' : 'Pin to top when sorted'}</button>
     ${movable && gi > first ? `<button class="ci" data-o="up">${ICON.up}Move up</button>` : ''}
     ${movable && gi < last ? `<button class="ci" data-o="down">${ICON.down}Move down</button>` : ''}
     <button class="ci danger" data-o="del"${own < 2 && gi !== first ? ' disabled' : ''}>${ICON.rm}${gi === first ? 'Remove section header' : 'Delete section'}</button>`;
@@ -2866,7 +2862,6 @@ function openGroupCtx(gi, x, y) {
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-o]'); if (!b) return;
     const o = b.dataset.o;
-    if (o === 'pin') { togglePin(g); closeRowCtx(); return; }
     if (o === 'del') {
       if (!b.classList.contains('armed')) { b.classList.add('armed'); b.lastChild.textContent = ` ${gi === first ? 'Remove header' : 'Delete'}? Click again`; return; }
       const snap = JSON.stringify(gs), name = g.name;
@@ -2882,14 +2877,12 @@ function openGroupCtx(gi, x, y) {
   m.style.left = Math.max(4, Math.min(x, innerWidth - w - 4)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - h - 4)) + 'px';
   setTimeout(() => { document.addEventListener('pointerdown', closeRowCtxOutside); m.querySelector('input').select(); }, 0);
 }
-function togglePin(g) { if (g.pin) delete g.pin; else g.pin = true; save(); renderRows(); toast(`${g.name || 'Section'} ${g.pin ? 'pinned: stays on top when sorted' : 'unpinned'}`); }
 function closeRowCtx() { $('rowctx')?.remove(); document.removeEventListener('pointerdown', closeRowCtxOutside); }
 function closeRowCtxOutside(e) { if (!e.target.closest('#rowctx')) closeRowCtx(); }
 function openGroupMenu(gi) {
   const l = activeList(), gs = l.groups, g = gs[gi]; if (!g || g.auto) return;
   const first = gs.findIndex(x => !x.auto), last = gs.length - 1, movable = groupMovable(gi), own = gs.filter(x => !x.auto).length;
   openSheet('group', g.name, `<form class="lmnew" id="gname"><input class="field" value="${esc(g.name)}" aria-label="Section name" autocomplete="off"><button>Rename</button></form>
-    <button class="opt" data-o="pin">${ICON.pin}${g.pin ? 'Unpin' : 'Pin to top when sorted'}</button>
     <button class="opt" data-o="up"${movable && gi > first ? '' : ' disabled'}>${ICON.up}Move up</button>
     <button class="opt" data-o="down"${movable && gi < last ? '' : ' disabled'}>${ICON.down}Move down</button>
     <button class="opt danger" data-o="del"${own < 2 && gi !== first ? ' disabled' : ''}>${ICON.rm}${gi === first ? 'Remove section header' : 'Delete section'}${g.symbols.length ? '<span class="c">symbols stay in the list</span>' : ''}</button>`);
@@ -2901,8 +2894,7 @@ function openGroupMenu(gi) {
   });
   $('shBody').onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return; closeSheet();
-    if (o === 'pin') togglePin(g);
-    else if (o === 'del') {
+    if (o === 'del') {
       const snap = JSON.stringify(gs), name = g.name;
       if (gi === first) { g.name = ''; g.collapsed = false; }   // the list now starts without a section
       else { gs[gi - 1].symbols.push(...g.symbols); gs.splice(gi, 1); }
@@ -2925,19 +2917,15 @@ function renderRows() {
   if (!all.length && !l.auto) html = '<div class="empty">This list is empty.</div>';
   else if (!all.length && l.auto === 'points') html = '<div class="empty">No buy or sell points yet. Right-click the chart → Horizontal ray → Buy point / Sell point, or a row → Alerts.</div>';
   else if (state.sort) {
-    // Indices and other non-equities keep their order on top; everything else is one group, biggest Chg% (or Ext) first.
+    // One group, biggest Chg% (or Ext) first.
     const giOf = sy => l.groups.findIndex(g => g.symbols.includes(sy)), key = state.sort === 'ext' ? 'e' : 'c';
-    // Pinned sections come first, each under its own header (collapsible, menu on press / right-click), sorted inside.
+    // Symbols above the first section header (a headerless first group, when the list has sections) stay on top in
+    // their own order, without a header.
     const byKey = (a, b) => (quotes[b]?.[key] ?? -Infinity) - (quotes[a]?.[key] ?? -Infinity);
-    const pinned = new Set();
-    l.groups.forEach((g, gi) => {
-      if (!g.pin || g.auto) return;
-      g.symbols.forEach(sy => pinned.add(sy));
-      html += ghHtml(g.name || 'Pinned', g.symbols.length, gi, g.collapsed, false, true) + (g.collapsed ? '' : [...g.symbols].sort(byKey).map(sy => rowHtml(sy, gi)).join(''));
-    });
-    const fixed = all.filter(sy => !pinned.has(sy) && (NON_EQUITY.has(raw[sy]?.type) || noChart(sy)));
-    const rest = all.filter(sy => !pinned.has(sy) && !fixed.includes(sy)).sort(byKey);
-    if (fixed.length) html += ghHtml('Index', fixed.length, null, false, true) + fixed.map(sy => rowHtml(sy, giOf(sy))).join('');
+    const fi = l.groups.findIndex(g => !g.auto), fg = l.groups[fi];
+    const pinned = new Set(fg && !fg.name && l.groups.filter(g => !g.auto).length > 1 ? fg.symbols : []);
+    html += [...pinned].map(sy => rowHtml(sy, fi)).join('');
+    const rest = all.filter(sy => !pinned.has(sy)).sort(byKey);   // everything in a section is sorted
     // Arrows only for the symbols that actually jumped: the longest run that kept its old relative order stays quiet
     // (so one big mover doesn't light up every row it passed). None on list / sort switch; adds/removes don't count.
     const sortKey = l.id + '|' + state.sort, both = sortKey === lastSortKey ? rest.filter(sy => sy in lastRank) : [], moved = {};
@@ -2953,7 +2941,7 @@ function renderRows() {
     const single = l.groups.length === 1, first = l.groups.findIndex(g => !g.auto);
     l.groups.forEach((g, gi) => {
       if ((g.auto === 'reported' || g.auto === 'buy' || g.auto === 'sell') && !g.symbols.length) return;   // shown only when they have something
-      if (!single && !(gi === first && !g.name)) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false, g.pin);
+      if (!single && !(gi === first && !g.name)) html += ghHtml(g.name, g.symbols.length, gi, g.collapsed, false);
       if (single || !g.collapsed) html += g.symbols.map((sy, i) => rowHtml(sy, gi, i, g.symbols.length)).join('');
       if (g.auto === true && !g.symbols.length && !g.collapsed) html += '<div class="empty">No earnings within 7 days in your lists.</div>';
     });
