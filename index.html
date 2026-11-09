@@ -329,6 +329,7 @@
   .hr-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
   .hr-row:first-child { border-top: 0; } .hr-row:hover { background: var(--bg3); }
   .hr-m { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .hr-1 .up { color: var(--up); } .hr-1 .down { color: var(--down); }
   .hr-1 { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hr-m small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hr-row time { flex-shrink: 0; font-size: 11px; line-height: 1.35; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
@@ -337,7 +338,7 @@
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
   /* Notes under the top bar: fired alerts, reached buy / sell points, fresh earnings — until dismissed */
-  .notes { position: fixed; z-index: 45; top: calc(var(--safe-t, 0px) + 48px); left: 8px; right: 8px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; pointer-events: none; }
+  .notes { position: fixed; z-index: 45; top: calc(var(--safe-t, 0px) + 48px); right: 8px; width: max-content; min-width: 210px; max-width: calc(100% - 16px); display: flex; flex-direction: column; align-items: stretch; gap: 6px; pointer-events: none; }
   .note { --c: #f7a600; pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 7px 6px 7px 10px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); border-left: 4px solid var(--c);
     box-shadow: 0 8px 24px rgba(0, 0, 0, .45); font-size: 13px; animation: noteIn .25s ease-out; }
   .note.buy, .note.beat { --c: var(--up); } .note.sell, .note.miss { --c: var(--down); } .note.earn { --c: var(--pre); } .note.follow { --c: #b06cff; }
@@ -352,7 +353,7 @@
   .notes .nfoot { display: flex; justify-content: flex-end; gap: 6px; }
   .notes .nall { pointer-events: auto; padding: 4px 10px; border-radius: 7px; font-size: 12px; color: var(--muted); background: var(--bg2); border: 1px solid var(--line); }
   @keyframes noteIn { from { opacity: 0; transform: translateY(-6px); } }
-  @media (min-width: 768px) { .notes { top: 56px; left: auto; right: 76px; width: 420px; } }
+  @media (min-width: 768px) { .notes { top: 56px; right: 76px; max-width: 420px; } }
   /* Alerts sheet */
   .lm.alm .field, .lmnew.alm .field { flex: 1; min-width: 0; height: 40px; } .lm.alm .ak, .lmnew.alm .ak { flex: 0 0 122px; color: var(--text); font-size: 14px; } .alm .ast { flex: 0 0 auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .alm .ast.hit { color: #f7a600; }
@@ -871,7 +872,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '15.8';  // bump on every push to main
+const APP_VERSION = '15.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2368,7 +2369,7 @@ function paintDrawer() {
     const inp = $('arIn'); if (inp) { inp.focus(); inp.select(); }
   } else {
     const L = state.notifLog || [], d = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), tm = t => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    body.innerHTML = L.length ? L.map(e => { const k = String(e.kind || '').trim(); return `<button class="hr-row ${esc(k)}" data-hist="${esc(e.sym)}">${arTag(k, e.sym)}<span class="hr-m"><span class="hr-1">${esc(e.msg)}</span><small>${esc(e.sub || '')}</small></span><time>${d(e.t)}<br>${tm(e.t)}</time></button>`; }).join('')
+    body.innerHTML = L.length ? L.map(e => { const k = String(e.kind || '').trim(); return `<button class="hr-row ${esc(k)}" data-hist="${esc(e.sym)}">${arTag(k, e.sym)}<span class="hr-m" title="${esc([e.msg, e.sub].filter(Boolean).join(' · '))}"><span class="hr-1">${shortWhat({ ...e, kind: k.split(' ').pop() })}</span><small>${esc([timeAgo(e.t), /^Earnings /.test(e.msg || '') ? e.sub : ''].filter(Boolean).join(' · '))}</small></span><time>${d(e.t)}<br>${tm(e.t)}</time></button>`; }).join('')
       : '<div class="dr-empty">No notifications yet.<br>Fired alerts, reached buy / sell points, follow alerts and earnings results show up here.</div>';
     foot.hidden = !L.length; foot.innerHTML = `<button class="dr-link" data-hist-clear>${drawer.armed ? 'Tap again to clear' : 'Clear history'}</button>`;
   }
@@ -2605,6 +2606,8 @@ function noteItems() {
   }
   return out.sort((a, b) => b.at - a.at);
 }
+// noteText's title without the ticker, as HTML with the ▲ / ▼ colored (notes and the History tab)
+const shortWhat = e => { const t = noteText(e).title, s = short(e.sym), rest = t.startsWith(s + ' ') ? t.slice(s.length + 1) : t; return esc(rest).replace(/^([▲▼])/, (_, a) => `<span class="${a === '▲' ? 'up' : 'down'}">${a}</span>`); };
 const timeAgo = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + ' d ago'; };
 function renderNotes() {
   let box = $('notes'); if (!box) { box = document.createElement('div'); box.className = 'notes'; box.id = 'notes'; document.body.appendChild(box); box.addEventListener('click', onNoteClick); }
@@ -2618,9 +2621,8 @@ function renderNotes() {
   // Shown short: the title says what happened (same words as the system notification), the second line only how long
   // ago — earnings keep their EPS / revenue line. Prices stay in the history / push body.
   const view = n => {
-    const kind = n.cls.trim().split(' ').pop(), t = noteText({ sym: n.sym, kind, msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), dir: n.dir, ...n.nums });
-    const s = short(n.sym), rest = t.title.startsWith(s + ' ') ? t.title.slice(s.length + 1) : t.title;
-    return { title: `<b>${esc(s)}</b> ${esc(rest).replace(/^([▲▼])/, (_, a) => `<span class="${a === '▲' ? 'up' : 'down'}">${a}</span>`)}`, sub: [timeAgo(n.at), n.cls.startsWith('earn') ? n.sub : ''].filter(Boolean).join(' · ') };
+    const kind = n.cls.trim().split(' ').pop();
+    return { title: `<b>${esc(short(n.sym))}</b> ${shortWhat({ sym: n.sym, kind, msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), dir: n.dir, ...n.nums })}`, sub: [timeAgo(n.at), n.cls.startsWith('earn') ? n.sub : ''].filter(Boolean).join(' · ') };
   };
   const html = shown.map(n => { const v = view(n); return `<div class="note ${n.cls}"><span class="ni">${n.icon}</span><button class="nt" data-note-sym="${esc(n.sym)}" title="${esc(n.sub.replace(/<[^>]+>/g, ''))}">${v.title}<small>${v.sub}</small></button><button class="nx" data-note-x="${esc(n.key)}" title="Dismiss">✕</button></div>`; }).join('')
     + (items.length > 2 ? `<div class="nfoot"><button class="nall" data-note-more>${notesOpen ? 'Show less' : `+${items.length - 2} more`}</button><button class="nall" data-note-all>Dismiss all</button></div>` : '');
