@@ -345,6 +345,7 @@
   .note .ni svg { width: 14px; height: 14px; }
   .note .nt { flex: 1; min-width: 0; text-align: left; color: var(--text); line-height: 1.35; }
   .note .nt small { display: block; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .note .nt .up { color: var(--up); } .note .nt .down { color: var(--down); }
   .note .nt small .up { color: var(--up); } .note .nt small .down { color: var(--down); }
   .note .nx { flex-shrink: 0; width: 30px; height: 30px; border-radius: 7px; color: var(--muted); font-size: 15px; }
   .note .nx:hover { background: var(--bg3); color: var(--text); }
@@ -870,7 +871,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '15.7';  // bump on every push to main
+const APP_VERSION = '15.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2604,6 +2605,7 @@ function noteItems() {
   }
   return out.sort((a, b) => b.at - a.at);
 }
+const timeAgo = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + ' d ago'; };
 function renderNotes() {
   let box = $('notes'); if (!box) { box = document.createElement('div'); box.className = 'notes'; box.id = 'notes'; document.body.appendChild(box); box.addEventListener('click', onNoteClick); }
   const items = noteItems();
@@ -2613,7 +2615,14 @@ function renderNotes() {
   if (fresh.map(n => logNote({ key: n.key, t: n.at, sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), ...(n.nums?.lvl != null ? { ...n.nums, dir: n.dir } : {}) })).some(Boolean)) save();
   if (fresh.length && Date.now() - pageStart > 15000) { const n0 = fresh.sort((a, b) => b.at - a.at)[0]; chime(n0.dir, n0.snd || defaultSound(n0.cls === 'follow' ? 'follow' : 'alert')); fresh.forEach(n => { const t = noteText({ sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), dir: n.dir, ...n.nums }); sysNotify(t.title, t.body, n.sym); }); }   // the newest note sets the chime: its direction and its alert's own sound
   const shown = notesOpen ? items : items.slice(0, 2);   // two at a time; the rest behind "+N more"
-  const html = shown.map(n => `<div class="note ${n.cls}"><span class="ni">${n.icon}</span><button class="nt" data-note-sym="${esc(n.sym)}">${n.title}<small>${n.sub}</small></button><button class="nx" data-note-x="${esc(n.key)}" title="Dismiss">✕</button></div>`).join('')
+  // Shown short: the title says what happened (same words as the system notification), the second line only how long
+  // ago — earnings keep their EPS / revenue line. Prices stay in the history / push body.
+  const view = n => {
+    const kind = n.cls.trim().split(' ').pop(), t = noteText({ sym: n.sym, kind, msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), dir: n.dir, ...n.nums });
+    const s = short(n.sym), rest = t.title.startsWith(s + ' ') ? t.title.slice(s.length + 1) : t.title;
+    return { title: `<b>${esc(s)}</b> ${esc(rest).replace(/^([▲▼])/, (_, a) => `<span class="${a === '▲' ? 'up' : 'down'}">${a}</span>`)}`, sub: [timeAgo(n.at), n.cls.startsWith('earn') ? n.sub : ''].filter(Boolean).join(' · ') };
+  };
+  const html = shown.map(n => { const v = view(n); return `<div class="note ${n.cls}"><span class="ni">${n.icon}</span><button class="nt" data-note-sym="${esc(n.sym)}" title="${esc(n.sub.replace(/<[^>]+>/g, ''))}">${v.title}<small>${v.sub}</small></button><button class="nx" data-note-x="${esc(n.key)}" title="Dismiss">✕</button></div>`; }).join('')
     + (items.length > 2 ? `<div class="nfoot"><button class="nall" data-note-more>${notesOpen ? 'Show less' : `+${items.length - 2} more`}</button><button class="nall" data-note-all>Dismiss all</button></div>` : '');
   if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
   box.hidden = !items.length; if (items.length <= 2) notesOpen = false;
