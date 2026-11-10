@@ -871,7 +871,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '16.0';  // bump on every push to main
+const APP_VERSION = '16.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -3542,7 +3542,7 @@ function openSearch(addMode = false) {   // true: add to the active list; 'pin':
   });
   $('shBody').onclick = e => {
     const add = e.target.closest('[data-add]');
-    if (add) { addSymbol(add.dataset.add); refreshSearch(); return; }
+    if (add) { const sy = add.dataset.add; if (search.pinMode) { if (!pinList().includes(sy)) { setPins([...pinList(), sy]); toast(`${short(sy)} pinned`); } } else addSymbol(sy); refreshSearch(); return; }   // pin mode: + pins
     const r = e.target.closest('[data-pick]');
     if (r) pickSearch(r.dataset.pick);
   };
@@ -3562,12 +3562,12 @@ function pickSearch(sym) {
 }
 function refreshSearch() {
   const box = $('sres'); if (!box || sheetKind !== 'search') return;
-  const inList = new Set(flatSymbols(activeList())), text = $('sq').value.trim();
+  const inList = new Set(search.pinMode ? pinList() : flatSymbols(activeList())), text = $('sq').value.trim(), what = search.pinMode ? 'pins' : 'list';
   if (!text) { box.innerHTML = '<div class="shint">Type a ticker or a company name.</div>'; return; }
   if (!search.items.length) { box.innerHTML = `<div class="shint">${search.pending ? 'Searching…' : 'No matches'}</div>`; return; }
   box.innerHTML = search.items.map((it, i) => `<div class="sr${i === search.index ? ' on' : ''}" data-pick="${esc(it.sym)}">
       <span class="s"><b>${esc(short(it.sym))}</b>${isBist(it.sym) ? TR_FLAG : ''}<small>${esc(it.ex || it.sym.split(':')[0])}</small></span>
-      <button class="add${inList.has(it.sym) ? ' in' : ''}" ${inList.has(it.sym) ? 'disabled aria-label="In list"' : `data-add="${esc(it.sym)}" aria-label="Add to list"`}>${inList.has(it.sym) ? CHECK : PLUS}</button>
+      <button class="add${inList.has(it.sym) ? ' in' : ''}" ${inList.has(it.sym) ? `disabled aria-label="In ${what}"` : `data-add="${esc(it.sym)}" aria-label="Add to ${what}"`}>${inList.has(it.sym) ? CHECK : PLUS}</button>
       <span class="d">${esc(it.desc || '')}</span></div>`).join('');
 }
 
