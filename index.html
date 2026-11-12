@@ -111,7 +111,7 @@
   .row[data-tone="neu"]::after { background: var(--muted); }
   .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
   .row .stl { display: none; flex-shrink: 0; width: 13px; height: 13px; background: var(--pre); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") center / contain no-repeat; }
-  .row .dly { flex-shrink: 0; padding: 0 4px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); font: 600 10px/14px var(--font, inherit); font-style: normal; }
+  .row.delayed .px::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; position: relative; top: -1px; }   /* delayed feed: a grey dot before Last */
   .row.stale .stl { display: block; } .row.stale .px, .row.stale .chg, .row.stale .ext { opacity: .35; text-decoration: line-through; text-decoration-thickness: 1px; }
   .row .sym b { flex-shrink: 0; font-weight: 600; white-space: nowrap; }   /* the ticker never shrinks; tags after it get clipped first */
   /* sorted view: a short-lived arrow next to a ticker that moved up / down since the last re-order */
@@ -874,7 +874,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '16.4';  // bump on every push to main
+const APP_VERSION = '16.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2934,7 +2934,7 @@ function openGroupMenu(gi) {
 // i / n: position in the group (up/down hidden at the ends and in sorted view)
 const rowHtml = (sym, gi, i = -1, n = 0) => `<div class="row${sym === state.symbol ? ' on' : ''}${activeList().groups[gi]?.auto ? ' auto' : ''}${flagColor(sym) ? ' flagged' : ''}" data-sym="${esc(sym)}" data-g="${gi}"${flagColor(sym) ? ` style="--c:${flagColor(sym)}"` : ''}>
 <button class="fl" data-act="row-flag" title="Flag: click to change the color" aria-label="Flag"></button>
-    <span class="sym"><b>${esc(short(sym))}</b><i class="stl" aria-label="No data"></i><i class="dly" hidden></i>${isBist(sym) ? TR_FLAG : ''}<i class="earn" hidden></i><span class="etw"></span><i class="erep" hidden>E</i><span class="alr"></span></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
+    <span class="sym"><b>${esc(short(sym))}</b><i class="stl" aria-label="No data"></i>${isBist(sym) ? TR_FLAG : ''}<i class="earn" hidden></i><span class="etw"></span><i class="erep" hidden>E</i><span class="alr"></span></span><span class="px"></span><span class="chg"></span><span class="ext"></span>
 </div>`;
 let lastSortRender = 0, lastSortKey = '', lastRank = {};
 const MV_ARROW = '<svg viewBox="0 0 10 10"><path d="M5 1.5 9 7.5H1z" fill="currentColor"/></svg>';
@@ -2991,11 +2991,12 @@ function flash(node, cls) { if (node.classList.contains('flash')) return; node.c
 // No data: a US-listed symbol with no trade for 5+ minutes during the regular session (the free feed can sit on the
 // open's print with yesterday's change). The row's numbers fade and a clock shows after the ticker; Data in details.
 const staleSince = sym => { const r = raw[sym], t = r?.lp_time * 1000; return t && lastPhase === 'open' && US_EX.has(sym.split(':')[0]) && Date.now() - t > 300000 ? t : 0; };
-// Delayed feeds (TradingView's update_mode: delayed_streaming_<s>, end of day, the scanner poll) get a small grey "15m" tag.
+// Delayed feeds (TradingView's update_mode: delayed_streaming_<s>, end of day, the scanner poll) get a grey dot before Last.
 const delayMin = sym => { const um = String(raw[sym]?.update_mode || ''), d = /delayed_streaming_(\d+)/.exec(um); return d ? Math.round(d[1] / 60) : um === 'polled' ? 15 : um === 'endofday' ? 'EOD' : 0; };
 function paintStale(row, sym) {
-  const dm = delayMin(sym), dt = dm ? (dm === 'EOD' ? 'EOD' : dm + 'm') : '', di = row.querySelector('.dly');
-  if (di && di.textContent !== dt) { di.textContent = dt; di.hidden = !dt; di.title = dt ? (dm === 'EOD' ? 'End-of-day data' : `Delayed ${dm} min`) : ''; }
+  const dm = delayMin(sym), dt = dm ? (dm === 'EOD' ? 'End-of-day data' : `Delayed ${dm} min`) : '', px = row.querySelector('.px');
+  if (row.classList.contains('delayed') !== !!dm) row.classList.toggle('delayed', !!dm);
+  if (px && (px.title || '') !== dt) px.title = dt;
   const t = staleSince(sym), on = !!t;
   if (row.classList.contains('stale') !== on) row.classList.toggle('stale', on);
   const tip = on ? `No data since ${new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}: these numbers may be old` : '';
