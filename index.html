@@ -874,7 +874,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '16.3';  // bump on every push to main
+const APP_VERSION = '16.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1833,14 +1833,16 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, sma200: false, ohlc: true, session: '24h', ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, sma200: false, ohlc: true, session: '24h', dayline: 'prev', ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
   if (y == null || !b) { cd.hidden = true; return; }
-  const o = chartOpts(), res = own.want && /^\d+$/.test(own.want.iv) ? +own.want.iv : 0, q = quotes[own.want?.sym];
+  const o = chartOpts(), res = own.want && /^\d+$/.test(own.want.iv) ? +own.want.iv : 0;
   cd.querySelector('.pr').textContent = fmtPrice(b.close);
-  const pc = cd.querySelector('.pc'); pc.hidden = !(o.pct && q); if (q) pc.textContent = pct(q.c);
+  /* % on the label: change from the first bar in view (its close, like TradingView's percent scale); follows scroll / zoom */
+  const vr = own.chart.timeScale().getVisibleLogicalRange(), d = own.data, f = vr && d?.length ? d[Math.max(0, Math.min(d.length - 1, Math.ceil(vr.from)))] : null, base = f?.close;
+  const pc = cd.querySelector('.pc'); pc.hidden = !(o.pct && base); if (base) pc.textContent = pct((b.close - base) / base * 100);
   const pt = cd.querySelector('.pt'); pt.hidden = !(o.countdown && res);
   if (res) {
     const startUtc = b.time + new Date().getTimezoneOffset() * 60, left = Math.max(0, startUtc + res * 60 - Date.now() / 1000);
@@ -1851,7 +1853,26 @@ function ownCountdown() {
   const g = $('ownChart').querySelector('.copts'); if (g) g.style.width = cd.style.width;
   document.querySelector('.charea').style.setProperty('--axw', cd.style.width);   // the full-screen button keeps clear of the axis
   cd.classList.toggle('up', b.close >= b.open); cd.hidden = false;
-  ownSessions(); ownHiLo(); ownVolLegend(); ownMeasure(); ownEarnings(); ownRays();
+  ownSessions(); ownHiLo(); ownVolLegend(); ownMeasure(); ownEarnings(); ownRays(); ownDayLine();
+}
+// Day reference line (chart option "Day line"): the previous close and / or today's open as a faint dashed line across the
+// chart with a grey axis tag, TradingView style. Values from the quote (prev_close_price / open_price); the previous close
+// falls back to the last bar of the day before in the loaded intraday bars. The lines don't stretch the price scale.
+// Rebuilt only when the symbol's values, the choice or the theme change (this runs with every reposition).
+const DAYLINE_OPTS = [['off', 'Off', 'No line.'], ['prev', 'Previous close', 'The last regular-session close.'], ['open', "Today's open", 'The open of the current (or last) regular session.'], ['both', 'Both', 'Previous close and today\'s open.']];
+function ownDayLine() {
+  if (!own.series) return;
+  const sym = own.want?.sym, r = raw[sym] || {}, o = chartOpts().dayline, lines = [];
+  if (own.active && sym && own.data?.length && o !== 'off') {
+    let pc = r.prev_close_price;
+    if (pc == null && own.intraday) { const day = t => Math.floor(t / 86400), d = own.data, k = d.findLastIndex(x => day(x.time) < day(d[d.length - 1].time)); if (k >= 0) pc = d[k].close; }
+    if (o !== 'open' && pc != null) lines.push(['Prev close', pc]);
+    if (o !== 'prev' && r.open_price != null) lines.push(['Open', r.open_price]);
+  }
+  const key = JSON.stringify([lines, state.theme]); if (own.dayKey === key) return; own.dayKey = key;
+  (own.dayLines || []).forEach(l => own.series.removePriceLine(l));
+  const m = cssVar('--muted'), faint = m + '99';   /* #rrggbb + alpha */
+  own.dayLines = lines.map(([title, price]) => own.series.createPriceLine({ price, color: faint, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, axisLabelColor: m, axisLabelTextColor: cssVar('--bg'), title: lines.length > 1 ? title : '' }));
 }
 // Earnings "E" on the time line: the last report (on its bar) and the next one (in the empty space after the last bar,
 // counted in bars of this interval and session). Hover shows the date.
@@ -1983,7 +2004,7 @@ function ownSessions() {
   if (bg.innerHTML !== html) bg.innerHTML = html;
 }
 const CHART_OPTS = [
-  ['pct', 'Change %', 'Day change next to the last price.'],
+  ['pct', 'Change %', 'Change from the first bar in view, next to the last price.'],
   ['countdown', 'Bar countdown', 'Time left until the current bar closes.'],
   ['sessions', 'Session shading', 'Pre-market, post-market and overnight tinted behind the bars (US symbols, minute charts).'],
   ['volume', 'Volume', 'Volume bars along the bottom, colored by the candle.'],
@@ -2003,7 +2024,7 @@ function setChartOpt(k, on) {
   else if (k === 'hilo') { ownHiLo(); ownVolLegend(); }
   else if (k === 'ohlc') ownOhlc();
   else if (k === 'earnings') ownEarnings();
-  else ownCountdown();
+  else ownCountdown();   /* also redraws the day line */
 }
 // ---- Tool column + measure tool (desktop, own chart) ----
 const toolW = () => isPhone() ? 0 : 40;
@@ -2020,7 +2041,7 @@ const CHART_TOOLS = [
   ['earnings', 'Earnings markers', TI('<circle cx="12" cy="12" r="9"/><path d="M14.5 8h-5v8h5M9.5 12h4"/>')],
   ['sessions', 'Session shading', TI('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1" opacity=".5"/><rect x="16" y="4" width="5" height="16" rx="1"/>')],
   ['countdown', 'Bar countdown', TI('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>')],
-  ['pct', 'Change % on the price label', TI('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>')],
+  ['pct', 'Change % on the price label (from the first bar in view)', TI('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>')],
   '|',
   ['clear', 'Clear measurements', TI('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>')],
 ];
@@ -2647,8 +2668,9 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
   if (isPhone()) {
     const o = chartOpts();
     openSheet('chartopts', 'Chart settings', CHART_OPTS.map(([k, t, d]) => `<label class="setrow"><span><b>${t}</b><small>${d}</small></span><input type="checkbox" data-co="${k}"${o[k] ? ' checked' : ''}></label>`).join('')
-      + `<div class="setrow"><span><b>Session</b><small>Which hours the bars cover.</small></span><select class="field" data-cs>${SESSION_OPTS.map(([v, t]) => `<option value="${v}"${o.session === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>`);
-    $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (k) setChartOpt(k, e.target.checked); if (e.target.dataset.cs != null) setChartOpt('session', e.target.value); });
+      + `<div class="setrow"><span><b>Session</b><small>Which hours the bars cover.</small></span><select class="field" data-cs>${SESSION_OPTS.map(([v, t]) => `<option value="${v}"${o.session === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>`
+      + `<div class="setrow"><span><b>Day line</b><small>Previous close and / or today's open as a faint dashed line.</small></span><select class="field" data-dl>${DAYLINE_OPTS.map(([v, t]) => `<option value="${v}"${o.dayline === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>`);
+    $('shBody').addEventListener('change', e => { const k = e.target.dataset.co; if (k) setChartOpt(k, e.target.checked); if (e.target.dataset.cs != null) setChartOpt('session', e.target.value); if (e.target.dataset.dl != null) setChartOpt('dayline', e.target.value); });
     return;
   }
   closeChartMenu();
@@ -2660,7 +2682,8 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
       + [['buy', 'Buy point', 'B'], ['sell', 'Sell point', 'S'], ['alert', 'Alert', ALERT_TAG.alert]].map(([k, t, g]) => `<button class="ci" data-ray-add="${k}"><span class="rk ${k}">${g}</span>${t}</button>`).join('')
       + `<button class="ci" data-follow-add><span class="rk follow">${ALERT_TAG.follow}</span>Follow alert…</button>`
       + `</div></div><div class="csep"></div>` : '') + CHART_OPTS.map(([k, t]) => `<button class="ci${o[k] ? ' on' : ''}" data-co="${k}"><i></i>${t}</button>`).join('')
-    + `<div class="subw"><button class="ci sub">◂ Session<span class="cv">${SESSION_OPTS.find(x => x[0] === o.session)?.[1] || ''}</span></button><div class="submenu">${SESSION_OPTS.map(([v, t]) => `<button class="ci r${o.session === v ? ' on' : ''}" data-cs="${v}"><i></i>${t}</button>`).join('')}</div></div>`; };
+    + `<div class="subw"><button class="ci sub">◂ Session<span class="cv">${SESSION_OPTS.find(x => x[0] === o.session)?.[1] || ''}</span></button><div class="submenu">${SESSION_OPTS.map(([v, t]) => `<button class="ci r${o.session === v ? ' on' : ''}" data-cs="${v}"><i></i>${t}</button>`).join('')}</div></div>`
+    + `<div class="subw"><button class="ci sub">◂ Day line<span class="cv">${DAYLINE_OPTS.find(x => x[0] === o.dayline)?.[1] || ''}</span></button><div class="submenu">${DAYLINE_OPTS.map(([v, t, d]) => `<button class="ci r${o.dayline === v ? ' on' : ''}" data-dl="${v}" title="${esc(d)}"><i></i>${t}</button>`).join('')}</div></div>`; };
   paint();
   m.addEventListener('click', e => {
     if (e.target.closest('[data-follow-add]')) { const sym = own.want.sym; closeChartMenu(); openAlerts(sym, ray.p); setTimeout(() => $('anS')?.focus(), 50); return; }
@@ -2670,8 +2693,9 @@ function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), ot
       if (ra.dataset.rayAdd) { ln.k = ra.dataset.rayAdd; armRay(sym, ln); askNotify(); }
       own.raySel = ln.id; setRays(sym, [...symRays(sym), ln]); closeChartMenu(); return;
     }
-    const b = e.target.closest('[data-co], [data-cs]'); if (!b) return;
-    if (b.dataset.cs) { setChartOpt('session', b.dataset.cs); closeChartMenu(); return; }   // a session choice closes the menu; checkboxes keep it open
+    const b = e.target.closest('[data-co], [data-cs], [data-dl]'); if (!b) return;
+    if (b.dataset.cs) { setChartOpt('session', b.dataset.cs); closeChartMenu(); return; }
+    if (b.dataset.dl) { setChartOpt('dayline', b.dataset.dl); closeChartMenu(); return; }   // a session choice closes the menu; checkboxes keep it open
     setChartOpt(b.dataset.co, !chartOpts()[b.dataset.co]);
     paint();
   });
