@@ -874,7 +874,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '16.7';  // bump on every push to main
+const APP_VERSION = '16.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2450,15 +2450,16 @@ const ALERT_EVERY = [[1, '1 min'], [5, '5 min'], [10, '10 min'], [30, '30 min'],
 const alertEvery = () => ALERT_EVERY.some(x => x[0] === state.alertCheck?.every) ? state.alertCheck.every : 1;
 const alertBucket = () => Math.floor((Date.now() / 60000 + (Number.isFinite(state.alertCheck?.tz) ? state.alertCheck.tz : -new Date().getTimezoneOffset())) / alertEvery());
 let alertBucketDone = null;
-/* Follow debounce: a crossed pair waits 5 s and then fires on the price at that moment (several steps at once, or nothing
-   when it's back inside), so a quick jump back and forth gives one note — the final one. */
+/* Follow debounce: a crossed pair waits 5 s and then fires once on the price at that moment — several steps at once, the
+   other side if it jumped there, and the crossed line even when the price is back inside (re-centred on that level). */
 const FOLLOW_WAIT = 5000, followWait = new Map();
-function followDebounce(sym, g) {
+function followDebounce(sym, g, id) {
   const k = sym + '|' + g; if (followWait.has(k)) return;
   followWait.set(k, setTimeout(() => {
     followWait.delete(k);
-    const p = livePrice(sym), ln = p == null ? null : followPair(sym, g).find(x => x.d && !x.hit && (x.d > 0 ? p >= x.p : p <= x.p));
-    if (!ln) { clog('info', 'follow settled back inside', { sym, at: p }); return; }
+    const p = livePrice(sym), pair = followPair(sym, g); if (p == null || !pair.length) return;
+    const ln = pair.find(x => x.d && !x.hit && (x.d > 0 ? p >= x.p : p <= x.p)) || pair.find(x => x.id === id);   /* back inside: still the crossed line */
+    if (!ln) return;
     followFire(sym, ln, p); clog('info', 'follow fired', { sym, p: ln.p, at: p }); save(); ownRays(); alertsChanged();
   }, FOLLOW_WAIT));
 }
@@ -2472,7 +2473,7 @@ function checkAlerts() {
   for (const sym of alertSyms()) for (const ln of state.lines[sym]) {
     if (!ln.k || ln.hit || !ln.d) continue;
     const p = livePrice(sym); if (p == null || !alertFeedOk(sym)) continue;
-    if (ln.k === 'follow') { if (ln.d > 0 ? p >= ln.p : p <= ln.p) followDebounce(sym, ln.g); continue; }
+    if (ln.k === 'follow') { if (ln.d > 0 ? p >= ln.p : p <= ln.p) followDebounce(sym, ln.g, ln.id); continue; }
     if (ln.d > 0 ? p >= ln.p : p <= ln.p) { ln.hit = Date.now(); ln.at = p; fired++; clog('info', 'alert fired', { sym, k: ln.k, p: ln.p, at: p }); }
   }
   if (fired) { save(); ownRays(); alertsChanged(); }
