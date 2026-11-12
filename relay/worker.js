@@ -63,6 +63,10 @@ const NF2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFr
 const fmtPrice = p => { const a = Math.abs(p); return a >= 1e12 ? (p / 1e12).toFixed(2) + 'T' : a >= 1e9 ? (p / 1e9).toFixed(2) + 'B' : a >= 1 || a === 0 ? NF2.format(p) : p.toFixed(Math.min(10, 3 - Math.floor(Math.log10(a)))); };
 const fmtStep = v => String(+(+v).toPrecision(6));
 const short = sym => sym.includes(':') ? sym.split(':')[1] : sym;
+const etMin = () => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value])); return +p.hour * 60 + +p.minute; };
+// The client's alert check interval (doc.alertCheck: { every: minutes, tz: minutes east of UTC }): one check per wall-clock step.
+const ALERT_EVERY = [1, 5, 10, 30, 60, 120, 240, 480, 1440];
+const alertBucket = ac => { const every = ALERT_EVERY.includes(ac?.every) ? ac.every : 1; return Math.floor((Date.now() / 60000 + (Number.isFinite(ac?.tz) ? ac.tz : 0)) / every); };
 function usPhase() {   // like the client's sessionPhase: closed / night / pre / open / post (New York time)
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value]));
   const m = +p.hour * 60 + +p.minute, wd = p.weekday;
@@ -75,10 +79,12 @@ async function scanPrices(syms) {
   const cols = ['close', 'premarket_close', 'postmarket_close'];
   const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify({ symbols: { tickers: syms }, columns: cols }) });
   if (!r.ok) return null;
-  const ph = usPhase(), out = {};
+  const ph = usPhase(), out = {}, early = ph === 'open' && etMin() < 570 + 20;
   for (const row of (await r.json()).data || []) {
     const [close, pre, post] = row.d, us = US_EX.has(row.s.split(':')[0]);
-    const p = !us ? close : ph === 'open' ? close : ph === 'pre' ? pre ?? close : ph === 'post' ? post ?? close : null;
+    // 15 min delayed: in the first 20 min of the session `close` is still yesterday's close (12 Nov 2026: NVDA "crossed above"
+    // at 173.73 while it traded at 158) — use the pre-market price there.
+    const p = !us ? close : ph === 'open' ? (early ? pre ?? close : close) : ph === 'pre' ? pre ?? close : ph === 'post' ? post ?? close : null;
     if (typeof p === 'number') out[row.s] = p;
   }
   return out;
@@ -291,7 +297,9 @@ export class SyncRoom extends DurableObject {
     const syms = Object.keys(lines).filter(s => Array.isArray(lines[s]) && lines[s].some(l => l.k && !l.hit && l.d)); if (!syms.length) return;
     await this.ctx.storage.setAlarm(Date.now() + CHECK_MS);
     if (this.liveSockets().length) return;   // a device is watching with live quotes; it fires and its notes push from the PUT
+    const bucket = alertBucket(d0.alertCheck); if (bucket === (await this.ctx.storage.get('checkBucket'))) return;   // once per interval step
     let prices; try { prices = await scanPrices(syms); } catch (_) { return; } if (!prices) return;
+    await this.ctx.storage.put('checkBucket', bucket);
     const d = await this.ctx.storage.get('doc'); if (!d) return;   // re-read: a PUT may have landed during the fetch
     const next = structuredClone(d);
     if (!checkLines(next, prices)) return;
