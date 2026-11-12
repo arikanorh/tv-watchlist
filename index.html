@@ -111,7 +111,7 @@
   .row[data-tone="neu"]::after { background: var(--muted); }
   .row .sym { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
   .row .stl { display: none; flex-shrink: 0; width: 13px; height: 13px; background: var(--pre); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") center / contain no-repeat; }
-  .row.delayed .px::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; position: relative; top: -1px; }   /* delayed feed: a grey dot before Last */
+  body.regular .row.delayed .px::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; position: relative; top: -1px; }   /* delayed feed in the regular session (Ext hidden): a grey dot before Last; otherwise the Ext dot turns grey */
   .row.stale .stl { display: block; } .row.stale .px, .row.stale .chg, .row.stale .ext { opacity: .35; text-decoration: line-through; text-decoration-thickness: 1px; }
   .row .sym b { flex-shrink: 0; font-weight: 600; white-space: nowrap; }   /* the ticker never shrinks; tags after it get clipped first */
   /* sorted view: a short-lived arrow next to a ticker that moved up / down since the last re-order */
@@ -121,7 +121,7 @@
   .row .px, .row .chg, .row .ext { text-align: right; white-space: nowrap; }
   .row .ext { display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 13px; }
   .ss { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .ss.pre { background: var(--pre); } .ss.post { background: var(--post); } .ss.night { background: var(--night); }
+  .ss.pre { background: var(--pre); } .ss.post { background: var(--post); } .ss.night { background: var(--night); } .ss.dly { background: var(--muted); }
   /* Flag strip = the border itself (desktop): hover shows it on unflagged rows, each click cycles the color */
   .fl { display: none; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; padding: 0; }
   .opt .fsw { width: 4px; height: 18px; border-radius: 2px; background: var(--c); margin: 0 7px; flex-shrink: 0; }
@@ -874,7 +874,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '16.5';  // bump on every push to main
+const APP_VERSION = '16.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2978,20 +2978,23 @@ function renderRows() {
   $('rows').innerHTML = html;
   patchRows(false);
 }
+/* the Ext session dot; grey instead of the session color when the symbol's feed is delayed */
+const ssDot = (sym, ss) => { const dm = delayMin(sym); return dm ? `<i class="ss dly" title="${dm === 'EOD' ? 'End-of-day data' : `Delayed ${dm} min`}"></i>` : `<i class="ss ${ss}"></i>`; };
 function cellsFor(sym) {
   const q = quotes[sym];
   if (!q) return { px: '', chg: '', chgCls: '', ext: '', extCls: '' };
   const last = !regular && q.ep != null ? q.ep : q.p;   // outside regular hours Last is the extended price
   return {
     px: fmtPrice(last), chg: pct(q.c), chgCls: dir(q.c),
-    ext: q.e == null ? (q.ss ? `<i class="ss ${q.ss}"></i>` : '') : `<i class="ss ${q.ss}"></i>${pct(q.e)}`, extCls: dir(q.e),
+    ext: q.e == null ? (q.ss ? ssDot(sym, q.ss) : '') : ssDot(sym, q.ss) + pct(q.e), extCls: dir(q.e),
   };
 }
 function flash(node, cls) { if (node.classList.contains('flash')) return; node.classList.add('flash', cls); node.addEventListener('animationend', () => node.classList.remove('flash', cls), { once: true }); }
 // No data: a US-listed symbol with no trade for 5+ minutes during the regular session (the free feed can sit on the
 // open's print with yesterday's change). The row's numbers fade and a clock shows after the ticker; Data in details.
 const staleSince = sym => { const r = raw[sym], t = r?.lp_time * 1000; return t && lastPhase === 'open' && US_EX.has(sym.split(':')[0]) && Date.now() - t > 300000 ? t : 0; };
-// Delayed feeds (TradingView's update_mode: delayed_streaming_<s>, end of day, the scanner poll) get a grey dot before Last.
+// Delayed feeds (TradingView's update_mode: delayed_streaming_<s>, end of day, the scanner poll): the Ext session dot turns grey
+// (`ssDot`); in the regular session, with Ext hidden, a grey dot before Last.
 const delayMin = sym => { const um = String(raw[sym]?.update_mode || ''), d = /delayed_streaming_(\d+)/.exec(um); return d ? Math.round(d[1] / 60) : um === 'polled' ? 15 : um === 'endofday' ? 'EOD' : 0; };
 function paintStale(row, sym) {
   const dm = delayMin(sym), dt = dm ? (dm === 'EOD' ? 'End-of-day data' : `Delayed ${dm} min`) : '', px = row.querySelector('.px');
