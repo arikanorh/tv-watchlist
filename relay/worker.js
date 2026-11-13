@@ -76,15 +76,20 @@ function usPhase() {   // like the client's sessionPhase: closed / night / pre /
 // Prices from TradingView's scanner (US stocks there are 15 min delayed; VIX, crypto, FX, yields are live). US stocks use
 // the pre / post-market price outside regular hours and are skipped overnight / at the weekend (the client uses BOATS then).
 async function scanPrices(syms) {
-  const cols = ['close', 'premarket_close', 'postmarket_close'];
+  const cols = ['close', 'premarket_close', 'postmarket_close', 'premarket_time', 'postmarket_time'];
   const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify({ symbols: { tickers: syms }, columns: cols }) });
   if (!r.ok) return null;
-  const ph = usPhase(), out = {}, early = ph === 'open' && etMin() < 570 + 20;
+  const ph = usPhase(), out = {}, early = ph === 'open' && etMin() < 570 + 20, nowS = Date.now() / 1000;
+  // premarket_time / postmarket_time are the start of that extended session (04:00 / 16:00 ET); a price counts only when
+  // that start is today's (< 6 h ago): at 04:00 ET the delayed scanner still serves the previous day's pre-market close
+  // (13 Nov 2026 04:00 ET: NVDA "crossed below 161.38 at 151.00" while it was ~166).
+  const fresh = t => typeof t === 'number' && nowS - t < 6 * 3600;
   for (const row of (await r.json()).data || []) {
-    const [close, pre, post] = row.d, us = US_EX.has(row.s.split(':')[0]);
+    const [close, pre, post, preT, postT] = row.d, us = US_EX.has(row.s.split(':')[0]);
+    const preOk = fresh(preT) ? pre : null, postOk = fresh(postT) ? post : null;
     // 15 min delayed: in the first 20 min of the session `close` is still yesterday's close (12 Nov 2026: NVDA "crossed above"
-    // at 173.73 while it traded at 158) — use the pre-market price there.
-    const p = !us ? close : ph === 'open' ? (early ? pre ?? close : close) : ph === 'pre' ? pre ?? close : ph === 'post' ? post ?? close : null;
+    // at 173.73 while it traded at 158) — use a fresh pre-market price there, else skip.
+    const p = !us ? close : ph === 'open' ? (early ? preOk : close) : ph === 'pre' ? preOk : ph === 'post' ? postOk ?? close : null;
     if (typeof p === 'number') out[row.s] = p;
   }
   return out;
