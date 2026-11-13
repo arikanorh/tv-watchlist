@@ -337,9 +337,10 @@
   .hr-row time { flex-shrink: 0; font-size: 11px; line-height: 1.35; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
   .alm.fol .flab { flex: 0 0 auto; font-size: 14px; color: var(--text); white-space: nowrap; padding-left: 4px; } .lmnew.alm .field.st, .lm.alm .field.st { flex: 0 0 76px; } .lm.alm.fol .ast { flex: 0 0 auto; font-size: 12px; color: var(--muted); } .lm.alm .field.fn { flex: 0 0 auto; width: auto; font-size: 13px; } .lm.alm.fol .field.st { flex: 0 0 56px; }
-  .lm.alm.fol .fu { flex: 0 0 auto; height: 40px; padding: 0 12px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--muted); background: var(--bg3); }
+  .lm.alm.fol .fu { flex: 0 0 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; color: var(--muted); background: var(--bg3); } .lm.alm.fol .fu svg { width: 18px; height: 18px; }
   .lm.alm.fol .fu.on { color: #fff; background: var(--accent); }   /* unsaved edits */
-  .lm.alm.fol { flex-wrap: wrap; } .lm.alm.fol .field[data-fc] { min-width: 84px; }
+  .lm.alm.fol .field[data-fc] { min-width: 70px; } .alm.fol .flab { font-size: 13px; }
+  @media (max-width: 420px) { .lm.alm.fol { flex-wrap: wrap; } }   /* one line on desktop; narrow phones wrap */
   #drBody .ar { cursor: pointer; }   /* a click on an alert row opens its Alerts sheet */
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
@@ -885,7 +886,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '17.6';  // bump on every push to main
+const APP_VERSION = '17.7';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2534,7 +2535,7 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
     const groups = [...new Set(symRays(sym).filter(l => l.k === 'follow').map(l => l.g))], c0 = around ?? now, fol = around != null;
     $('shBody').innerHTML = `<div class="shint">Last ${now != null ? fmtPrice(now) : '–'}. An alert switches off once the price crosses it; a buy / sell point keeps its icon next to the ticker; a follow alert sits one step below and above and moves with the price each time one is crossed. Lines drawn on the chart show here too.</div>`
       /* follow pair: centre and step are editable (the lines move to centre ± step), the lines' prices shown after */
-      + groups.map(g => { const [lo, hi] = followPair(sym, g), c = hi ? +((lo.p + hi.p) / 2).toPrecision(10) : lo.p; return `<div class="lm alm fol" data-g="${esc(g)}"><span class="flab" title="Follow: ${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}">Follow ±</span><input class="field st" data-fs inputmode="decimal" title="Step" value="${fmtStep(lo.s)}"><input class="field" data-fc inputmode="decimal" title="Centre — lines at ${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}" value="${+c.toPrecision(6)}"><select class="field fn" data-fn title="Notify at most once per… (moves in between are sent as the latest one when the period ends)">${NOTIFY_EVERY.map(([v, t]) => `<option value="${v}"${(+lo.n || 0) === v ? ' selected' : ''}>${v ? '≤ ' + t : t}</option>`).join('')}</select><button class="fu" data-fu title="Apply step, centre and notify period">Update</button><button class="ib del" data-fd title="Remove this follow alert">✕</button></div>`; }).join('')
+      + groups.map(g => { const [lo, hi] = followPair(sym, g), c = hi ? +((lo.p + hi.p) / 2).toPrecision(10) : lo.p; return `<div class="lm alm fol" data-g="${esc(g)}"><span class="flab" title="Follow: ${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}">Follow ±</span><input class="field st" data-fs inputmode="decimal" title="Step" value="${fmtStep(lo.s)}"><input class="field" data-fc inputmode="decimal" title="Centre — lines at ${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}" value="${+c.toPrecision(6)}"><select class="field fn" data-fn title="Notify at most once per… (moves in between are sent as the latest one when the period ends)">${NOTIFY_EVERY.map(([v, t]) => `<option value="${v}"${(+lo.n || 0) === v ? ' selected' : ''}>${v ? '≤ ' + t : t}</option>`).join('')}</select><button class="fu" data-fu title="Update: apply step, centre and notify period (Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button><button class="ib del" data-fd title="Remove this follow alert">✕</button></div>`; }).join('')
       + symRays(sym).filter(ln => ln.k !== 'follow').map(ln => `<div class="lm alm" data-id="${ln.id}">${kinds(ln.k || '', 'data-ak')}<input class="field" data-ap inputmode="decimal" value="${ln.p}">${status(ln)}<button class="ib del" data-ad title="Remove">✕</button></div>`).join('')
       // one add row; "Follow ±step" shows a step field and the price becomes the centre
       + `<div class="lmnew alm">${kinds(fol ? 'follow' : 'alert', 'id="anK"', true)}<input class="field" id="anP" inputmode="decimal" placeholder="${fol ? 'Around' : 'Price'}" value="${c0 != null ? +c0.toPrecision(6) : ''}"><input class="field st" id="anS" inputmode="decimal" placeholder="± step" title="Step" value="${c0 ? niceStep(c0 * 0.025) : ''}"${fol ? '' : ' hidden'}><button id="anAdd">Add</button></div>`;
