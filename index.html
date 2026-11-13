@@ -336,7 +336,7 @@
   .hr-m small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hr-row time { flex-shrink: 0; font-size: 11px; line-height: 1.35; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
-  .alm.fol .flab { flex: 0 0 122px; font-size: 14px; color: var(--text); white-space: nowrap; padding-left: 4px; } .lmnew.alm .field.st { flex: 0 0 84px; } .lm.alm.fol .ast { flex: 1; font-size: 14px; color: var(--muted); }
+  .alm.fol .flab { flex: 0 0 auto; font-size: 14px; color: var(--text); white-space: nowrap; padding-left: 4px; } .lmnew.alm .field.st, .lm.alm .field.st { flex: 0 0 76px; } .lm.alm.fol .ast { flex: 0 0 auto; font-size: 12px; color: var(--muted); }
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
   /* Notes under the top bar: fired alerts, reached buy / sell points, fresh earnings — until dismissed */
@@ -352,9 +352,8 @@
   .note .nt small .up { color: var(--up); } .note .nt small .down { color: var(--down); }
   .note .nx { flex-shrink: 0; width: 30px; height: 30px; border-radius: 7px; color: var(--muted); font-size: 15px; }
   .note .nx:hover { background: var(--bg3); color: var(--text); }
-  .note .ne { display: none; flex-shrink: 0; width: 30px; height: 30px; border-radius: 7px; color: var(--muted); place-items: center; }   /* edit: on hover (always on touch) */
+  .note .ne { display: grid; flex-shrink: 0; width: 30px; height: 30px; border-radius: 7px; color: var(--muted); place-items: center; }   /* edit, always shown */
   .note .ne svg { width: 15px; height: 15px; } .note .ne:hover { background: var(--bg3); color: var(--text); }
-  .note:hover .ne { display: grid; } @media (hover: none) { .note .ne { display: grid; } }
   .notes .nfoot { display: flex; justify-content: flex-end; gap: 6px; }
   .notes .nall { pointer-events: auto; padding: 4px 10px; border-radius: 7px; font-size: 12px; color: var(--muted); background: var(--bg2); border: 1px solid var(--line); }
   @keyframes noteIn { from { opacity: 0; transform: translateY(-6px); } }
@@ -877,7 +876,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '16.9';  // bump on every push to main
+const APP_VERSION = '17.0';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2511,7 +2510,8 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
     const now = livePrice(sym);
     const groups = [...new Set(symRays(sym).filter(l => l.k === 'follow').map(l => l.g))], c0 = around ?? now, fol = around != null;
     $('shBody').innerHTML = `<div class="shint">Last ${now != null ? fmtPrice(now) : '–'}. An alert switches off once the price crosses it; a buy / sell point keeps its icon next to the ticker; a follow alert sits one step below and above and moves with the price each time one is crossed. Lines drawn on the chart show here too.</div>`
-      + groups.map(g => { const [lo, hi] = followPair(sym, g); return `<div class="lm alm fol" data-g="${esc(g)}"><span class="flab">Follow ±${fmtStep(lo.s)}</span><span class="ast">${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}</span><button class="ib del" data-fd title="Remove">✕</button></div>`; }).join('')
+      /* follow pair: centre and step are editable (the lines move to centre ± step), the lines' prices shown after */
+      + groups.map(g => { const [lo, hi] = followPair(sym, g), c = hi ? +((lo.p + hi.p) / 2).toPrecision(10) : lo.p; return `<div class="lm alm fol" data-g="${esc(g)}"><span class="flab">Follow ±</span><input class="field st" data-fs inputmode="decimal" title="Step" value="${fmtStep(lo.s)}"><input class="field" data-fc inputmode="decimal" title="Centre" value="${+c.toPrecision(6)}"><span class="ast">${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}</span><button class="ib del" data-fd title="Remove">✕</button></div>`; }).join('')
       + symRays(sym).filter(ln => ln.k !== 'follow').map(ln => `<div class="lm alm" data-id="${ln.id}">${kinds(ln.k || '', 'data-ak')}<input class="field" data-ap inputmode="decimal" value="${ln.p}">${status(ln)}<button class="ib del" data-ad title="Remove">✕</button></div>`).join('')
       // one add row; "Follow ±step" shows a step field and the price becomes the centre
       + `<div class="lmnew alm">${kinds(fol ? 'follow' : 'alert', 'id="anK"', true)}<input class="field" id="anP" inputmode="decimal" placeholder="${fol ? 'Around' : 'Price'}" value="${c0 != null ? +c0.toPrecision(6) : ''}"><input class="field st" id="anS" inputmode="decimal" placeholder="± step" title="Step" value="${c0 ? niceStep(c0 * 0.025) : ''}"${fol ? '' : ' hidden'}><button id="anAdd">Add</button></div>`;
@@ -2521,6 +2521,13 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
   const body = $('shBody');
   body.onchange = e => {
     if (e.target.matches('#anK')) { const f = e.target.value === 'follow'; $('anS').hidden = !f; $('anP').placeholder = f ? 'Around' : 'Price'; return; }
+    const fr = e.target.closest('[data-g]');
+    if (fr && e.target.matches('[data-fs], [data-fc]')) {   /* edit a follow pair: new centre / step, both lines move, same group (start bar kept) */
+      const s = parseP(fr.querySelector('[data-fs]').value), c = parseP(fr.querySelector('[data-fc]').value), pair = followPair(sym, fr.dataset.g);
+      if (s == null || c == null || c - s <= 0 || !pair.length) { paint(); return; }
+      for (const x of pair) { const up = x.d > 0; x.s = s; x.p = +(up ? c + s : c - s).toPrecision(10); delete x.hit; }
+      setRays(sym, [...symRays(sym)]); toast(`Follow ${fmtPrice(c - s)} / ${fmtPrice(c + s)}`); paint(); return;
+    }
     const row = e.target.closest('[data-id]'); if (!row) return;
     const ln = symRays(sym).find(x => x.id === row.dataset.id); if (!ln) return;
     if (e.target.matches('[data-ak]')) { if (e.target.value) ln.k = e.target.value; else delete ln.k; askNotify(); }
@@ -2538,7 +2545,7 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
     }
     const row = e.target.closest('[data-ad]')?.closest('[data-id]'); if (row) { removeRay(row.dataset.id, sym); paint(); }
   };
-  body.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('#anP, #anS')) $('anAdd').click(); else if (e.key === 'Enter' && e.target.matches('[data-ap]')) e.target.blur(); };
+  body.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('#anP, #anS')) $('anAdd').click(); else if (e.key === 'Enter' && e.target.matches('[data-ap], [data-fs], [data-fc]')) e.target.blur(); };
 }
 // Sound + system notification for a new note (the system one only where the browser allows it).
 let actx = null;
@@ -2684,7 +2691,7 @@ function renderNotes() {
     const kind = n.cls.trim().split(' ').pop();
     return { title: `<b>${esc(short(n.sym))}</b> ${shortWhat({ sym: n.sym, kind, msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), dir: n.dir, ...n.nums })}`, sub: [timeAgo(n.at), n.cls.startsWith('earn') ? n.sub : ''].filter(Boolean).join(' · ') };
   };
-  const html = shown.map(n => { const v = view(n); return `<div class="note ${n.cls}"><span class="ni">${n.icon}</span><button class="nt" data-note-sym="${esc(n.sym)}" title="${esc(n.sub.replace(/<[^>]+>/g, ''))}">${v.title}<small>${v.sub}</small></button>${n.cls.startsWith('earn') ? '' : `<button class="ne" data-note-edit="${esc(n.sym)}" title="Edit alerts of ${esc(short(n.sym))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>`}<button class="nx" data-note-x="${esc(n.key)}" title="Dismiss">✕</button></div>`; }).join('')
+  const html = shown.map(n => { const v = view(n); return `<div class="note ${n.cls}"><span class="ni">${n.icon}</span><button class="nt" data-note-sym="${esc(n.sym)}" data-note-key="${esc(n.key)}" title="${esc(n.sub.replace(/<[^>]+>/g, ''))} · click to dismiss">${v.title}<small>${v.sub}</small></button>${n.cls.startsWith('earn') ? '' : `<button class="ne" data-note-edit="${esc(n.sym)}" data-note-key="${esc(n.key)}" title="Edit alerts of ${esc(short(n.sym))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>`}</div>`; }).join('')
     + (items.length > 2 ? `<div class="nfoot"><button class="nall" data-note-more>${notesOpen ? 'Show less' : `+${items.length - 2} more`}</button><button class="nall" data-note-all>Dismiss all</button></div>` : '');
   if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
   box.hidden = !items.length; if (items.length <= 2) notesOpen = false;
@@ -2697,10 +2704,13 @@ function ackNote(key) {
 }
 function onNoteClick(e) {
   if (e.target.closest('[data-note-more]')) { notesOpen = !notesOpen; renderNotes(); return; }
-  const ed = e.target.closest('[data-note-edit]'); if (ed) { openAlerts(ed.dataset.noteEdit); return; }   /* the symbol's alerts sheet; the note stays */
-  const x = e.target.closest('[data-note-x]'), all = e.target.closest('[data-note-all]'), go = e.target.closest('[data-note-sym]');
-  if (x || all) { (all ? noteItems().map(n => n.key) : [x.dataset.noteX]).forEach(ackNote); save(); patchRows(false); renderNotes(); return; }
-  if (go && go.dataset.noteSym !== state.symbol) selectSymbol(go.dataset.noteSym, false);
+  /* a click dismisses the note: on the text it also opens the symbol, on the pencil that symbol's Alerts sheet */
+  const ed = e.target.closest('[data-note-edit]'), all = e.target.closest('[data-note-all]'), go = e.target.closest('[data-note-sym]');
+  const keys = all ? noteItems().map(n => n.key) : (ed || go) ? [(ed || go).dataset.noteKey] : [];
+  if (!keys.length) return;
+  keys.forEach(ackNote); save(); patchRows(false); renderNotes();
+  if (ed) openAlerts(ed.dataset.noteEdit);
+  else if (go && go.dataset.noteSym !== state.symbol) selectSymbol(go.dataset.noteSym, false);
 }
 // Chart settings: a context-style menu next to the ⚙ on desktop (click toggles, stays open), a sheet on phones.
 function openChartOpts(at) {   // at = {x, y} inside #ownChart (right-click), otherwise beside the gear
