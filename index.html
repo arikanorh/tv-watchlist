@@ -336,7 +336,7 @@
   .hr-m small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hr-row time { flex-shrink: 0; font-size: 11px; line-height: 1.35; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
-  .alm.fol .flab { flex: 0 0 auto; font-size: 14px; color: var(--text); white-space: nowrap; padding-left: 4px; } .lmnew.alm .field.st, .lm.alm .field.st { flex: 0 0 76px; } .lm.alm.fol .ast { flex: 0 0 auto; font-size: 12px; color: var(--muted); }
+  .alm.fol .flab { flex: 0 0 auto; font-size: 14px; color: var(--text); white-space: nowrap; padding-left: 4px; } .lmnew.alm .field.st, .lm.alm .field.st { flex: 0 0 76px; } .lm.alm.fol .ast { flex: 0 0 auto; font-size: 12px; color: var(--muted); } .lm.alm .field.fn { flex: 0 0 auto; width: auto; font-size: 13px; } .lm.alm.fol .field.st { flex: 0 0 56px; }
   .alr i.bell.hit { --c: #f7a600; background: none; color: var(--c); animation: ring .9s ease-in-out 4; }
   @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(16deg); } 75% { transform: rotate(-16deg); } }
   /* Notes under the top bar: fired alerts, reached buy / sell points, fresh earnings — until dismissed */
@@ -881,7 +881,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '17.2';  // bump on every push to main
+const APP_VERSION = '17.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1007,14 +1007,14 @@ const SYNC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const syncApi = () => (new URLSearchParams(location.search).get('sync_api') || RELAY_WS.replace(/^wss:/, 'https:').replace(/\/$/, '')) + '/state/';
 const syncShape = lists => lists.filter(l => l.auto !== 'points').map(l => ({ id: l.id, name: l.name, summary: l.summary, ...(l.auto ? { auto: l.auto } : {}),
   groups: l.groups.filter(g => !g.auto).map(g => ({ name: g.name, symbols: g.symbols })) }));
-const syncDoc = () => ({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null, notifLog: state.notifLog || [], alertCheck: state.alertCheck || null });
+const syncDoc = () => ({ lists: syncShape(state.lists), flags: state.flags || {}, sort: state.sort || null, lines: state.lines || {}, seen: state.seen || {}, pins: state.pins || null, notifLog: state.notifLog || [] });
 const syncJson = () => JSON.stringify(syncDoc());
 // ---- three-way merge ----
 const SYNC_BASE_KEY = 'tvwl.syncBase.v1';
 let syncBase = (() => { try { return JSON.parse(localStorage.getItem(SYNC_BASE_KEY)); } catch (_) { return null; } })();   // { code, updatedAt, doc }
 const stableJson = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(y => [y, x[y]])) : x);
 const sameJ = (a, b) => stableJson(a ?? null) === stableJson(b ?? null);
-const docPart = d => ({ lists: d.lists, flags: d.flags || {}, sort: d.sort ?? null, lines: d.lines || {}, seen: d.seen || {}, pins: d.pins ?? null, notifLog: d.notifLog || [], alertCheck: d.alertCheck ?? null });
+const docPart = d => ({ lists: d.lists, flags: d.flags || {}, sort: d.sort ?? null, lines: d.lines || {}, seen: d.seen || {}, pins: d.pins ?? null, notifLog: d.notifLog || [] });
 function setSyncBase(doc, updatedAt) { syncBase = { code: state.sync?.code, updatedAt, doc: JSON.parse(JSON.stringify(docPart(doc))) };   /* a copy: state shares arrays with docs and edits them in place */ try { localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(syncBase)); } catch (_) {} }
 const baseOk = () => syncBase && syncBase.code === state.sync?.code;
 const localDirty = () => !baseOk() || !sameJ(syncDoc(), syncBase.doc);
@@ -1070,7 +1070,6 @@ function syncMerge(b, l, r) {
     seen: m3obj(b.seen, l.seen, r.seen),
     sort: m3(b.sort, l.sort, r.sort),
     pins: m3(b.pins, l.pins, r.pins),
-    alertCheck: m3(b.alertCheck, l.alertCheck, r.alertCheck),
     lines: mergeLines(b.lines, l.lines, r.lines, lineTie),
     notifLog: [...notes.values()].sort((a, c) => (c.t || 0) - (a.t || 0)).slice(0, 100),
   };
@@ -1221,7 +1220,6 @@ function syncAdopt(remote, notify = true, base = remote) {
   if (remote.flags && typeof remote.flags === 'object') state.flags = remote.flags;
   if ('sort' in remote) state.sort = ['chg', 'ext'].includes(remote.sort) ? remote.sort : null;   // the Chg% / Ext sort travels too
   if (remote.lines && typeof remote.lines === 'object') { state.lines = remote.lines; oneFollow(state.lines); }   // chart lines and alerts too (one follow pair per symbol)
-  if ('alertCheck' in remote) state.alertCheck = remote.alertCheck && typeof remote.alertCheck === 'object' ? remote.alertCheck : null;   // alert check interval
   if (remote.seen && typeof remote.seen === 'object') state.seen = remote.seen;   // dismissed earnings notes
   if (Array.isArray(remote.pins)) state.pins = remote.pins;   // pinned quick symbols
   if (Array.isArray(remote.notifLog)) state.notifLog = remote.notifLog;   // notification history
@@ -2338,9 +2336,15 @@ function followFire(sym, ln, p) {
   // only the price moves — the lines keep their start bar (t) — and they flash briefly on the chart
   for (const x of followPair(sym, ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; rayFlash.set(x.id, Date.now() + 2500); }
   setTimeout(ownRays, 2600);
-  // dedupe across devices: same pair, same level, same minute
-  logNote({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(Date.now() / 60000)}`, t: Date.now(), sym, kind: 'follow', note: true, dir: up0 ? 1 : -1, lvl, px: p, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(ln.snd ? { snd: ln.snd } : {}),
-    msg: `Follow ±${fmtStep(s)}: crossed ${up0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(p)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
+  const pair = followPair(sym, ln.g), trig = { lvl, dir: up0 ? 1 : -1, px: p, c };
+  if (+ln.n && Date.now() - (ln.na || 0) < ln.n * 60000) { for (const x of pair) x.nt = trig; return; }   /* quiet period: keep the latest trigger */
+  followNote(sym, pair, s, trig);
+}
+/* One follow note (dedupe across devices: same pair, same level, same minute); starts the pair's notify period. */
+function followNote(sym, pair, s, { lvl, dir, px, c }) {
+  const now = Date.now(), a = pair[0]; for (const x of pair) { x.na = now; delete x.nt; }
+  logNote({ key: `f:${sym}:${a.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir, lvl, px, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(a.snd ? { snd: a.snd } : {}),
+    msg: `Follow ±${fmtStep(s)}: crossed ${dir > 0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(px)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
 }
 // Notification history (state.notifLog, synced, newest first, 100 kept): every note once — fired alerts, reached points,
 // follow alerts, earnings results. Plain text only (it comes back through sync). Follow notes live only here (`note`, `ack`).
@@ -2451,11 +2455,12 @@ function drawerTick() {
   });
 })();
 // Run on every quote batch: a level whose crossing happened fires (once; a follow pair moves on instead).
-/* Alert check interval (Settings → Alert check, synced, the relay follows it too): alerts are looked at once per interval,
-   on wall-clock steps in the setting device's time zone (1 min → every minute, 4 h → 00:00 / 04:00 / …, 1 day → midnight). */
-const ALERT_EVERY = [[1, '1 min'], [5, '5 min'], [10, '10 min'], [30, '30 min'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours'], [1440, '1 day']];
-const alertEvery = () => ALERT_EVERY.some(x => x[0] === state.alertCheck?.every) ? state.alertCheck.every : 1;
-const alertBucket = () => Math.floor((Date.now() / 60000 + (Number.isFinite(state.alertCheck?.tz) ? state.alertCheck.tz : -new Date().getTimezoneOffset())) / alertEvery());
+/* Alerts are checked once per wall-clock minute (here and in the relay). How often a follow pair may notify is per pair
+   (`n` minutes on both lines, 0 = every move; Alerts sheet → Notify): the pair keeps following the price at every check,
+   but a move within `n` minutes of its last note (`na`) stays quiet and is remembered (`nt` = {lvl, dir, px, c}); when the
+   period is over, that latest trigger is sent as one note. */
+const NOTIFY_EVERY = [[0, 'Every move'], [1, '1 min'], [5, '5 min'], [10, '10 min'], [30, '30 min'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours'], [1440, '1 day']];
+const alertBucket = () => Math.floor(Date.now() / 60000);
 let alertBucketDone = null;
 /* Follow debounce: a crossed pair waits 5 s and then fires once on the price at that moment — several steps at once, the
    other side if it jumped there, and the crossed line even when the price is back inside (re-centred on that level). */
@@ -2477,6 +2482,10 @@ function checkAlerts() {
   if (alertsHeld()) return;   // not before this device has the room's latest copy
   const bucket = alertBucket(); if (bucket === alertBucketDone) return; alertBucketDone = bucket;
   let fired = 0;
+  for (const sym of alertSyms()) for (const g of new Set(state.lines[sym].filter(x => x.k === 'follow' && x.nt).map(x => x.g))) {   /* period over: the latest quiet trigger */
+    const pair = followPair(sym, g), a = pair.find(x => x.nt); if (!a || Date.now() - (a.na || 0) < (+a.n || 0) * 60000) continue;
+    const t = a.nt; followNote(sym, pair, a.s, t); fired++; clog('info', 'follow note after quiet period', { sym, lvl: t.lvl });
+  }
   for (const sym of alertSyms()) for (const ln of state.lines[sym]) {
     if (!ln.k || ln.hit || !ln.d) continue;
     const p = livePrice(sym); if (p == null || !alertFeedOk(sym)) continue;
@@ -2516,7 +2525,7 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
     const groups = [...new Set(symRays(sym).filter(l => l.k === 'follow').map(l => l.g))], c0 = around ?? now, fol = around != null;
     $('shBody').innerHTML = `<div class="shint">Last ${now != null ? fmtPrice(now) : '–'}. An alert switches off once the price crosses it; a buy / sell point keeps its icon next to the ticker; a follow alert sits one step below and above and moves with the price each time one is crossed. Lines drawn on the chart show here too.</div>`
       /* follow pair: centre and step are editable (the lines move to centre ± step), the lines' prices shown after */
-      + groups.map(g => { const [lo, hi] = followPair(sym, g), c = hi ? +((lo.p + hi.p) / 2).toPrecision(10) : lo.p; return `<div class="lm alm fol" data-g="${esc(g)}"><span class="flab">Follow ±</span><input class="field st" data-fs inputmode="decimal" title="Step" value="${fmtStep(lo.s)}"><input class="field" data-fc inputmode="decimal" title="Centre" value="${+c.toPrecision(6)}"><span class="ast">${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}</span><button class="ib del" data-fd title="Remove">✕</button></div>`; }).join('')
+      + groups.map(g => { const [lo, hi] = followPair(sym, g), c = hi ? +((lo.p + hi.p) / 2).toPrecision(10) : lo.p; return `<div class="lm alm fol" data-g="${esc(g)}"><span class="flab" title="Follow: ${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}">Follow ±</span><input class="field st" data-fs inputmode="decimal" title="Step" value="${fmtStep(lo.s)}"><input class="field" data-fc inputmode="decimal" title="Centre — lines at ${fmtPrice(lo.p)}${hi ? ' / ' + fmtPrice(hi.p) : ''}" value="${+c.toPrecision(6)}"><select class="field fn" data-fn title="Notify at most once per… (moves in between are sent as the latest one when the period ends)">${NOTIFY_EVERY.map(([v, t]) => `<option value="${v}"${(+lo.n || 0) === v ? ' selected' : ''}>${v ? '≤ ' + t : t}</option>`).join('')}</select><button class="ib del" data-fd title="Remove">✕</button></div>`; }).join('')
       + symRays(sym).filter(ln => ln.k !== 'follow').map(ln => `<div class="lm alm" data-id="${ln.id}">${kinds(ln.k || '', 'data-ak')}<input class="field" data-ap inputmode="decimal" value="${ln.p}">${status(ln)}<button class="ib del" data-ad title="Remove">✕</button></div>`).join('')
       // one add row; "Follow ±step" shows a step field and the price becomes the centre
       + `<div class="lmnew alm">${kinds(fol ? 'follow' : 'alert', 'id="anK"', true)}<input class="field" id="anP" inputmode="decimal" placeholder="${fol ? 'Around' : 'Price'}" value="${c0 != null ? +c0.toPrecision(6) : ''}"><input class="field st" id="anS" inputmode="decimal" placeholder="± step" title="Step" value="${c0 ? niceStep(c0 * 0.025) : ''}"${fol ? '' : ' hidden'}><button id="anAdd">Add</button></div>`;
@@ -2527,6 +2536,10 @@ function openAlerts(sym, around) {   // around: a price to centre a new follow a
   body.onchange = e => {
     if (e.target.matches('#anK')) { const f = e.target.value === 'follow'; $('anS').hidden = !f; $('anP').placeholder = f ? 'Around' : 'Price'; return; }
     const fr = e.target.closest('[data-g]');
+    if (fr && e.target.matches('[data-fn]')) {   /* notify period of the pair */
+      const v = +e.target.value; for (const x of followPair(sym, fr.dataset.g)) { if (v) x.n = v; else delete x.n; if (!v) delete x.nt; }
+      setRays(sym, [...symRays(sym)]); toast(v ? `Notifies at most once per ${NOTIFY_EVERY.find(x => x[0] === v)[1]}` : 'Notifies every move'); paint(); return;
+    }
     if (fr && e.target.matches('[data-fs], [data-fc]')) {   /* edit a follow pair: new centre / step, both lines move, same group (start bar kept) */
       const s = parseP(fr.querySelector('[data-fs]').value), c = parseP(fr.querySelector('[data-fc]').value), pair = followPair(sym, fr.dataset.g);
       if (s == null || c == null || c - s <= 0 || !pair.length) { paint(); return; }
@@ -3690,7 +3703,6 @@ function openSettings() {
   openSheet('settings', 'Settings', `<div class="sync" id="syncBox"></div>
     <div class="setrow theme"><span><b>Theme</b><small>Colors for the whole app and both charts.</small></span><div class="tseg" data-theme-seg><button data-theme="dark" title="Dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button><button data-theme="light" title="Light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></div></div>
     ${[['alertSound', 'Alert sound', 'Alerts and buy / sell points. Rising for an upward cross, falling for a downward one.', 'alert'], ['followSound', 'Follow sound', 'Follow alerts, each time the pair moves.', 'follow']].map(([k, t, d, kind]) => `<div class="setrow snd"><span><b>${t}</b><small>${d}</small></span><select class="field" data-snd-key="${k}">${SOUNDS.map(x => `<option value="${x.id}"${defaultSound(kind) === x.id ? ' selected' : ''}>${x.name}</option>`).join('')}<option value="off"${defaultSound(kind) === 'off' ? ' selected' : ''}>Off</option></select><button class="ib" data-snd="1" title="Play upward">▲</button><button class="ib" data-snd="-1" title="Play downward">▼</button></div>`).join('')}
-    <div class="setrow"><span><b>Alert check</b><small>How often alerts, points and follow alerts look at the price (all devices and the relay; on the clock: 4 hours = 00:00, 04:00, …).</small></span><select class="field" id="alertEvery">${ALERT_EVERY.map(([v, t]) => `<option value="${v}"${alertEvery() === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
     <label class="setrow"><span><b>Own chart for all symbols</b><small>Draw every chart ourselves (TradingView data, Lightweight Charts) instead of the TradingView widget. Lighter and faster; no drawing tools or indicators.</small></span><input type="checkbox" id="ownAll"${state.ownChart ? ' checked' : ''}></label>
     <div class="setrow ntf" id="ntfRow"><span><b>Notifications</b><small></small></span><button class="btn" data-ntf></button></div>
     <div class="about"><span>tv-watchlist v${APP_VERSION} · charts by <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></span><button class="btn link" data-act="reconnect">Reconnect quotes</button></div>`);
@@ -3709,7 +3721,6 @@ function openSettings() {
     }
     sysNotify('Test notification', 'Alerts will show like this.', state.symbol, true);
   });
-  $('alertEvery').addEventListener('change', e => { state.alertCheck = { every: +e.target.value, tz: -new Date().getTimezoneOffset() }; alertBucketDone = null; save(); toast('Alerts checked every ' + ALERT_EVERY.find(x => x[0] === +e.target.value)[1]); });
   $('ownAll').addEventListener('change', e => {
     state.ownChart = e.target.checked; save();
     if (!state.ownChart && !$('tv_chart').querySelector('iframe')) mountChart();

@@ -64,9 +64,8 @@ const fmtPrice = p => { const a = Math.abs(p); return a >= 1e12 ? (p / 1e12).toF
 const fmtStep = v => String(+(+v).toPrecision(6));
 const short = sym => sym.includes(':') ? sym.split(':')[1] : sym;
 const etMin = () => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value])); return +p.hour * 60 + +p.minute; };
-// The client's alert check interval (doc.alertCheck: { every: minutes, tz: minutes east of UTC }): one check per wall-clock step.
-const ALERT_EVERY = [1, 5, 10, 30, 60, 120, 240, 480, 1440];
-const alertBucket = ac => { const every = ALERT_EVERY.includes(ac?.every) ? ac.every : 1; return Math.floor((Date.now() / 60000 + (Number.isFinite(ac?.tz) ? ac.tz : 0)) / every); };
+// Alerts are checked once per wall-clock minute (like the client).
+const alertBucket = () => Math.floor(Date.now() / 60000);
 function usPhase() {   // like the client's sessionPhase: closed / night / pre / open / post (New York time)
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value]));
   const m = +p.hour * 60 + +p.minute, wd = p.weekday;
@@ -114,6 +113,20 @@ function checkLines(doc, prices) {   // mutates doc: hits, follow moves, notifLo
   const now = Date.now(), log = doc.notifLog = Array.isArray(doc.notifLog) ? doc.notifLog : [];
   const note = e => { if (!log.some(x => x.key === e.key)) log.unshift(e); };
   let fired = 0;
+  // A follow pair's own notify period (`n` minutes; the client's followFire / followNote): moves inside it stay quiet and
+  // keep the latest trigger (`nt`), which is sent once the period is over.
+  const fnote = (sym, pair, s, { lvl, dir, px, c }) => {
+    const a = pair[0]; for (const x of pair) { x.na = now; delete x.nt; }
+    note({ key: `f:${sym}:${a.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir, lvl, px, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(a.snd ? { snd: a.snd } : {}),
+      msg: `Follow ±${fmtStep(s)}: crossed ${dir > 0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(px)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
+  };
+  for (const [sym, lines] of Object.entries(doc.lines || {})) {
+    if (!Array.isArray(lines)) continue;
+    for (const g of new Set(lines.filter(x => x.k === 'follow' && x.nt).map(x => x.g))) {
+      const pair = lines.filter(x => x.k === 'follow' && x.g === g), a = pair.find(x => x.nt);
+      if (now - (a.na || 0) >= (+a.n || 0) * 60000) { fnote(sym, pair, a.s, a.nt); fired++; }
+    }
+  }
   for (const [sym, lines] of Object.entries(doc.lines || {})) {
     const p = prices[sym]; if (p == null || !Array.isArray(lines)) continue;
     for (const ln of lines) {
@@ -122,9 +135,10 @@ function checkLines(doc, prices) {   // mutates doc: hits, follow moves, notifLo
       if (ln.k === 'follow') {
         const s = ln.s, lvl = ln.p, up0 = ln.d > 0; let c = lvl;
         if (up0) while (p >= c + s) c += s; else while (p <= c - s) c -= s;
-        for (const x of lines.filter(x => x.k === 'follow' && x.g === ln.g)) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; }
-        note({ key: `f:${sym}:${ln.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir: up0 ? 1 : -1, lvl, px: p, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(ln.snd ? { snd: ln.snd } : {}),
-          msg: `Follow ±${fmtStep(s)}: crossed ${up0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(p)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
+        const pair = lines.filter(x => x.k === 'follow' && x.g === ln.g);
+        for (const x of pair) { const up = x === ln ? up0 : x.p > lvl; x.p = +(up ? c + s : c - s).toPrecision(10); x.d = up ? 1 : -1; }
+        const trig = { lvl, dir: up0 ? 1 : -1, px: p, c };
+        if (+ln.n && now - (ln.na || 0) < ln.n * 60000) { for (const x of pair) x.nt = trig; } else fnote(sym, pair, s, trig);
       } else {
         ln.hit = now; ln.at = p;
         const what = ln.k === 'buy' ? 'Buy point reached' : ln.k === 'sell' ? 'Sell point reached' : `Alert: crossed ${ln.d > 0 ? 'above' : 'below'}`;
@@ -302,7 +316,7 @@ export class SyncRoom extends DurableObject {
     const syms = Object.keys(lines).filter(s => Array.isArray(lines[s]) && lines[s].some(l => l.k && !l.hit && l.d)); if (!syms.length) return;
     await this.ctx.storage.setAlarm(Date.now() + CHECK_MS);
     if (this.liveSockets().length) return;   // a device is watching with live quotes; it fires and its notes push from the PUT
-    const bucket = alertBucket(d0.alertCheck); if (bucket === (await this.ctx.storage.get('checkBucket'))) return;   // once per interval step
+    const bucket = alertBucket(); if (bucket === (await this.ctx.storage.get('checkBucket'))) return;   // once a minute
     let prices; try { prices = await scanPrices(syms); } catch (_) { return; } if (!prices) return;
     await this.ctx.storage.put('checkBucket', bucket);
     const d = await this.ctx.storage.get('doc'); if (!d) return;   // re-read: a PUT may have landed during the fetch
