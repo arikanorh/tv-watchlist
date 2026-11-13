@@ -886,7 +886,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '17.7';  // bump on every push to main
+const APP_VERSION = '17.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2489,6 +2489,10 @@ function followDebounce(sym, g, id) {
    they don't fire here; the relay or a device with the live feed does. */
 const alertFeedOk = sym => !(raw[sym]?.update_mode === 'polled' && US_EX.has(sym.split(':')[0]));
 function checkAlerts() {
+  /* With a sync code the room (relay) is the single place alerts are checked and sent from (live prices, once a minute,
+     5 s follow debounce, push); devices only show the notes it writes. A device waking with stale quotes or an old copy
+     used to fire false alerts. Without a code this device checks itself. */
+  if (state.sync?.code) return;
   if (alertsHeld()) return;   // not before this device has the room's latest copy
   const bucket = alertBucket(); if (bucket === alertBucketDone) return; alertBucketDone = bucket;
   let fired = 0;
@@ -2711,7 +2715,7 @@ function renderNotes() {
   const fresh = items.filter(n => !notesKnown.has(n.key)); fresh.forEach(n => notesKnown.add(n.key));
   // every note goes into the history once (plain text: the sub line loses its colored spans)
   if (fresh.map(n => logNote({ key: n.key, t: n.at, sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), ...(n.nums?.lvl != null ? { ...n.nums, dir: n.dir } : {}) })).some(Boolean)) save();
-  if (fresh.length && Date.now() - pageStart > 15000) { const n0 = fresh.sort((a, b) => b.at - a.at)[0]; chime(n0.dir, n0.snd || defaultSound(n0.cls === 'follow' ? 'follow' : 'alert')); fresh.forEach(n => { const t = noteText({ sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), dir: n.dir, ...n.nums }); sysNotify(t.title, t.body, n.sym); }); }   // the newest note sets the chime: its direction and its alert's own sound
+  if (fresh.length && Date.now() - pageStart > 15000) { const n0 = fresh.sort((a, b) => b.at - a.at)[0]; chime(n0.dir, n0.snd || defaultSound(n0.cls === 'follow' ? 'follow' : 'alert')); fresh.forEach(n => { if (pushState === 'on' && ['follow', 'alert', 'buy', 'sell'].includes(n.cls.trim().split(' ').pop())) return;   /* the room pushes these */ const t = noteText({ sym: n.sym, kind: n.cls.trim().split(' ').pop(), msg: n.msg, sub: n.sub.replace(/<[^>]+>/g, ''), dir: n.dir, ...n.nums }); sysNotify(t.title, t.body, n.sym); }); }   // the newest note sets the chime: its direction and its alert's own sound
   const shown = notesOpen ? items : items.slice(0, 2);   // two at a time; the rest behind "+N more"
   // Shown short: the title says what happened (same words as the system notification), the second line only how long
   // ago — earnings keep their EPS / revenue line. Prices stay in the history / push body.

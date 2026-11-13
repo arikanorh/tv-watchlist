@@ -72,7 +72,50 @@ function usPhase() {   // like the client's sessionPhase: closed / night / pre /
   if (wd === 'Sat' || (wd === 'Sun' && m < 1200) || (wd === 'Fri' && m >= 1200)) return 'closed';
   return m < 240 || m >= 1200 ? 'night' : m < 570 ? 'pre' : m < 960 ? 'open' : 'post';
 }
-// Prices from TradingView's scanner (US stocks there are 15 min delayed; VIX, crypto, FX, yields are live). US stocks use
+// Live prices from one short TradingView quote session (the same unauthorized feed the app uses: US stocks real-time
+// via Cboe One, overnight via the BOATS twin), picked like the client's livePrice: regular session → last; pre / post →
+// the extended price (rtc); overnight → BOATS last, else rtc; weekend → US stocks skipped. A price older than the start
+// of the current session is skipped (at 04:00 / 09:30 the feed can still carry the previous session's value).
+const NON_EQUITY = new Set(['index', 'cfd', 'futures', 'economic']);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function livePrices(syms) {
+  const ph = usPhase(), night = ph === 'night', boats = s => { const [ex, t] = s.split(':'); return t && US_EX.has(ex) ? 'BOATS:' + t : null; };
+  const want = [...new Set([...syms, ...(night ? syms.map(boats).filter(Boolean) : [])])];
+  const up = await fetch(UPSTREAM, { headers: { Upgrade: 'websocket', Origin: 'https://www.tradingview.com' } });
+  const ws = up.webSocket; if (!ws) return null;
+  ws.accept();
+  const raw = {}, seen = new Set(), frame = o => { const j = JSON.stringify(o); return '~m~' + j.length + '~m~' + j; };
+  await new Promise(res => {
+    let grace = null; const end = setTimeout(res, 8000);
+    const fin = () => { clearTimeout(end); clearTimeout(grace); res(); };
+    ws.addEventListener('message', e => {
+      for (const part of String(e.data).split(/~m~\d+~m~/).filter(Boolean)) {
+        if (part.startsWith('~h~')) { try { ws.send('~m~' + part.length + '~m~' + part); } catch (_) {} continue; }
+        let m; try { m = JSON.parse(part); } catch (_) { continue; }
+        if (m.m !== 'qsd' || !m.p?.[1]?.n) continue;
+        const q = m.p[1]; seen.add(q.n); if (q.s === 'ok') raw[q.n] = Object.assign(raw[q.n] || {}, q.v);
+      }
+      if (!grace && want.every(s => seen.has(s))) grace = setTimeout(fin, 600);   // the rest of the first snapshot
+    });
+    ws.addEventListener('close', fin); ws.addEventListener('error', fin);
+    for (const o of [{ m: 'set_auth_token', p: ['unauthorized_user_token'] }, { m: 'quote_create_session', p: ['qs'] },
+      { m: 'quote_set_fields', p: ['qs', 'lp', 'lp_time', 'rtc', 'rtc_time', 'current_session', 'type'] }, { m: 'quote_add_symbols', p: ['qs', ...want] }]) ws.send(frame(o));
+  });
+  try { ws.close(1000, 'done'); } catch (_) {}
+  const out = {}, nowS = Date.now() / 1000, m = etMin(), since = start => nowS - (((m - start) % 1440 + 1440) % 1440) * 60 - 90;
+  for (const s of syms) {
+    const r = raw[s]; if (!r || r.lp == null) continue;
+    if (!US_EX.has(s.split(':')[0])) { out[s] = r.lp; continue; }
+    if (ph === 'closed') continue;
+    const fresh = (t, start) => !t || t >= since(start);
+    if (ph === 'open') { if (fresh(r.lp_time, 570)) out[s] = r.lp; continue; }
+    if (night) { const b = raw[boats(s)]; if (b?.lp != null && !NON_EQUITY.has(r.type)) out[s] = b.lp; else if (r.rtc != null && fresh(r.rtc_time, 960)) out[s] = r.rtc; continue; }
+    if (r.rtc != null && fresh(r.rtc_time, ph === 'pre' ? 240 : 960)) out[s] = r.rtc;
+  }
+  return out;
+}
+// Prices from TradingView's scanner (US stocks there are 15 min delayed; VIX, crypto, FX, yields are live) — fallback when
+// the quote socket gives nothing. US stocks use
 // the pre / post-market price outside regular hours and are skipped overnight / at the weekend (the client uses BOATS then).
 async function scanPrices(syms) {
   const cols = ['close', 'premarket_close', 'postmarket_close', 'premarket_time', 'postmarket_time'];
@@ -109,7 +152,10 @@ function pushText(e) {
   if (/^Earnings /.test(e.msg || '')) return { title: `${s} earnings ${e.msg.slice(9)}`, body: e.sub || '' };
   return { title: `${s} · ${e.msg}`, body: e.sub || '' };
 }
-function checkLines(doc, prices) {   // mutates doc: hits, follow moves, notifLog entries (same keys as the client's)
+// mutates doc: hits, follow moves, notifLog entries (same keys as the client's). only: 'follow' (pairs + their quiet-period
+// notes) or 'other' (alerts, buy / sell points). force: follow line ids crossed 5 s ago (debounce) that fire on this price
+// even when it is back inside (re-centred on that level), unless their pair already fired here.
+function checkLines(doc, prices, { only, force } = {}) {
   const now = Date.now(), log = doc.notifLog = Array.isArray(doc.notifLog) ? doc.notifLog : [];
   const note = e => { if (!log.some(x => x.key === e.key)) log.unshift(e); };
   let fired = 0;
@@ -120,17 +166,21 @@ function checkLines(doc, prices) {   // mutates doc: hits, follow moves, notifLo
     note({ key: `f:${sym}:${a.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir, lvl, px, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(a.snd ? { snd: a.snd } : {}),
       msg: `Follow ±${fmtStep(s)}: crossed ${dir > 0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(px)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
   };
-  for (const [sym, lines] of Object.entries(doc.lines || {})) {
+  for (const [sym, lines] of Object.entries(only === 'other' ? {} : doc.lines || {})) {
     if (!Array.isArray(lines)) continue;
     for (const g of new Set(lines.filter(x => x.k === 'follow' && x.nt).map(x => x.g))) {
       const pair = lines.filter(x => x.k === 'follow' && x.g === g), a = pair.find(x => x.nt);
       if (now - (a.na || 0) >= (+a.n || 0) * 60000) { fnote(sym, pair, a.s, a.nt); fired++; }
     }
   }
+  const movedG = new Set();
   for (const [sym, lines] of Object.entries(doc.lines || {})) {
     const p = prices[sym]; if (p == null || !Array.isArray(lines)) continue;
-    for (const ln of lines) {
-      if (!ln.k || ln.hit || !ln.d || !(ln.d > 0 ? p >= ln.p : p <= ln.p)) continue;
+    const cand = [...lines.filter(ln => ln.k && !ln.hit && ln.d && (ln.d > 0 ? p >= ln.p : p <= ln.p))];
+    for (const ln of lines) if (force?.has(ln.id) && ln.k === 'follow' && !cand.some(x => x.g === ln.g)) cand.push(ln);   // back inside: still the crossed line
+    for (const ln of cand) {
+      if (only && (only === 'follow') !== (ln.k === 'follow')) continue;
+      if (ln.k === 'follow') { if (movedG.has(ln.g)) continue; movedG.add(ln.g); }
       fired++;
       if (ln.k === 'follow') {
         const s = ln.s, lvl = ln.p, up0 = ln.d > 0; let c = lvl;
@@ -289,7 +339,10 @@ export class SyncRoom extends DurableObject {
   async notify(prev, d, from) {
     const subs = (await this.ctx.storage.get('subs')) || {}, ids = Object.keys(subs).filter(id => id !== from); if (!ids.length) return;
     const old = new Set((prev?.notifLog || []).map(e => e.key)), now = Date.now();
-    const fresh = (d.notifLog || []).filter(e => e && e.key && e.sym && !old.has(e.key) && now - (e.t || 0) < 12 * 36e5).slice(0, 5).reverse();
+    // alert / point / follow notes are pushed only from the room's own check (from = ''); a device's PUT can't push them
+    // (an old version or a device waking with stale quotes used to fire false ones)
+    const ALERT_KINDS = new Set(['follow', 'alert', 'buy', 'sell']);
+    const fresh = (d.notifLog || []).filter(e => e && e.key && e.sym && !old.has(e.key) && now - (e.t || 0) < 12 * 36e5 && (!from || !ALERT_KINDS.has(e.kind))).slice(0, 5).reverse();
     if (!fresh.length) return;
     const vapid = await this.vapid(); let gone = false;
     for (const e of fresh) {
@@ -306,22 +359,35 @@ export class SyncRoom extends DurableObject {
     return this.ctx.getWebSockets().filter(ws => ws.readyState === 1 && Math.max(this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() || 0, ws.deserializeAttachment()?.at || 0) > cut);
   }
   async ensureAlarm() {
-    const subs = await this.ctx.storage.get('subs'); if (!subs || !Object.keys(subs).length) return;
+    const d = await this.ctx.storage.get('doc'), lines = d?.lines || {};
+    if (!Object.values(lines).some(L => Array.isArray(L) && L.some(l => l.k && !l.hit && l.d))) return;
     if (!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + CHECK_MS);
   }
-  // Every 20 s while a device is subscribed and something is armed: with no live device, check the alerts here and push.
+  // The single place alerts are checked (since v17.8 the app no longer fires them when it has a sync code): once a minute
+  // while anything is armed, on live prices. Alerts / points fire at once; a crossed follow pair waits 5 s and fires on the
+  // price then (the crossed line even if it's back inside). Notes go into the doc (devices show them) and out as push.
   async alarm() {
-    const subs = (await this.ctx.storage.get('subs')) || {}; if (!Object.keys(subs).length) return;
     const d0 = await this.ctx.storage.get('doc'), lines = d0?.lines || {};
     const syms = Object.keys(lines).filter(s => Array.isArray(lines[s]) && lines[s].some(l => l.k && !l.hit && l.d)); if (!syms.length) return;
     await this.ctx.storage.setAlarm(Date.now() + CHECK_MS);
-    if (this.liveSockets().length) return;   // a device is watching with live quotes; it fires and its notes push from the PUT
     const bucket = alertBucket(); if (bucket === (await this.ctx.storage.get('checkBucket'))) return;   // once a minute
-    let prices; try { prices = await scanPrices(syms); } catch (_) { return; } if (!prices) return;
     await this.ctx.storage.put('checkBucket', bucket);
-    const d = await this.ctx.storage.get('doc'); if (!d) return;   // re-read: a PUT may have landed during the fetch
-    const next = structuredClone(d);
-    if (!checkLines(next, prices)) return;
+    const prices = async list => { try { const p = await livePrices(list); if (p && Object.keys(p).length) return p; } catch (_) {} try { return await scanPrices(list); } catch (_) { return null; } };
+    const p1 = await prices(syms); if (!p1) return;
+    // alerts / points now, and which follow lines are crossed
+    let d = await this.ctx.storage.get('doc'); if (!d) return;
+    let next = structuredClone(d);
+    const crossed = new Set(), csyms = new Set();
+    for (const [sym, L] of Object.entries(next.lines || {})) { const p = p1[sym]; if (p == null || !Array.isArray(L)) continue; for (const ln of L) if (ln.k === 'follow' && !ln.hit && ln.d && (ln.d > 0 ? p >= ln.p : p <= ln.p)) { crossed.add(ln.id); csyms.add(sym); } }
+    if (checkLines(next, p1, { only: 'other' })) await this.commit(d, next);
+    // follow: 5 s debounce on the crossed symbols, then the pairs (and notes whose quiet period ended)
+    let p2 = p1;
+    if (crossed.size) { await sleep(5000); const q = await prices([...csyms]); p2 = { ...p1, ...(q || {}) }; }
+    d = await this.ctx.storage.get('doc'); if (!d) return;
+    next = structuredClone(d);
+    if (checkLines(next, p2, { only: 'follow', force: crossed })) await this.commit(d, next);
+  }
+  async commit(d, next) {   // store a checked doc, send it to the open devices, push its new notes
     next.updatedAt = Math.max(Date.now(), d.updatedAt + 1);
     await this.ctx.storage.put('doc', next);
     const msg = JSON.stringify({ type: 'state', doc: next });
