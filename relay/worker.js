@@ -495,6 +495,8 @@ export default {
     }
     if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
 
+    if (url.searchParams.get('pipe') === '1') return fetch(UPSTREAM, { headers: { Upgrade: 'websocket', Origin: 'https://www.tradingview.com' } });
+
     const up = await fetch(UPSTREAM, { headers: { Upgrade: 'websocket', Origin: 'https://www.tradingview.com' } });
     const upstream = up.webSocket;
     if (!upstream) return new Response('upstream refused: ' + up.status, { status: 502 });
