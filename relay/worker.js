@@ -495,22 +495,12 @@ export default {
     }
     if (!allowed(origin, env)) return new Response('forbidden', { status: 403 });
 
-    if (url.searchParams.get('pipe') === '1') return fetch(UPSTREAM, { headers: { Upgrade: 'websocket', Origin: 'https://www.tradingview.com' } });
-
+    // Hand TradingView's 101 response straight back: the runtime then pipes the two sockets itself and no JS runs per
+    // message. Until Nov 2026 this accepted both ends and forwarded every message in a JS event handler; that spends CPU
+    // per message against the one upgrade request's budget (10 ms on the free plan), so a busy quote socket was cut with
+    // 1006 after ~11k messages (~15–20 min in market hours) while the same socket direct, or a quiet chart socket, stayed up.
     const up = await fetch(UPSTREAM, { headers: { Upgrade: 'websocket', Origin: 'https://www.tradingview.com' } });
-    const upstream = up.webSocket;
-    if (!upstream) return new Response('upstream refused: ' + up.status, { status: 502 });
-    upstream.accept();
-
-    const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair);
-    server.accept();
-
-    const closeBoth = () => { try { upstream.close(); } catch (_) {} try { server.close(); } catch (_) {} };
-    server.addEventListener('message', e => { try { upstream.send(e.data); } catch (_) { closeBoth(); } });
-    upstream.addEventListener('message', e => { try { server.send(e.data); } catch (_) { closeBoth(); } });
-    for (const ws of [server, upstream]) { ws.addEventListener('close', closeBoth); ws.addEventListener('error', closeBoth); }
-
-    return new Response(null, { status: 101, webSocket: client });
+    if (!up.webSocket) return new Response('upstream refused: ' + up.status, { status: 502 });
+    return up;
   },
 };

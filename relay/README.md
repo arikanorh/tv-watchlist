@@ -1,7 +1,11 @@
 # Quote relay (Cloudflare Worker)
 
 TradingView's quote websocket only accepts connections whose `Origin` is localhost or a tradingview.com domain.
-This worker accepts the page's websocket, dials TradingView with a `https://www.tradingview.com` Origin and relays frames both ways.
+This worker accepts the page's websocket, dials TradingView with a `https://www.tradingview.com` Origin and returns TradingView's
+`101` response as its own, so the Workers runtime pipes the two sockets natively — no JS runs per message. (Until Nov 2026 it accepted
+both ends and forwarded each message in an event handler: that CPU counts against the single upgrade request's budget, 10 ms on the
+free plan, so busy quote sockets were cut with `1006` every ~15–20 min — ~11k messages — while direct sockets stayed up. Don't go back to a
+JS forwarder for long-lived, busy sockets; if one is ever needed, put it in a Durable Object, where each incoming message resets the CPU budget.)
 It also proxies `GET /search?text=…` to TradingView's symbol search (same origin lock) for the add-box autocomplete,
 and keeps the synced watchlists: one `SyncRoom` Durable Object per sync code (SQLite-backed, free plan). `GET/PUT /state/<code>` read and write
 the code's lists; the `/sync/<code>?client=<id>` websocket delivers the room's copy on connect and after every save from another device, so
