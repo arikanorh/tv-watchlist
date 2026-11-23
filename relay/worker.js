@@ -138,16 +138,16 @@ async function scanPrices(syms) {
 }
 // Notification text: the client's noteText (index.html), kept in step — iOS cuts titles short, numbers go in the body.
 function pushText(e) {
-  const s = short(e.sym), f = fmtPrice, now = px => px != null ? `Now ${f(px)}` : '';
+  const s = short(e.sym), f = fmtPrice, lim = lvl => `Limit ${lvl}`;
   // One format for every alert (watch-friendly: the ticker first and the title short enough not to scroll):
-  // title "<TICKER> <kind><arrow> <level>" — F follow, A alert, B / S buy / sell point, E earnings — body "Now <price>".
-  const T = (k, dir, lvl) => `${s} ${k}${dir == null ? '' : dir > 0 ? '▲' : '▼'} ${lvl}`;
-  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null) return { title: T(e.kind === 'follow' ? 'F' : 'A', e.dir, f(e.lvl)), body: now(e.px) };
-  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) return { title: T(e.kind === 'buy' ? 'B' : 'S', null, f(e.lvl)), body: now(e.px) };
+  // title "<TICKER> <kind><arrow> <price>" — F follow, A alert, B / S buy / sell point, E earnings — body "Limit <level>".
+  const T = (k, dir, v) => `${s} ${k}${dir == null ? '' : dir > 0 ? '▲' : '▼'} ${v}`;
+  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null) return { title: T(e.kind === 'follow' ? 'F' : 'A', e.dir, f(e.px ?? e.lvl)), body: lim(f(e.lvl)) };
+  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) return { title: T(e.kind === 'buy' ? 'B' : 'S', null, f(e.px ?? e.lvl)), body: lim(f(e.lvl)) };
   const m = /^(Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
-  if (m) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(m[1] === 'Alert' ? 'A' : 'F', m[2] === 'above' ? 1 : -1, m[3]), body: n ? `Now ${n[1]}` : '' }; }
+  if (m) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(m[1] === 'Alert' ? 'A' : 'F', m[2] === 'above' ? 1 : -1, n ? n[1] : m[3]), body: lim(m[3]) }; }
   const pt = /^(Buy|Sell) point reached (\S+)$/.exec(e.msg || '');
-  if (pt) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(pt[1][0], null, pt[2]), body: n ? `Now ${n[1]}` : '' }; }
+  if (pt) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(pt[1][0], null, n ? n[1] : pt[2]), body: lim(pt[2]) }; }
   if (/^Earnings /.test(e.msg || '')) return { title: `${s} E ${e.msg.slice(9)}`, body: e.sub || '' };
   return { title: `${s} · ${e.msg}`, body: e.sub || '' };
 }
