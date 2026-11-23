@@ -886,7 +886,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '17.8';  // bump on every push to main
+const APP_VERSION = '17.9';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2658,18 +2658,17 @@ async function sysNotify(title, body, sym, force) {
 //   point   NBIS hit buy point 132.96   Now 132.74 · 0.2% below
 //   earn    APP earnings beat        EPS 4.30 vs 4.03 +6.6% · Rev …
 function noteText(e) {
-  const s = short(e.sym), f = fmtPrice, cross = (dir, lvl) => `${s} ${dir > 0 ? '▲ above' : '▼ below'} ${lvl}`;
-  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null)
-    return { title: cross(e.dir, f(e.lvl)), body: [e.px != null ? `Now ${f(e.px)}` : '', e.kind === 'follow' ? (e.lo != null ? `next ${f(e.lo)} / ${f(e.hi)}` : '') : 'alert done'].filter(Boolean).join(' · ') };
-  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) {
-    const d = e.px != null ? Math.abs(e.px - e.lvl) / e.lvl * 100 : null;
-    return { title: `${s} hit ${e.kind} point ${f(e.lvl)}`, body: e.px == null ? '' : `Now ${f(e.px)}${d >= 0.05 ? ` · ${d.toFixed(1)}% ${e.px < e.lvl ? 'below' : 'above'}` : ''}` };
-  }
-  const m = /^(?:Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
-  if (m) { const n = /^at (\S+)(?: · now (.+))?/.exec(e.sub || ''); return { title: cross(m[1] === 'above' ? 1 : -1, m[2]), body: n ? [`Now ${n[1]}`, n[2] ? `next ${n[2]}` : 'alert done'].join(' · ') : e.sub || '' }; }
+  const s = short(e.sym), f = fmtPrice, now = px => px != null ? `Now ${f(px)}` : '';
+  // One format for every alert (watch-friendly: the ticker first and the title short enough not to scroll):
+  // title "<TICKER> <kind><arrow> <level>" — F follow, A alert, B / S buy / sell point, E earnings — body "Now <price>".
+  const T = (k, dir, lvl) => `${s} ${k}${dir == null ? '' : dir > 0 ? '▲' : '▼'} ${lvl}`;
+  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null) return { title: T(e.kind === 'follow' ? 'F' : 'A', e.dir, f(e.lvl)), body: now(e.px) };
+  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) return { title: T(e.kind === 'buy' ? 'B' : 'S', null, f(e.lvl)), body: now(e.px) };
+  const m = /^(Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
+  if (m) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(m[1] === 'Alert' ? 'A' : 'F', m[2] === 'above' ? 1 : -1, m[3]), body: n ? `Now ${n[1]}` : '' }; }
   const pt = /^(Buy|Sell) point reached (\S+)$/.exec(e.msg || '');
-  if (pt) return { title: `${s} hit ${pt[1].toLowerCase()} point ${pt[2]}`, body: (e.sub || '').replace(/^at /, 'Now ').replace(/ · \d\d:\d\d$/, '') };
-  if (/^Earnings /.test(e.msg || '')) return { title: `${s} earnings ${e.msg.slice(9)}`, body: e.sub || '' };
+  if (pt) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(pt[1][0], null, pt[2]), body: n ? `Now ${n[1]}` : '' }; }
+  if (/^Earnings /.test(e.msg || '')) return { title: `${s} E ${e.msg.slice(9)}`, body: e.sub || '' };
   return { title: `${s} · ${e.msg}`, body: e.sub || '' };
 }
 // Settings row: state of the permission plus Enable / Test (iOS asks only from a tap, and only in the home-screen app).
@@ -2706,7 +2705,7 @@ function noteItems() {
   return out.sort((a, b) => b.at - a.at);
 }
 // noteText's title without the ticker, as HTML with the ▲ / ▼ colored (notes and the History tab)
-const shortWhat = e => { const t = noteText(e).title, s = short(e.sym), rest = t.startsWith(s + ' ') ? t.slice(s.length + 1) : t; return esc(rest).replace(/^([▲▼])/, (_, a) => `<span class="${a === '▲' ? 'up' : 'down'}">${a}</span>`); };
+const shortWhat = e => { const t = noteText(e).title, s = short(e.sym), rest = t.startsWith(s + ' ') ? t.slice(s.length + 1) : t; return esc(rest).replace(/([▲▼])/, (_, a) => `<span class="${a === '▲' ? 'up' : 'down'}">${a}</span>`); };
 const timeAgo = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + ' d ago'; };
 function renderNotes() {
   let box = $('notes'); if (!box) { box = document.createElement('div'); box.className = 'notes'; box.id = 'notes'; document.body.appendChild(box); box.addEventListener('click', onNoteClick); }
