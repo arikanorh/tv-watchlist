@@ -886,7 +886,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '18.0';  // bump on every push to main
+const APP_VERSION = '18.1';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2351,7 +2351,7 @@ function followFire(sym, ln, p) {
 /* One follow note (dedupe across devices: same pair, same level, same minute); starts the pair's notify period. */
 function followNote(sym, pair, s, { lvl, dir, px, c }) {
   const now = Date.now(), a = pair[0]; for (const x of pair) { x.na = now; delete x.nt; }
-  logNote({ key: `f:${sym}:${a.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir, lvl, px, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(a.snd ? { snd: a.snd } : {}),
+  logNote({ key: `f:${sym}:${a.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir, lvl, px, ...(quotes[sym] ? { chg: +((!regular && quotes[sym].e != null ? quotes[sym].e : quotes[sym].c) ?? 0).toFixed(2) } : {}), lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(a.snd ? { snd: a.snd } : {}),
     msg: `Follow ±${fmtStep(s)}: crossed ${dir > 0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(px)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
 }
 // Notification history (state.notifLog, synced, newest first, 100 kept): every note once — fired alerts, reached points,
@@ -2658,17 +2658,18 @@ async function sysNotify(title, body, sym, force) {
 //   point   NBIS hit buy point 132.96   Now 132.74 · 0.2% below
 //   earn    APP earnings beat        EPS 4.30 vs 4.03 +6.6% · Rev …
 function noteText(e) {
-  const s = short(e.sym), f = fmtPrice, lim = lvl => `Limit ${lvl}`;
-  // One format for every alert (watch-friendly: the ticker first and the title short enough not to scroll):
-  // title "<TICKER> <kind><arrow> <price>" — F follow, A alert, B / S buy / sell point, E earnings — body "Limit <level>".
-  const T = (k, dir, v) => `${s} ${k}${dir == null ? '' : dir > 0 ? '▲' : '▼'} ${v}`;
-  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null) return { title: T(e.kind === 'follow' ? 'F' : 'A', e.dir, f(e.px ?? e.lvl)), body: lim(f(e.lvl)) };
-  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) return { title: T(e.kind === 'buy' ? 'B' : 'S', null, f(e.px ?? e.lvl)), body: lim(f(e.lvl)) };
-  const m = /^(Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
-  if (m) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(m[1] === 'Alert' ? 'A' : 'F', m[2] === 'above' ? 1 : -1, n ? n[1] : m[3]), body: lim(m[3]) }; }
+  const s = short(e.sym), n = v => String(fmtPrice(+v)).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+  // One format for every alert: title "<TICKER> above|below|buy|sell <limit>", body "<TICKER> <price> <±day %>"
+  // (VIX above 88 / VIX 88.1 +5.2%); numbers without trailing zeros.
+  const num = v => typeof v === 'number' ? n(v) : String(v).replace(/,/g, '') === '' ? '' : n(+String(v).replace(/,/g, ''));
+  const body = (px, chg) => px == null ? '' : `${s} ${num(px)}${chg != null && isFinite(chg) ? ` ${chg >= 0 ? '+' : '−'}${Math.abs(chg).toFixed(1)}%` : ''}`;
+  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null) return { title: `${s} ${e.dir > 0 ? 'above' : 'below'} ${num(e.lvl)}`, body: body(e.px, e.chg) };
+  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) return { title: `${s} ${e.kind} ${num(e.lvl)}`, body: body(e.px, e.chg) };
+  const m = /^(?:Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
+  if (m) { const a = /^at (\S+)/.exec(e.sub || ''); return { title: `${s} ${m[1]} ${num(m[2])}`, body: a ? body(a[1]) : '' }; }
   const pt = /^(Buy|Sell) point reached (\S+)$/.exec(e.msg || '');
-  if (pt) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(pt[1][0], null, n ? n[1] : pt[2]), body: lim(pt[2]) }; }
-  if (/^Earnings /.test(e.msg || '')) return { title: `${s} E ${e.msg.slice(9)}`, body: e.sub || '' };
+  if (pt) { const a = /^at (\S+)/.exec(e.sub || ''); return { title: `${s} ${pt[1].toLowerCase()} ${num(pt[2])}`, body: a ? body(a[1]) : '' }; }
+  if (/^Earnings /.test(e.msg || '')) return { title: `${s} earnings ${e.msg.slice(9)}`, body: e.sub || '' };
   return { title: `${s} · ${e.msg}`, body: e.sub || '' };
 }
 // Settings row: state of the permission plus Enable / Test (iOS asks only from a tap, and only in the home-screen app).
@@ -2705,7 +2706,7 @@ function noteItems() {
   return out.sort((a, b) => b.at - a.at);
 }
 // noteText's title without the ticker, as HTML with the ▲ / ▼ colored (notes and the History tab)
-const shortWhat = e => { const t = noteText(e).title, s = short(e.sym), rest = t.startsWith(s + ' ') ? t.slice(s.length + 1) : t; return esc(rest).replace(/([▲▼])/, (_, a) => `<span class="${a === '▲' ? 'up' : 'down'}">${a}</span>`); };
+const shortWhat = e => { const t = noteText(e).title, s = short(e.sym), rest = t.startsWith(s + ' ') ? t.slice(s.length + 1) : t; return esc(rest).replace(/^(above|below)\b/, (_, a) => `<span class="${a === 'above' ? 'up' : 'down'}">${a}</span>`); };
 const timeAgo = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + ' d ago'; };
 function renderNotes() {
   let box = $('notes'); if (!box) { box = document.createElement('div'); box.className = 'notes'; box.id = 'notes'; document.body.appendChild(box); box.addEventListener('click', onNoteClick); }

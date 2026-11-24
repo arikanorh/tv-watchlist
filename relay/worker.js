@@ -77,6 +77,9 @@ function usPhase() {   // like the client's sessionPhase: closed / night / pre /
 // the extended price (rtc); overnight → BOATS last, else rtc; weekend → US stocks skipped. A price older than the start
 // of the current session is skipped (at 04:00 / 09:30 the feed can still carry the previous session's value).
 const NON_EQUITY = new Set(['index', 'cfd', 'futures', 'economic']);
+// % change that goes with the last price picked per symbol (regular: day change; pre / post: vs the close; overnight: BOATS
+// vs the close) — the notes carry it as `chg`.
+const dayChg = {};
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function livePrices(syms) {
   const ph = usPhase(), night = ph === 'night', boats = s => { const [ex, t] = s.split(':'); return t && US_EX.has(ex) ? 'BOATS:' + t : null; };
@@ -99,18 +102,18 @@ async function livePrices(syms) {
     });
     ws.addEventListener('close', fin); ws.addEventListener('error', fin);
     for (const o of [{ m: 'set_auth_token', p: ['unauthorized_user_token'] }, { m: 'quote_create_session', p: ['qs'] },
-      { m: 'quote_set_fields', p: ['qs', 'lp', 'lp_time', 'rtc', 'rtc_time', 'current_session', 'type'] }, { m: 'quote_add_symbols', p: ['qs', ...want] }]) ws.send(frame(o));
+      { m: 'quote_set_fields', p: ['qs', 'lp', 'lp_time', 'rtc', 'rtc_time', 'current_session', 'type', 'chp', 'rchp'] }, { m: 'quote_add_symbols', p: ['qs', ...want] }]) ws.send(frame(o));
   });
   try { ws.close(1000, 'done'); } catch (_) {}
   const out = {}, nowS = Date.now() / 1000, m = etMin(), since = start => nowS - (((m - start) % 1440 + 1440) % 1440) * 60 - 90;
   for (const s of syms) {
     const r = raw[s]; if (!r || r.lp == null) continue;
-    if (!US_EX.has(s.split(':')[0])) { out[s] = r.lp; continue; }
+    if (!US_EX.has(s.split(':')[0])) { out[s] = r.lp; dayChg[s] = r.chp; continue; }
     if (ph === 'closed') continue;
     const fresh = (t, start) => !t || t >= since(start);
-    if (ph === 'open') { if (fresh(r.lp_time, 570)) out[s] = r.lp; continue; }
-    if (night) { const b = raw[boats(s)]; if (b?.lp != null && !NON_EQUITY.has(r.type)) out[s] = b.lp; else if (r.rtc != null && fresh(r.rtc_time, 960)) out[s] = r.rtc; continue; }
-    if (r.rtc != null && fresh(r.rtc_time, ph === 'pre' ? 240 : 960)) out[s] = r.rtc;
+    if (ph === 'open') { if (fresh(r.lp_time, 570)) { out[s] = r.lp; dayChg[s] = r.chp; } continue; }
+    if (night) { const b = raw[boats(s)]; if (b?.lp != null && !NON_EQUITY.has(r.type)) { out[s] = b.lp; dayChg[s] = (b.lp - r.lp) / r.lp * 100; } else if (r.rtc != null && fresh(r.rtc_time, 960)) { out[s] = r.rtc; dayChg[s] = r.rchp; } continue; }
+    if (r.rtc != null && fresh(r.rtc_time, ph === 'pre' ? 240 : 960)) { out[s] = r.rtc; dayChg[s] = r.rchp; }
   }
   return out;
 }
@@ -118,7 +121,7 @@ async function livePrices(syms) {
 // the quote socket gives nothing. US stocks use
 // the pre / post-market price outside regular hours and are skipped overnight / at the weekend (the client uses BOATS then).
 async function scanPrices(syms) {
-  const cols = ['close', 'premarket_close', 'postmarket_close', 'premarket_time', 'postmarket_time'];
+  const cols = ['close', 'premarket_close', 'postmarket_close', 'premarket_time', 'postmarket_time', 'change', 'premarket_change', 'postmarket_change'];
   const r = await fetch('https://scanner.tradingview.com/global/scan', { method: 'POST', body: JSON.stringify({ symbols: { tickers: syms }, columns: cols }) });
   if (!r.ok) return null;
   const ph = usPhase(), out = {}, early = ph === 'open' && etMin() < 570 + 20, nowS = Date.now() / 1000;
@@ -127,28 +130,29 @@ async function scanPrices(syms) {
   // (13 Nov 2026 04:00 ET: NVDA "crossed below 161.38 at 151.00" while it was ~166).
   const fresh = t => typeof t === 'number' && nowS - t < 6 * 3600;
   for (const row of (await r.json()).data || []) {
-    const [close, pre, post, preT, postT] = row.d, us = US_EX.has(row.s.split(':')[0]);
+    const [close, pre, post, preT, postT, ch, preCh, postCh] = row.d, us = US_EX.has(row.s.split(':')[0]);
     const preOk = fresh(preT) ? pre : null, postOk = fresh(postT) ? post : null;
     // 15 min delayed: in the first 20 min of the session `close` is still yesterday's close (12 Nov 2026: NVDA "crossed above"
     // at 173.73 while it traded at 158) — use a fresh pre-market price there, else skip.
     const p = !us ? close : ph === 'open' ? (early ? preOk : close) : ph === 'pre' ? preOk : ph === 'post' ? postOk ?? close : null;
-    if (typeof p === 'number') out[row.s] = p;
+    if (typeof p === 'number') { out[row.s] = p; dayChg[row.s] = p === pre ? preCh : p === post ? postCh : ch; }
   }
   return out;
 }
 // Notification text: the client's noteText (index.html), kept in step — iOS cuts titles short, numbers go in the body.
 function pushText(e) {
-  const s = short(e.sym), f = fmtPrice, lim = lvl => `Limit ${lvl}`;
-  // One format for every alert (watch-friendly: the ticker first and the title short enough not to scroll):
-  // title "<TICKER> <kind><arrow> <price>" — F follow, A alert, B / S buy / sell point, E earnings — body "Limit <level>".
-  const T = (k, dir, v) => `${s} ${k}${dir == null ? '' : dir > 0 ? '▲' : '▼'} ${v}`;
-  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null) return { title: T(e.kind === 'follow' ? 'F' : 'A', e.dir, f(e.px ?? e.lvl)), body: lim(f(e.lvl)) };
-  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) return { title: T(e.kind === 'buy' ? 'B' : 'S', null, f(e.px ?? e.lvl)), body: lim(f(e.lvl)) };
-  const m = /^(Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
-  if (m) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(m[1] === 'Alert' ? 'A' : 'F', m[2] === 'above' ? 1 : -1, n ? n[1] : m[3]), body: lim(m[3]) }; }
+  const s = short(e.sym), n = v => String(fmtPrice(+v)).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+  // One format for every alert: title "<TICKER> above|below|buy|sell <limit>", body "<TICKER> <price> <±day %>"
+  // (VIX above 88 / VIX 88.1 +5.2%); numbers without trailing zeros.
+  const num = v => typeof v === 'number' ? n(v) : String(v).replace(/,/g, '') === '' ? '' : n(+String(v).replace(/,/g, ''));
+  const body = (px, chg) => px == null ? '' : `${s} ${num(px)}${chg != null && isFinite(chg) ? ` ${chg >= 0 ? '+' : '−'}${Math.abs(chg).toFixed(1)}%` : ''}`;
+  if ((e.kind === 'follow' || e.kind === 'alert') && e.lvl != null) return { title: `${s} ${e.dir > 0 ? 'above' : 'below'} ${num(e.lvl)}`, body: body(e.px, e.chg) };
+  if ((e.kind === 'buy' || e.kind === 'sell') && e.lvl != null) return { title: `${s} ${e.kind} ${num(e.lvl)}`, body: body(e.px, e.chg) };
+  const m = /^(?:Follow ±[\d.]+|Alert): crossed (above|below) (\S+)$/.exec(e.msg || '');   // older entries
+  if (m) { const a = /^at (\S+)/.exec(e.sub || ''); return { title: `${s} ${m[1]} ${num(m[2])}`, body: a ? body(a[1]) : '' }; }
   const pt = /^(Buy|Sell) point reached (\S+)$/.exec(e.msg || '');
-  if (pt) { const n = /^at (\S+)/.exec(e.sub || ''); return { title: T(pt[1][0], null, n ? n[1] : pt[2]), body: lim(pt[2]) }; }
-  if (/^Earnings /.test(e.msg || '')) return { title: `${s} E ${e.msg.slice(9)}`, body: e.sub || '' };
+  if (pt) { const a = /^at (\S+)/.exec(e.sub || ''); return { title: `${s} ${pt[1].toLowerCase()} ${num(pt[2])}`, body: a ? body(a[1]) : '' }; }
+  if (/^Earnings /.test(e.msg || '')) return { title: `${s} earnings ${e.msg.slice(9)}`, body: e.sub || '' };
   return { title: `${s} · ${e.msg}`, body: e.sub || '' };
 }
 // mutates doc: hits, follow moves, notifLog entries (same keys as the client's). only: 'follow' (pairs + their quiet-period
@@ -162,7 +166,7 @@ function checkLines(doc, prices, { only, force } = {}) {
   // keep the latest trigger (`nt`), which is sent once the period is over.
   const fnote = (sym, pair, s, { lvl, dir, px, c }) => {
     const a = pair[0]; for (const x of pair) { x.na = now; delete x.nt; }
-    note({ key: `f:${sym}:${a.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir, lvl, px, lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(a.snd ? { snd: a.snd } : {}),
+    note({ key: `f:${sym}:${a.g}:${Math.round(c / s)}:${Math.floor(now / 60000)}`, t: now, sym, kind: 'follow', note: true, dir, lvl, px, ...(dayChg[sym] != null ? { chg: +dayChg[sym].toFixed(2) } : {}), lo: +(c - s).toPrecision(10), hi: +(c + s).toPrecision(10), ...(a.snd ? { snd: a.snd } : {}),
       msg: `Follow ±${fmtStep(s)}: crossed ${dir > 0 ? 'above' : 'below'} ${fmtPrice(lvl)}`, sub: `at ${fmtPrice(px)} · now ${fmtPrice(c - s)} / ${fmtPrice(c + s)}` });
   };
   for (const [sym, lines] of Object.entries(only === 'other' ? {} : doc.lines || {})) {
@@ -191,7 +195,7 @@ function checkLines(doc, prices, { only, force } = {}) {
       } else {
         ln.hit = now; ln.at = p;
         const what = ln.k === 'buy' ? 'Buy point reached' : ln.k === 'sell' ? 'Sell point reached' : `Alert: crossed ${ln.d > 0 ? 'above' : 'below'}`;
-        note({ key: 'l:' + sym + ':' + ln.id, t: now, sym, kind: ln.k, dir: ln.d, lvl: ln.p, px: p, msg: `${what} ${fmtPrice(ln.p)}`, sub: `at ${fmtPrice(p)}` });
+        note({ key: 'l:' + sym + ':' + ln.id, t: now, sym, kind: ln.k, dir: ln.d, lvl: ln.p, px: p, ...(dayChg[sym] != null ? { chg: +dayChg[sym].toFixed(2) } : {}), msg: `${what} ${fmtPrice(ln.p)}`, sub: `at ${fmtPrice(p)}` });
       }
     }
   }
