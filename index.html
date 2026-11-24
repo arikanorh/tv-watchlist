@@ -725,9 +725,6 @@
     .ohlc { display: flex; align-items: baseline; gap: 9px; padding: 0 8px 0 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .ohlc span b { margin-left: 3px; font-weight: 500; } .ohlc b.up { color: var(--up); } .ohlc b.down { color: var(--down); }
     .cover { position: absolute; left: calc(var(--tb, 0px) + 8px); top: 8px; z-index: 5; display: flex; flex-wrap: wrap; row-gap: 4px; max-width: calc(100% - var(--tb, 0px) - 96px); align-items: center; gap: 6px; padding: 4px; border-radius: 9px; background: var(--cover); backdrop-filter: blur(4px); }
-    .cover .sbtn { flex: none; height: 32px; padding: 0 10px; border-radius: 6px; gap: 8px; background: var(--bg3); }
-    .cover .chist { gap: 2px; } .cover .chist button { width: 26px; height: 32px; border-radius: 6px; } .cover .chist button:not(:disabled):hover { background: var(--line); }
-    .cover .sbtn:hover { color: var(--text); }
     .cover .seg { display: flex; align-items: stretch; gap: 1px; padding: 0; height: 32px; }
     .mkt, .cinfo { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--muted); }
     .mkt:hover, .cinfo:hover { background: var(--bg3); color: var(--text); }
@@ -762,13 +759,19 @@
     .top .sp { display: block; }
     .pin:hover { background: var(--bg3); }
     .cbar { display: contents; }   /* search box (with the symbol), intervals, details; the session/tick block at the far right */
-    .cbar .sbtn { order: -2; flex: none; height: auto; align-self: stretch; border-radius: 0; gap: 8px; padding: 0 14px; }
-    .cbar .sbtn:hover { color: var(--text); }
-    .sbtn .q { display: flex; align-items: baseline; gap: 7px; font-variant-numeric: tabular-nums; }
-    .sbtn .q b { color: var(--text); font-size: 14px; }
-    .sbtn .q2 { display: flex; gap: 6px; }
-    .sbtn .q .px { color: var(--text); font-size: 13px; }
+    /* the chart's symbol opens the pin bar like a pin of its own (name, then last + chg%), ‹ › small on its right, then the pins' divider */
+    .cbar .sbtn { order: -3; flex: none; height: auto; align-self: stretch; border-radius: 0; gap: 8px; padding: 0 4px 0 18px; background: none; }   /* 18px: clear of the list tab on the seam */
+    .cbar .sbtn > svg { display: none; }
+    .cbar .sbtn:hover { color: var(--text); background: var(--bg3); }
+    .sbtn .q { display: flex; flex-direction: column; align-items: flex-start; gap: 0; font-size: 12px; line-height: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sbtn .q b { color: var(--text); font-size: 14px; font-weight: 600; }
+    .sbtn .q2 { display: flex; gap: 6px; align-items: baseline; }
+    .sbtn .q .px { color: var(--text); font-size: 12px; }
     .sbtn .q .chg { font-size: 12px; font-weight: 600; }
+    .cbar .chist { order: -2; align-self: center; gap: 0; margin-right: 2px; }
+    .cbar .chist button { width: 22px; height: 26px; border-radius: 5px; background: none; color: var(--text); } .cbar .chist button:disabled { color: var(--muted); opacity: .35; }
+    .cbar .chist button:not(:disabled):hover { background: var(--bg3); color: var(--text); }
+    .cbar .chist svg { width: 15px; height: 15px; }
     .sbtn.has .ph { display: none; }
     .cbar .infobtn { display: none; }   /* desktop: details from the row's hover tools */
     .cbar .infobtn:hover { background: var(--bg3); color: var(--text); }
@@ -886,7 +889,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '18.2';  // bump on every push to main
+const APP_VERSION = '18.3';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -3426,8 +3429,10 @@ function placeTools() {   // the session/tick/toggle block stays in the header (
   if (pins.parentElement !== pdest) pdest.insertBefore(pins, before);
   // desktop: the search box and the interval buttons float over the chart's top-left corner
   const cover = $('cover'), sb = $('sbtn'), seg = $('seg');
-  if (!isPhone()) { if (sb.parentElement !== cover) { cover.prepend($('chist'), sb); cover.append(seg, $('ohlc')); } }   // order: back / forward, search, market dot, details, intervals, OHLC
-  else { if (sb.parentElement === cover) { document.querySelector('.cbar').prepend($('chist'), sb); document.querySelector('.ctools').prepend(seg); } }
+  const cbar = document.querySelector('.cbar');   /* back / forward + search box stay in the chart bar: phones ‹ › first; desktop (display: contents) orders them by CSS: ticker, ‹ ›, pins */
+  if (sb.parentElement !== cbar) cbar.prepend($('chist'), sb);
+  if (!isPhone()) { if (seg.parentElement !== cover) cover.append(seg, $('ohlc')); }   // over the chart: market dot, details, intervals, OHLC
+  else if (seg.parentElement === cover) document.querySelector('.ctools').prepend(seg);
   // the list dock: last row of the list pane on desktop (CSS lifts it above the list), the page's bottom bar on phones
   const dock = document.querySelector('.dock'), ddest = isPhone() ? document.body : document.querySelector('.listpane');
   if (dock.parentElement !== ddest) { if (isPhone()) document.querySelector('.main').after(dock); else ddest.append(dock); }
