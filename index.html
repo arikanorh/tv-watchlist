@@ -199,6 +199,19 @@
   #ownChart { z-index: 2; background: var(--bg); -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }   /* phones: long press = our menu, not iOS selection */
   .sessbg { position: absolute; left: var(--tb, 0px); top: 0; bottom: 27px; right: 70px; z-index: 1; pointer-events: none; overflow: hidden; }
   .sessbg i { position: absolute; top: 0; bottom: 0; }
+  /* RSI band along the bottom of our chart (chart option "RSI 14"): a divider at its top, the 70–30 zone tinted, name + value at the left */
+  .rsiband { position: absolute; left: var(--tb, 0px); right: 70px; height: 0; z-index: 3; pointer-events: none; border-top: 1px solid var(--line); }
+  .rsiband i { position: absolute; left: 0; right: 0; background: rgba(126, 87, 194, .08); }
+  .rsiband span { position: absolute; left: 8px; top: 3px; font-size: 11px; line-height: 14px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rsiband span b { margin-left: 5px; font-weight: 500; color: #7e57c2; }
+  .rsiband .rh { position: absolute; left: 0; right: 0; top: -6px; height: 11px; pointer-events: auto; cursor: ns-resize; touch-action: none; }
+  .rsiband .rh:hover, .rsiband .rh:active { background: linear-gradient(transparent 4px, var(--accent) 4px, var(--accent) 6px, transparent 6px); opacity: .7; }
+  .rsiband.max .rh { display: none; } .rsiband.max { border-top-color: transparent; }
+  .rsiband .rmax { position: absolute; right: 6px; top: 3px; width: 24px; height: 22px; border-radius: 5px; display: flex; align-items: center; justify-content: center; pointer-events: auto; color: var(--muted); }
+  .rsiband .rmax svg { width: 13px; height: 13px; } .rsiband .rmax:hover { background: var(--bg3); color: var(--text); }
+  .rsiband.max .rmax { color: var(--accent); }
+  /* RSI maximized: the candles and everything drawn on them hide */
+  #ownChart.rsimax .hrays, #ownChart.rsimax .hilo, #ownChart.rsimax .plabel, #ownChart.rsimax .xlabel, #ownChart.rsimax .emk, #ownChart.rsimax .sessbg, #ownChart.rsimax .meas { display: none !important; }
   .sessbg i.pre { background: rgba(247, 166, 0, .07); } .sessbg i.post { background: rgba(41, 98, 255, .08); } .sessbg i.night { background: rgba(156, 39, 176, .09); }
   #ownChart .tv-lightweight-charts { position: relative; z-index: 2; }   /* the library's container above the shading, below our label */
   .plabel { position: absolute; right: 0; z-index: 3; display: flex; flex-direction: column; padding: 2px 0 2px 6px; border-radius: 4px 0 0 4px; font-size: 11px; line-height: 14px; color: #fff; background: #f23645; font-variant-numeric: tabular-nums; pointer-events: none; box-sizing: border-box; }
@@ -889,7 +902,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '18.4';  // bump on every push to main
+const APP_VERSION = '18.5';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1729,6 +1742,12 @@ async function showOwnChart(sym) {
       const b = e.target.closest('[data-leg]'); if (!b) return; e.stopPropagation(); setChartOpt(b.dataset.leg, !chartOpts()[b.dataset.leg]);
     });
     own.sma = SMAS.map(([, , color]) => own.chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
+    /* RSI: its own overlay scale fixed to 0–100 in the bottom band; the candles' scale leaves room for it while it's on (ownRsi) */
+    own.rsi = own.chart.addLineSeries({ color: RSI_COLOR, lineWidth: 1, priceScaleId: 'rsi', priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) });
+    own.chart.priceScale('rsi').applyOptions({ scaleMargins: { top: 0.76, bottom: 0.03 }, visible: false });
+    for (const price of [70, 30]) own.rsi.createPriceLine({ price, color: 'rgba(120, 123, 134, .55)', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+    el.insertAdjacentHTML('beforeend', '<div class="rsiband" id="rsiband" hidden><i></i><span>RSI 14<b></b></span><em class="rh" title="Drag to resize"></em><button class="rmax" data-rmax title="Maximize RSI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button></div>');
+    initPanes(el);
     own.chart.subscribeCrosshairMove(p => { own.cross = p?.point || null; own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); ownCrossLabel(p); });
     el.insertAdjacentHTML('beforeend', '<div class="xlabel" id="xlabel" hidden></div>');
     el.addEventListener('contextmenu', e => { e.preventDefault(); if (isPhone()) return; /* phones: the long press (initLongPress) instead */ const r = e.target.closest('[data-ray]'); if (r) { openRayCtx(r.dataset.ray, e.clientX, e.clientY); return; } const b = el.getBoundingClientRect(); openChartOpts({ x: e.clientX - b.left, y: e.clientY - b.top }); });
@@ -1749,7 +1768,7 @@ function ownRequest(sym, iv) {
   own.want = { sym, iv };
   if (!own.ws || own.ws.readyState !== 1) { if (!own.ws || own.ws.readyState > 1) ownConnect(); return; }
   const n = ++own.n, cs = 'cs_' + n; own.sid = cs; own.intraday = /^\d+$/.test(iv);
-  own.series?.setData([]); own.vol?.setData([]); own.sma?.forEach(x => x.setData([])); own.hoverBar = null; own.meas = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
+  own.series?.setData([]); own.vol?.setData([]); own.sma?.forEach(x => x.setData([])); own.rsi?.setData([]); own.rsiVals = null; own.hoverBar = null; own.meas = null; own.data = null; own.last = null; own.loaded = false; own.loadingMore = false; own.noMore = false; clearTimeout(own.moreTimer); ownBusy(); ownCountdown();   // no stale label from the previous symbol
   own.chart?.applyOptions({ timeScale: { timeVisible: own.intraday } });
   const f = (m, p) => own.ws.send(frame({ m, p }));
   // Delete only a session this socket created: deleting an unknown one is a protocol_error and TradingView drops the
@@ -1852,7 +1871,7 @@ function ownConnect() {
 }
 // Last-price label on the price axis, TradingView style: price, day change % and the bar-close countdown in one box
 // (the latter two per `state.chartOpts`, chart settings ⚙ at the bottom right). Countdown only for minute intervals.
-const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, sma200: false, ohlc: true, session: '24h', dayline: 'prev', ...(state.chartOpts || {}) });
+const chartOpts = () => ({ pct: true, countdown: true, sessions: true, volume: true, hilo: true, earnings: true, sma20: false, sma50: false, sma200: false, rsi: false, ohlc: true, session: '24h', dayline: 'prev', ...(state.chartOpts || {}) });
 function ownCountdown() {
   const cd = $('plabel'); if (!cd || !own.chart || !own.series) return;
   const b = own.last, y = b && own.active ? own.series.priceToCoordinate(b.close) : null;
@@ -1953,16 +1972,93 @@ function ownEarnings() {
 }
 // Legend rows: the hovered bar's values, else the latest; a row that is off is dimmed and struck through.
 const SMAS = [['sma20', 20, '#f7a600'], ['sma50', 50, '#4f8cff'], ['sma200', 200, '#ec407a']];
-const LEGS = [['volume', 'Vol'], ['sma20', 'SMA 20'], ['sma50', 'SMA 50'], ['sma200', 'SMA 200'], ['hilo', 'High / Low']];
+const LEGS = [['volume', 'Vol'], ['sma20', 'SMA 20'], ['sma50', 'SMA 50'], ['sma200', 'SMA 200'], ['rsi', 'RSI 14'], ['hilo', 'High / Low']];
 const fmtVol = v => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(2) + 'K' : String(Math.round(v || 0));
 const smaAt = (n, i) => { if (!own.data || i < n - 1) return null; let t = 0; for (let k = i - n + 1; k <= i; k++) t += own.data[k].close; return t / n; };
 function ownSma(full) {   // full: recompute the whole line; otherwise just the newest point
+  ownRsi(full);
   if (!own.sma || !own.data) return;
   SMAS.forEach(([k, n], j) => {
     const ser = own.sma[j]; if (!chartOpts()[k]) { if (full !== false) ser.setData([]); return; }
     if (full !== false) { const out = []; let t = 0; own.data.forEach((b, i) => { t += b.close; if (i >= n) t -= own.data[i - n].close; if (i >= n - 1) out.push({ time: b.time, value: t / n }); }); ser.setData(out); }
     else { const i = own.data.length - 1, v = smaAt(n, i); if (v != null) try { ser.update({ time: own.data[i].time, value: v }); } catch (_) {} }
   });
+}
+// RSI 14 (Wilder's smoothing on closes), chart option "RSI 14": a line in the bottom band (own 0–100 scale, 70 / 30 dashed);
+// the candles' scale shrinks to the top 70% and the volume sits at its bottom while it's on.
+const RSI_N = 14, RSI_COLOR = '#7e57c2';
+function rsiCalc(d, n = RSI_N) {   /* [{time, value}], the first at bar n */
+  const out = []; if (!d || d.length <= n) return out;
+  let g = 0, l = 0;
+  for (let i = 1; i <= n; i++) { const ch = d[i].close - d[i - 1].close; if (ch > 0) g += ch; else l -= ch; }
+  g /= n; l /= n;
+  const val = () => l === 0 ? (g === 0 ? 50 : 100) : 100 - 100 / (1 + g / l);
+  out.push({ time: d[n].time, value: val() });
+  for (let i = n + 1; i < d.length; i++) { const ch = d[i].close - d[i - 1].close; g = (g * (n - 1) + Math.max(ch, 0)) / n; l = (l * (n - 1) + Math.max(-ch, 0)) / n; out.push({ time: d[i].time, value: val() }); }
+  return out;
+}
+const rsiAt = i => own.rsiVals?.[i - RSI_N]?.value ?? null;   /* bar index → RSI */
+function ownRsi(full) {
+  if (!own.rsi) return;
+  const on = !!chartOpts().rsi;
+  if (full !== false) ownPanes();
+  if (!on || !own.data) { if (full !== false) own.rsi.setData([]); own.rsiVals = null; ownRsiBand(); return; }
+  const vals = own.rsiVals = rsiCalc(own.data);
+  if (full !== false) own.rsi.setData(vals); else if (vals.length) try { own.rsi.update(vals[vals.length - 1]); } catch (_) {}
+  ownRsiBand();
+}
+// Panes like TradingView's: the RSI band's height is dragged at its divider (chart option rsiH, share of the plot, local);
+// as on TradingView a double-click / double-tap on a pane maximizes it (on the candles: the RSI hides; on the RSI: it fills the
+// plot) and another restores; the band's corner button maximizes / restores the RSI too (own.paneMax, not saved).
+const rsiH = () => Math.min(0.7, Math.max(0.12, +chartOpts().rsiH || 0.25));
+function ownPanes() {
+  if (!own.chart || !own.rsi) return;
+  const on = !!chartOpts().rsi; if (!on) own.paneMax = null;
+  const max = own.paneMax, H = rsiH(), split = on && !max, main = max !== 'rsi';   /* max: null | 'main' | 'rsi' */
+  own.chart.priceScale('right').applyOptions({ scaleMargins: split ? { top: 0.1, bottom: H + 0.05 } : { top: 0.2, bottom: 0.1 } });
+  own.chart.priceScale('vol').applyOptions({ scaleMargins: split ? { top: Math.max(0.05, 0.83 - H), bottom: H + 0.05 } : { top: 0.8, bottom: 0 } });
+  own.chart.priceScale('rsi').applyOptions({ scaleMargins: max === 'rsi' ? { top: 0.08, bottom: 0.05 } : { top: 1 - H + 0.02, bottom: 0.03 } });
+  for (const s of [own.series, own.vol, ...(own.sma || [])]) s.applyOptions({ visible: main });
+  own.rsi.applyOptions({ visible: on && max !== 'main' });
+  $('ownChart').classList.toggle('rsimax', max === 'rsi');
+}
+function ownPaneMax(m) { own.paneMax = chartOpts().rsi ? m : null; ownPanes(); ownCountdown(); ownRsiBand(); }
+function ownPaneDbl(y) {   /* y: pointer offset in #ownChart */
+  if (!chartOpts().rsi || !own.rsi) return;
+  if (own.paneMax) return ownPaneMax(null);
+  const t = own.rsi.priceToCoordinate(100); ownPaneMax(t != null && y >= t - 6 ? 'rsi' : 'main');
+}
+function initPanes(el) {
+  const skip = e => e.target.closest('button, .legs, .cmenu, .hray, [data-ray], .rh, .ctool') || own.measuring || own.rayTool || own.meas;
+  el.addEventListener('dblclick', e => { if (skip(e)) return; ownPaneDbl(e.clientY - el.getBoundingClientRect().top); });
+  let tap = null;   /* touch: two quick taps in place (iOS sends no dblclick here) */
+  el.addEventListener('pointerup', e => {
+    if (e.pointerType === 'mouse' || skip(e)) { tap = null; return; }
+    const now = Date.now();
+    if (tap && now - tap.t < 320 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 24) { tap = null; ownPaneDbl(e.clientY - el.getBoundingClientRect().top); } else tap = { t: now, x: e.clientX, y: e.clientY };
+  });
+  el.querySelector('[data-rmax]').addEventListener('click', e => { e.stopPropagation(); ownPaneMax(own.paneMax === 'rsi' ? null : 'rsi'); });
+  const rh = el.querySelector('.rh');
+  rh.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation(); rh.setPointerCapture(e.pointerId);
+    const move = ev => {
+      const r = el.getBoundingClientRect(), paneH = r.height - own.chart.timeScale().height(); if (paneH <= 0) return;
+      const H = Math.min(0.7, Math.max(0.12, 1.02 - (ev.clientY - r.top + 6) / paneH));
+      state.chartOpts = { ...chartOpts(), rsiH: +H.toFixed(3) }; ownPanes(); ownCountdown();
+    };
+    const up = () => { rh.removeEventListener('pointermove', move); rh.removeEventListener('pointerup', up); rh.removeEventListener('pointercancel', up); save(); };
+    rh.addEventListener('pointermove', move); rh.addEventListener('pointerup', up); rh.addEventListener('pointercancel', up);
+  });
+}
+function ownRsiBand() {
+  const bx = $('rsiband'); if (!bx) return;
+  const top = own.active && own.rsiVals?.length && chartOpts().rsi && own.paneMax !== 'main' ? own.rsi.priceToCoordinate(100) : null;
+  if (top == null) { bx.hidden = true; return; }
+  const z1 = own.rsi.priceToCoordinate(70), z2 = own.rsi.priceToCoordinate(30), z = bx.querySelector('i');
+  bx.hidden = false; bx.classList.toggle('max', !!own.paneMax); const mb = bx.querySelector('.rmax'); mb.title = own.paneMax ? 'Restore (or double-click)' : 'Maximize RSI (or double-click it)'; bx.style.top = (top - 6) + 'px'; bx.style.right = own.chart.priceScale('right').width() + 'px';
+  z.style.top = (z1 - top + 6) + 'px'; z.style.height = Math.max(0, z2 - z1) + 'px';
+  const b = own.hoverBar || own.last, i = b && own.data ? own.data.indexOf(b) : -1, v = rsiAt(i < 0 ? own.data.length - 1 : i);
+  const t = v == null ? '–' : v.toFixed(1), el = bx.querySelector('b'); if (el.textContent !== t) el.textContent = t;
 }
 // OHLC of the bar under the pointer (else the latest) and its change from the previous close, right of the intervals
 // (desktop, own chart; chart option "OHLC").
@@ -1989,7 +2085,7 @@ function ownOhlc() {
   const cv = $('cover'), lg = $('legs'); if (cv && lg) lg.style.top = Math.max(54, cv.offsetTop + cv.offsetHeight + 6) + 'px';   // the legend sits below the (maybe two-line) cover
 }
 function ownVolLegend() {
-  ownOhlc();
+  ownOhlc(); ownRsiBand();
   const box = $('legs'); if (!box) return;
   const b = own.hoverBar || own.last;
   box.hidden = !own.active || !b; if (box.hidden) return;
@@ -1998,6 +2094,7 @@ function ownVolLegend() {
     const k = row.dataset.leg, v = row.querySelector('b'); row.classList.toggle('off', !o[k]);
     if (k === 'volume') { v.textContent = fmtVol(b.vol); v.className = b.close >= b.open ? 'up' : 'down'; }
     else if (k === 'hilo') { const h = own.hiloVals; v.innerHTML = h ? `<span class="up">${fmtPrice(h[0])}</span> <span class="down">${fmtPrice(h[1])}</span>` : '–'; v.className = ''; v.style.color = ''; }
+    else if (k === 'rsi') { const r = rsiAt(i < 0 ? (own.data?.length || 0) - 1 : i); v.textContent = r == null ? '–' : r.toFixed(1); v.className = ''; v.style.color = RSI_COLOR; }
     else { const s = SMAS.find(x => x[0] === k), val = smaAt(s[1], i < 0 ? (own.data?.length || 0) - 1 : i); v.textContent = val == null ? '–' : fmtPrice(val); v.className = ''; v.style.color = s[2]; }
   }
 }
@@ -2032,6 +2129,7 @@ const CHART_OPTS = [
   ['sma20', 'SMA 20', '20-bar simple moving average (amber).'],
   ['sma50', 'SMA 50', '50-bar simple moving average (blue).'],
   ['sma200', 'SMA 200', '200-bar simple moving average (pink).'],
+  ['rsi', 'RSI 14', 'Relative Strength Index (14 bars) in a band along the bottom, 70 / 30 marked.'],
   ['ohlc', 'OHLC', 'Open, high, low, close and % change of the bar under the pointer (else the latest), next to the intervals.'],
 ];
 const SESSION_OPTS = [['regular', 'Regular only', 'Just the main session.'], ['extended', 'Extended', 'Pre- and post-market too.'], ['24h', '24 hours', 'Extended plus overnight trading (US stocks, 20:00–04:00 ET).']];
@@ -2040,6 +2138,7 @@ function setChartOpt(k, on) {
   if (k === 'session') { if (own.active) ownRequest(state.symbol, state.interval); }
   else if (k === 'volume') { own.vol?.setData(on && own.data ? own.data.map(volBar) : []); ownVolLegend(); }
   else if (SMAS.some(x => x[0] === k)) { ownSma(true); ownVolLegend(); }
+  else if (k === 'rsi') { ownRsi(true); ownVolLegend(); }
   else if (k === 'hilo') { ownHiLo(); ownVolLegend(); }
   else if (k === 'ohlc') ownOhlc();
   else if (k === 'earnings') ownEarnings();
@@ -2056,6 +2155,7 @@ const CHART_TOOLS = [
   ['sma20', 'SMA 20', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#f7a600"/>', '<b>20</b>')],
   ['sma50', 'SMA 50', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#4f8cff"/>', '<b>50</b>')],
   ['sma200', 'SMA 200', TI('<path d="M3 16c4-6 8-7 18-9" stroke="#ec407a"/>', '<b>200</b>')],
+  ['rsi', 'RSI 14', TI('<path d="M3 15l4-5 4 4 4-7 6 8" stroke="#7e57c2"/>', '<b>RSI</b>')],
   ['hilo', 'Visible high / low', TI('<path d="M12 3v8M8 7l4-4 4 4M12 21v-8M8 17l4 4 4-4"/>')],
   ['earnings', 'Earnings markers', TI('<circle cx="12" cy="12" r="9"/><path d="M14.5 8h-5v8h5M9.5 12h4"/>')],
   ['sessions', 'Session shading', TI('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1" opacity=".5"/><rect x="16" y="4" width="5" height="16" rx="1"/>')],
