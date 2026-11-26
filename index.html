@@ -200,13 +200,16 @@
   .sessbg { position: absolute; left: var(--tb, 0px); top: 0; bottom: 27px; right: 70px; z-index: 1; pointer-events: none; overflow: hidden; }
   .sessbg i { position: absolute; top: 0; bottom: 0; }
   /* RSI band along the bottom of our chart (chart option "RSI 14"): a divider at its top, the 70–30 zone tinted, name + value at the left */
-  .rsiband { position: absolute; left: var(--tb, 0px); right: 70px; height: 0; z-index: 3; pointer-events: none; border-top: 1px solid var(--line); }
+  .rsiband { position: absolute; left: var(--tb, 0px); right: 70px; height: 0; z-index: 3; pointer-events: none; border-top: 1px solid var(--line); box-sizing: border-box; }
+  .rsiband .rax { position: absolute; left: 100%; top: -1px; bottom: 0; pointer-events: auto; background: var(--bg); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }   /* covers the candles' axis in the band */
+  .rsiband .rax s, .rsiband .rax u { position: absolute; left: 0; right: 0; transform: translateY(-50%); padding-left: 7px; font-size: 11px; line-height: 16px; text-decoration: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rsiband .rax u { color: #fff; background: #7e57c2; border-radius: 3px 0 0 3px; }
   .rsiband i { position: absolute; left: 0; right: 0; background: rgba(126, 87, 194, .08); }
   .rsiband span { position: absolute; left: 8px; top: 3px; font-size: 11px; line-height: 14px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .rsiband span b { margin-left: 5px; font-weight: 500; color: #7e57c2; }
   .rsiband .rh { position: absolute; left: 0; right: 0; top: -6px; height: 11px; pointer-events: auto; cursor: ns-resize; touch-action: none; }
   .rsiband .rh:hover, .rsiband .rh:active { background: linear-gradient(transparent 4px, var(--accent) 4px, var(--accent) 6px, transparent 6px); opacity: .7; }
-  .rsiband.max .rh { display: none; } .rsiband.max { border-top-color: transparent; }
+  .rsiband.max .rh { display: none; } .rsiband.max, .rsiband.max .rax { border-top-color: transparent; } .rsiband.max span { display: none; }   /* the cover sits there; the legend row has the value */
   .rsiband .rmax { position: absolute; right: 6px; top: 3px; width: 24px; height: 22px; border-radius: 5px; display: flex; align-items: center; justify-content: center; pointer-events: auto; color: var(--muted); }
   .rsiband .rmax svg { width: 13px; height: 13px; } .rsiband .rmax:hover { background: var(--bg3); color: var(--text); }
   .rsiband.max .rmax { color: var(--accent); }
@@ -902,7 +905,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '18.5';  // bump on every push to main
+const APP_VERSION = '18.6';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1746,7 +1749,7 @@ async function showOwnChart(sym) {
     own.rsi = own.chart.addLineSeries({ color: RSI_COLOR, lineWidth: 1, priceScaleId: 'rsi', priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) });
     own.chart.priceScale('rsi').applyOptions({ scaleMargins: { top: 0.76, bottom: 0.03 }, visible: false });
     for (const price of [70, 30]) own.rsi.createPriceLine({ price, color: 'rgba(120, 123, 134, .55)', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
-    el.insertAdjacentHTML('beforeend', '<div class="rsiband" id="rsiband" hidden><i></i><span>RSI 14<b></b></span><em class="rh" title="Drag to resize"></em><button class="rmax" data-rmax title="Maximize RSI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button></div>');
+    el.insertAdjacentHTML('beforeend', '<div class="rsiband" id="rsiband" hidden><i></i><span>RSI 14<b></b></span><em class="rh" title="Drag to resize"></em><div class="rax"></div><button class="rmax" data-rmax title="Maximize RSI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button></div>');
     initPanes(el);
     own.chart.subscribeCrosshairMove(p => { own.cross = p?.point || null; own.hoverBar = p?.time != null ? own.data?.find(b => b.time === p.time) : null; ownVolLegend(); ownCrossLabel(p); });
     el.insertAdjacentHTML('beforeend', '<div class="xlabel" id="xlabel" hidden></div>');
@@ -1792,9 +1795,9 @@ function ownRequest(sym, iv) {
 // Crosshair price on the axis, drawn by us so it sits above the last-price label and the line tags (canvas labels can't).
 function ownCrossLabel(p) {
   const x = $('xlabel'); if (!x) return;
-  const y = p?.point?.y, price = y != null ? own.series.coordinateToPrice(y) : null;
+  const y = p?.point?.y, inRsi = y != null && own.rsiTop != null && y >= own.rsiTop, price = y == null ? null : inRsi ? own.rsi.coordinateToPrice(y) : own.series.coordinateToPrice(y);
   if (price == null || !own.active) { x.hidden = true; return; }
-  x.textContent = fmtPrice(price); x.style.top = (y - 9) + 'px'; x.style.width = own.chart.priceScale('right').width() + 'px'; x.hidden = false;
+  x.textContent = inRsi ? (+price).toFixed(2) : fmtPrice(price); x.style.top = (y - 9) + 'px'; x.style.width = own.chart.priceScale('right').width() + 'px'; x.hidden = false;
 }
 // Highest / lowest bar of the visible range: a small triangle + price pill above / below that bar (chart option "Visible
 // high / low"). Drawn as our own overlays so they match the price label, repositioned whenever the chart moves.
@@ -2015,9 +2018,10 @@ function ownPanes() {
   if (!own.chart || !own.rsi) return;
   const on = !!chartOpts().rsi; if (!on) own.paneMax = null;
   const max = own.paneMax, H = rsiH(), split = on && !max, main = max !== 'rsi';   /* max: null | 'main' | 'rsi' */
-  own.chart.priceScale('right').applyOptions({ scaleMargins: split ? { top: 0.1, bottom: H + 0.05 } : { top: 0.2, bottom: 0.1 } });
-  own.chart.priceScale('vol').applyOptions({ scaleMargins: split ? { top: Math.max(0.05, 0.83 - H), bottom: H + 0.05 } : { top: 0.8, bottom: 0 } });
-  own.chart.priceScale('rsi').applyOptions({ scaleMargins: max === 'rsi' ? { top: 0.08, bottom: 0.05 } : { top: 1 - H + 0.02, bottom: 0.03 } });
+  /* no gaps: the volume stands on the divider (at 1 − H), the RSI's 100 / 0 sit just inside its band */
+  own.chart.priceScale('right').applyOptions({ scaleMargins: split ? { top: 0.1, bottom: H + 0.02 } : { top: 0.2, bottom: 0.1 } });
+  own.chart.priceScale('vol').applyOptions({ scaleMargins: split ? { top: Math.max(0.05, 0.86 - H), bottom: H } : { top: 0.8, bottom: 0 } });
+  own.chart.priceScale('rsi').applyOptions({ scaleMargins: max === 'rsi' ? { top: 0.04, bottom: 0.02 } : { top: 1 - H + 0.03, bottom: 0.015 } });
   for (const s of [own.series, own.vol, ...(own.sma || [])]) s.applyOptions({ visible: main });
   own.rsi.applyOptions({ visible: on && max !== 'main' });
   $('ownChart').classList.toggle('rsimax', max === 'rsi');
@@ -2043,7 +2047,7 @@ function initPanes(el) {
     e.preventDefault(); e.stopPropagation(); rh.setPointerCapture(e.pointerId);
     const move = ev => {
       const r = el.getBoundingClientRect(), paneH = r.height - own.chart.timeScale().height(); if (paneH <= 0) return;
-      const H = Math.min(0.7, Math.max(0.12, 1.02 - (ev.clientY - r.top + 6) / paneH));
+      const H = Math.min(0.7, Math.max(0.12, 1 - (ev.clientY - r.top) / paneH));
       state.chartOpts = { ...chartOpts(), rsiH: +H.toFixed(3) }; ownPanes(); ownCountdown();
     };
     const up = () => { rh.removeEventListener('pointermove', move); rh.removeEventListener('pointerup', up); rh.removeEventListener('pointercancel', up); save(); };
@@ -2052,13 +2056,22 @@ function initPanes(el) {
 }
 function ownRsiBand() {
   const bx = $('rsiband'); if (!bx) return;
-  const top = own.active && own.rsiVals?.length && chartOpts().rsi && own.paneMax !== 'main' ? own.rsi.priceToCoordinate(100) : null;
-  if (top == null) { bx.hidden = true; return; }
-  const z1 = own.rsi.priceToCoordinate(70), z2 = own.rsi.priceToCoordinate(30), z = bx.querySelector('i');
-  bx.hidden = false; bx.classList.toggle('max', !!own.paneMax); const mb = bx.querySelector('.rmax'); mb.title = own.paneMax ? 'Restore (or double-click)' : 'Maximize RSI (or double-click it)'; bx.style.top = (top - 6) + 'px'; bx.style.right = own.chart.priceScale('right').width() + 'px';
-  z.style.top = (z1 - top + 6) + 'px'; z.style.height = Math.max(0, z2 - z1) + 'px';
+  const show = own.active && own.rsiVals?.length && chartOpts().rsi && own.paneMax !== 'main' && own.rsi.priceToCoordinate(100) != null;
+  if (!show) { bx.hidden = true; own.rsiTop = null; return; }
+  const el = $('ownChart'), paneH = el.clientHeight - own.chart.timeScale().height(), top = own.paneMax === 'rsi' ? 0 : Math.round(paneH * (1 - rsiH()));
+  own.rsiTop = top;   /* the divider; ownCrossLabel reads RSI below it */
+  const y = v => own.rsi.priceToCoordinate(v) - top, z = bx.querySelector('i'), axw = own.chart.priceScale('right').width();
+  bx.hidden = false; bx.classList.toggle('max', !!own.paneMax); bx.querySelector('.rmax').title = own.paneMax ? 'Restore (or double-click)' : 'Maximize RSI (or double-click it)';
+  bx.style.top = top + 'px'; bx.style.height = (paneH - top) + 'px'; bx.style.right = axw + 'px';
+  z.style.top = y(70) + 'px'; z.style.height = Math.max(0, y(30) - y(70)) + 'px';
   const b = own.hoverBar || own.last, i = b && own.data ? own.data.indexOf(b) : -1, v = rsiAt(i < 0 ? own.data.length - 1 : i);
-  const t = v == null ? '–' : v.toFixed(1), el = bx.querySelector('b'); if (el.textContent !== t) el.textContent = t;
+  const t = v == null ? '–' : v.toFixed(1), lb = bx.querySelector('span b'); if (lb.textContent !== t) lb.textContent = t;
+  /* its own 0–100 axis over the candles' axis in the band: 100 / 70 / 50 / 30 / 0 and the latest value as a purple tag */
+  const ax = bx.querySelector('.rax'); ax.style.width = axw + 'px';
+  const last = own.rsiVals[own.rsiVals.length - 1].value, h = paneH - top;
+  const ticks = [100, 70, 50, 30, 0].filter(k => y(k) >= 7 && y(k) <= h - 7 && Math.abs(y(k) - y(last)) > 14);
+  const html = ticks.map(k => `<s style="top:${y(k).toFixed(1)}px">${k}</s>`).join('') + `<u style="top:${y(last).toFixed(1)}px">${last.toFixed(2)}</u>`;
+  if (ax.dataset.h !== html) { ax.dataset.h = html; ax.innerHTML = html; }
 }
 // OHLC of the bar under the pointer (else the latest) and its change from the previous close, right of the intervals
 // (desktop, own chart; chart option "OHLC").
