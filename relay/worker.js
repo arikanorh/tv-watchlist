@@ -112,7 +112,7 @@ async function livePrices(syms) {
     if (ph === 'closed') continue;
     const fresh = (t, start) => !t || t >= since(start);
     if (ph === 'open') { if (fresh(r.lp_time, 570)) { out[s] = r.lp; dayChg[s] = r.chp; } continue; }
-    if (night) { const b = raw[boats(s)]; if (b?.lp != null && !NON_EQUITY.has(r.type)) { out[s] = b.lp; dayChg[s] = (b.lp - r.lp) / r.lp * 100; } else if (r.rtc != null && fresh(r.rtc_time, 960)) { out[s] = r.rtc; dayChg[s] = r.rchp; } continue; }
+    if (night) { const b = raw[boats(s)]; if (b?.lp != null && b.lp_time >= since(1200) && !NON_EQUITY.has(r.type))   /* tonight's print only: a holiday night keeps the previous night's */ { out[s] = b.lp; dayChg[s] = (b.lp - r.lp) / r.lp * 100; } else if (r.rtc != null && fresh(r.rtc_time, 960)) { out[s] = r.rtc; dayChg[s] = r.rchp; } continue; }
     if (r.rtc != null && fresh(r.rtc_time, ph === 'pre' ? 240 : 960)) { out[s] = r.rtc; dayChg[s] = r.rchp; }
   }
   return out;

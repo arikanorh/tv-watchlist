@@ -889,7 +889,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '18.3';  // bump on every push to main
+const APP_VERSION = '18.4';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -1499,6 +1499,9 @@ function wsConnect() {
 const US_EX = new Set(['NASDAQ', 'NYSE', 'AMEX', 'NYSEARCA', 'ARCA', 'BATS']);
 const boatsOf = sym => { const [ex, t] = sym.split(':'); return t && US_EX.has(ex) && !NON_EQUITY.has(raw[sym]?.type) ? 'BOATS:' + t : null; };
 const overnightNow = () => sessionPhase()[0] === 'night';
+/* A BOATS print counts only if it is from tonight's session (20:00 ET on): on a holiday night (Thanksgiving 2026) Blue Ocean
+   doesn't trade and the twin still carries the previous night's last print, which read as the day's move reversed. */
+const boatsFresh = b => b?.lp != null && (b.lp_time || 0) * 1000 >= phaseStartTs() - 90000;
 // After the post-market ends (weekday night without a Blue Ocean print, and the whole weekend) the quote socket sends
 // rtc/rchp as null, but the scanner still has the last post-market close: keep showing it in Ext (blue) until pre-market.
 const extFill = {};
@@ -1532,7 +1535,7 @@ function onQuote(sym, v) {
   if (r.lp == null) return;
   // Extended session: pre-market (amber), post-market (blue), overnight via BOATS (purple).
   const bo = overnightNow() && boatsOf(sym) ? raw[boatsOf(sym)] : null;
-  const night = bo?.lp != null;
+  const night = boatsFresh(bo);
   const ss0 = night ? 'night' : r.current_session === 'pre_market' ? 'pre' : r.current_session === 'post_market' ? 'post'
     : r.current_session !== 'market' && r.rtc != null ? 'night' : '';
   const xf = !night && r.rtc == null && (lastPhase === 'closed' || lastPhase === 'night') ? extFill[sym] : null;
@@ -3307,7 +3310,7 @@ function dataSecHtml(sym, r, q) {
   const t = r.lp_time ? r.lp_time * 1000 : null, age = t ? Date.now() - t : null;
   const stale = !!staleSince(sym);
   const when = t ? `${new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} · ${timeAgo(t)}` : null;
-  const ext = q.ss === 'night' && boatsOf(sym) && raw[boatsOf(sym)]?.lp != null ? 'Blue Ocean (BOATS), overnight' : extFill[sym] && q.ss === 'post' && r.rtc == null ? 'Scanner: last post-market close' : q.ss ? 'Same feed' : null;
+  const ext = q.ss === 'night' && boatsOf(sym) && boatsFresh(raw[boatsOf(sym)]) ? 'Blue Ocean (BOATS), overnight' : extFill[sym] && q.ss === 'post' && r.rtc == null ? 'Scanner: last post-market close' : q.ss ? 'Same feed' : null;
   return dtSec('data', 'Data', stale ? `<span class="down">No trades since ${new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>` : mode,
     kv('Source', src) + kv('Feed', mode) + kv('Prices from', esc(r.exchange || '–')) + kv('Listed on', esc(sym.split(':')[0])) + kv('Last trade', when ? (stale ? `<span class="down">${when}</span>` : when) : null)
     + kv('Extended hours', ext)
