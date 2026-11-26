@@ -905,7 +905,7 @@
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-const APP_VERSION = '18.7';  // bump on every push to main
+const APP_VERSION = '18.8';  // bump on every push to main
 const KEY = 'tvwl.state.v2';
 const INTERVALS = [['1m', '1'], ['5m', '5'], ['15m', '15'], ['30m', '30'], ['1h', '60'], ['4h', '240'], ['1D', 'D'], ['1W', 'W']];
 const intervalLabel = v => INTERVALS.find(x => x[1] === v)?.[0] || (/^\d+$/.test(v) ? (+v < 60 ? v + 'm' : (+v / 60) + 'h') : v);
@@ -2011,13 +2011,13 @@ function ownRsi(full) {
   ownRsiBand();
 }
 // Panes like TradingView's: the RSI band's height is dragged at its divider (chart option rsiH, share of the plot, local);
-// as on TradingView a double-click / double-tap on a pane maximizes it (on the candles: the RSI hides; on the RSI: it fills the
-// plot) and another restores; the band's corner button maximizes / restores the RSI too (own.paneMax, not saved).
+// a double-click / double-tap on the candles turns the RSI on / off (the chart option, so its tool button follows); on the RSI
+// it maximizes it over the plot, another restores; the band's corner button does that too (own.paneMax, not saved).
 const rsiH = () => Math.min(0.7, Math.max(0.12, +chartOpts().rsiH || 0.25));
 function ownPanes() {
   if (!own.chart || !own.rsi) return;
   const on = !!chartOpts().rsi; if (!on) own.paneMax = null;
-  const max = own.paneMax, H = rsiH(), split = on && !max, main = max !== 'rsi';   /* max: null | 'main' | 'rsi' */
+  const max = own.paneMax, H = rsiH(), split = on && !max, main = max !== 'rsi';   /* max: null | 'rsi' */
   /* no gaps: the volume stands on the divider (at 1 − H), the RSI's 100 / 0 sit just inside its band */
   own.chart.priceScale('right').applyOptions({ scaleMargins: split ? { top: 0.1, bottom: H + 0.02 } : { top: 0.2, bottom: 0.1 } });
   own.chart.priceScale('vol').applyOptions({ scaleMargins: split ? { top: Math.max(0.05, 0.86 - H), bottom: H } : { top: 0.8, bottom: 0 } });
@@ -2028,9 +2028,10 @@ function ownPanes() {
 }
 function ownPaneMax(m) { own.paneMax = chartOpts().rsi ? m : null; ownPanes(); ownCountdown(); ownRsiBand(); }
 function ownPaneDbl(y) {   /* y: pointer offset in #ownChart */
-  if (!chartOpts().rsi || !own.rsi) return;
+  if (!own.rsi) return;
   if (own.paneMax) return ownPaneMax(null);
-  const t = own.rsi.priceToCoordinate(100); ownPaneMax(t != null && y >= t - 6 ? 'rsi' : 'main');
+  if (own.rsiTop != null && y >= own.rsiTop) return ownPaneMax('rsi');   /* on the RSI: maximize it */
+  own.paneMax = null; setChartOpt('rsi', !chartOpts().rsi);   /* on the candles: the RSI toggle itself (tool button, legend, settings follow) */
 }
 function initPanes(el) {
   const offPlot = e => { const r = el.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;   /* the time / price axes: a double-click there is the library's auto-fit */
